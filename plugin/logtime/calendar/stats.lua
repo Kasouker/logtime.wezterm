@@ -1,0 +1,1 @@
+-- plugin/logtime/calendar/stats.lua : total, moyenne, meilleur jour, série en cours

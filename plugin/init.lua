@@ -1,0 +1,309 @@
+-- plugin/init.lua : point d'entrée du plugin logtime.
+-- Étape 4 : le compteur dans la barre d'onglets, avec sauvegarde des heures dans .logtime.json.
+--
+-- Ce fichier est chargé par logtime_plugin.lua, qui lui transmet le dossier du plugin :
+--   local logtime = chunk(dossier_du_plugin)
+local wezterm = require("wezterm")
+local sep = package.config:sub(1, 1)
+
+local M = {}
+M.version = "2.0.0-etape4b"
+
+-- ------------------------------------------------------------
+-- Retrouver le dossier du plugin
+-- ------------------------------------------------------------
+-- Un dossier est le bon s'il contient plugin/logtime/core/counter.lua.
+local function is_plugin_dir(dir)
+if type(dir) ~= "string" or dir == "" then
+return false
+end
+local f = io.open(table.concat({ dir, "plugin", "logtime", "core", "counter.lua" }, sep), "rb")
+if f then
+f:close()
+return true
+end
+return false
+end
+
+-- Trois pistes : le dossier transmis par le chargeur (logtime_plugin.lua), la liste des plugins de WezTerm,
+-- puis un dossier "logtime.wezterm" placé dans le dossier de config.
+local function find_plugin_dir(given)
+if is_plugin_dir(given) then
+return given
+end
+local ok, list = pcall(function()
+return wezterm.plugin.list()
+end)
+if ok and type(list) == "table" then
+for _, p in ipairs(list) do
+if is_plugin_dir(p.plugin_dir) then
+return p.plugin_dir
+end
+end
+end
+if type(wezterm.config_dir) == "string" then
+local candidate = wezterm.config_dir .. sep .. "logtime.wezterm"
+if is_plugin_dir(candidate) then
+return candidate
+end
+end
+return nil
+end
+
+local DIR = find_plugin_dir(...)
+if not DIR then
+error("logtime : dossier du plugin introuvable (il doit contenir plugin/logtime/core/counter.lua)", 0)
+end
+
+-- ------------------------------------------------------------
+-- Charger les modules
+-- ------------------------------------------------------------
+local cache = {}
+local function load_module(name)
+if cache[name] == nil then
+local path = table.concat({ DIR, "plugin", "logtime", (name:gsub("/", sep)) .. ".lua" }, sep)
+local f = io.open(path, "rb")
+if not f then
+error("logtime : module introuvable : " .. path, 0)
+end
+local source = f:read("*a")
+f:close()
+local chunk, err = load(source, "@" .. path)
+if not chunk then
+error(err, 0)
+end
+cache[name] = chunk(load_module)
+end
+return cache[name]
+end
+
+local day = load_module("core/day")
+local counter = load_module("core/counter")
+local status = load_module("status/status")
+local storage = load_module("storage/days")
+
+-- Options provisoires : elles iront dans config/defaults.lua à une étape suivante.
+local cfg = {
+normal_gap = 5, -- un écart de 5 s ou moins entre deux mises à jour est du temps normal
+sleep_limit = 3900, -- veille comptée par épisode : 65 min
+settle_time = 60, -- secondes d'utilisation continue avant de rendre le budget de veille
+	day_offset = 0, -- 0 : la journée change à minuit
+	save_every = 10, -- sauvegarde dans le fichier toutes les 10 secondes (s'il y a du nouveau)
+data_file = nil, -- nil : <dossier personnel>/.logtime.json
+}
+
+function M.setup(opts)
+for key, value in pairs(opts or {}) do
+cfg[key] = value
+end
+return M
+end
+
+local function data_path()
+return cfg.data_file or (wezterm.home_dir .. sep .. ".logtime.json")
+end
+
+-- ------------------------------------------------------------
+-- L'état, gardé dans wezterm.GLOBAL (il survit au rechargement de la config, pas à la fermeture de WezTerm)
+-- ------------------------------------------------------------
+-- Deux précautions, apprises sur un vrai WezTerm :
+--   1. Une table lue dans wezterm.GLOBAL n'est pas une vraie table Lua : ses valeurs sont des objets "Value" qui
+--      s'additionnent mais ne se comparent pas à un nombre. On n'y met donc JAMAIS de table : les heures par jour y
+--      sont gardées sous forme de texte (le même que le fichier), et lues dans une vraie table Lua locale.
+--   2. Même un nombre lu dans GLOBAL peut être un objet "Value" : num() le convertit toujours en vrai nombre.
+--
+--   logtime_days_json     : les heures par jour, en texte
+--   logtime_last, logtime_budget, logtime_calm : le comptage
+--   logtime_storage_ready : le fichier a été lu et fusionné dans cette session
+--   logtime_dirty         : il y a du temps compté qui n'est pas encore dans le fichier
+--   logtime_saved         : l'instant de la dernière tentative de sauvegarde
+--   logtime_backup_done   : la copie de sécurité de la session a été faite
+--   logtime_save_failed   : la dernière sauvegarde a échoué (la barre affiche alors un point d'alerte)
+--   logtime_sync_retry_at, logtime_sync_error_logged : nouvelle tentative de lecture du fichier dans une minute
+local G = wezterm.GLOBAL
+
+local function num(v, default)
+	if type(v) == "number" then
+		return v
+	end
+	if v ~= nil then
+		local ok, n = pcall(function()
+			return v + 0
+		end)
+		if ok and type(n) == "number" then
+			return n
+		end
+	end
+	return default
+end
+
+-- L'ancienne version gardait une table dans GLOBAL : on la retire, elle ne sert plus.
+pcall(function()
+G.logtime_days = nil
+end)
+
+-- Les heures par jour de cette session : une vraie table Lua, reconstruite depuis GLOBAL après un rechargement.
+local days_mem = nil
+
+local function get_days()
+if not days_mem then
+local text = G.logtime_days_json
+local decoded = type(text) == "string" and storage.decode(text) or nil
+days_mem = decoded or {}
+if not decoded and G.logtime_storage_ready then
+-- le texte gardé en mémoire est illisible : on relira le fichier plutôt que de repartir de zéro
+G.logtime_storage_ready = false
+end
+end
+return days_mem
+end
+
+local function remember(days)
+G.logtime_days_json = storage.encode(days)
+end
+
+-- Lit le fichier et le fusionne avec ce qui est déjà compté en mémoire : pour chaque jour, la plus grande des deux
+-- valeurs (jamais la somme : on ne risque pas de compter deux fois). Un fichier illisible est mis de côté, jamais écrasé.
+-- Quand la lecture échoue, on réessaie une minute plus tard (pas à chaque seconde) et on ne l'écrit qu'une fois dans les journaux.
+local function sync_failed(now, message)
+G.logtime_sync_retry_at = now + 60
+G.logtime_save_failed = true
+if not G.logtime_sync_error_logged then
+G.logtime_sync_error_logged = true
+wezterm.log_error(message)
+end
+end
+
+local function sync_from_file(now)
+local path = data_path()
+local ok, from_file, state, err = pcall(storage.load, path)
+if not ok then
+sync_failed(now, "logtime : lecture du fichier d'heures impossible : " .. tostring(from_file))
+return
+end
+
+if state == "corrupt" then
+local moved, qerr = storage.quarantine(path)
+if not moved then
+-- impossible de le mettre de côté : on ne l'écrase surtout pas, on compte en mémoire seulement
+sync_failed(now, "logtime : le fichier d'heures est illisible (" .. tostring(err) .. ") et n'a pas pu être mis de côté (" .. tostring(qerr) .. ") : rien n'est sauvegardé")
+return
+end
+wezterm.log_error("logtime : le fichier d'heures était illisible (" .. tostring(err) .. ") : il a été mis de côté dans " .. moved)
+end
+
+local memory = get_days()
+local merged, dirty = {}, false
+for key, secs in pairs(from_file) do
+merged[key] = secs
+end
+for key, secs in pairs(memory) do
+if (merged[key] or 0) < secs then
+merged[key] = secs
+dirty = true
+end
+end
+days_mem = merged
+remember(merged)
+G.logtime_dirty = dirty
+G.logtime_storage_ready = true
+G.logtime_sync_error_logged = false
+G.logtime_save_failed = false
+end
+
+local function maybe_save(now, days)
+if not G.logtime_dirty then
+return
+end
+local last_save = num(G.logtime_saved)
+if last_save and last_save <= now and now - last_save < cfg.save_every then
+return
+end
+
+local path = data_path()
+if not G.logtime_backup_done then
+pcall(storage.backup, path) -- copie de sécurité de l'état d'avant les écritures de la session
+G.logtime_backup_done = true
+end
+
+local ok, saved, err = pcall(storage.save, path, days)
+G.logtime_saved = now
+if ok and saved then
+G.logtime_dirty = false
+G.logtime_save_failed = false
+else
+if not G.logtime_save_failed then
+wezterm.log_error("logtime : sauvegarde impossible : " .. tostring(ok and err or saved))
+end
+G.logtime_save_failed = true
+end
+end
+
+-- ------------------------------------------------------------
+-- Le comptage
+-- ------------------------------------------------------------
+local function compute()
+local now = os.time()
+local days = get_days()
+if not G.logtime_storage_ready then
+local retry_at = num(G.logtime_sync_retry_at)
+if not retry_at or now >= retry_at or retry_at > now + 3600 then
+sync_from_file(now)
+days = get_days()
+end
+end
+
+local last = num(G.logtime_last)
+local state = { budget = num(G.logtime_budget, 0), calm = num(G.logtime_calm, 0) }
+
+if counter.advance(days, last, now, cfg, state) then
+remember(days)
+G.logtime_dirty = true
+end
+G.logtime_budget = state.budget
+G.logtime_calm = state.calm
+
+if not last or now > last then
+G.logtime_last = now
+end
+
+if G.logtime_storage_ready then
+maybe_save(now, days)
+end
+return days[day.key(now, cfg.day_offset)] or 0
+end
+
+-- Les secondes comptées aujourd'hui
+function M.today_seconds()
+local days = get_days()
+return days[day.key(os.time(), cfg.day_offset)] or 0
+end
+
+-- À appeler chaque seconde par la barre d'onglets : fait avancer le compteur et renvoie le texte à afficher.
+-- Une erreur ne doit jamais casser la barre : elle est écrite dans les journaux de WezTerm, une seule fois tant que
+-- c'est la même (et de nouveau si elle revient après un passage normal).
+function M.tick(window)
+local ok, result = pcall(compute)
+if not ok then
+local message = tostring(result)
+if G.logtime_error_message ~= message then
+G.logtime_error_message = message
+wezterm.log_error("logtime : " .. message)
+end
+return "logtime : erreur (voir les journaux)"
+end
+if G.logtime_error_message ~= nil then
+G.logtime_error_message = nil
+end
+local text = status.text(result)
+if G.logtime_save_failed then
+text = text .. " ⚠"
+end
+return text
+end
+
+if wezterm.log_info then
+wezterm.log_info("logtime : version " .. M.version .. " chargée depuis " .. DIR)
+end
+
+return M

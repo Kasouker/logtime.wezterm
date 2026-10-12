@@ -1,0 +1,1 @@
+-- plugin/logtime/system/platform.lua : Windows, macOS, Linux

@@ -1,0 +1,1 @@
+-- plugin/logtime/config/defaults.lua : valeurs par défaut des options

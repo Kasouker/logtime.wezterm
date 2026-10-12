@@ -1,0 +1,1 @@
+-- plugin/logtime/calendar/frame.lua : encadrés : aucun, séparateurs avec fond, case seule, double trait

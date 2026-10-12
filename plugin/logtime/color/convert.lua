@@ -1,0 +1,1 @@
+-- plugin/logtime/color/convert.lua : conversions hex, rgb, hsl et contraste du texte

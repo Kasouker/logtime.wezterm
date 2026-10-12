@@ -1,0 +1,1 @@
+-- plugin/logtime/calendar/layout.lua : où va chaque texte (total, moyenne, meilleur jour, série, objectif)

@@ -1,0 +1,1 @@
+-- plugin/logtime/ui/keytable.lua : les touches d'une page

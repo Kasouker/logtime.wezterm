@@ -1,0 +1,1 @@
+-- plugin/logtime/color/palette.lua : couleurs de la config : la plus pure de chaque teinte

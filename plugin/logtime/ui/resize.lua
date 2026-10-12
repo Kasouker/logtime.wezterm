@@ -1,0 +1,1 @@
+-- plugin/logtime/ui/resize.lua : redessiner au redimensionnement de la fenêtre

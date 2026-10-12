@@ -1,0 +1,23 @@
+
+# tes heures et leurs copies de sécurité : ne jamais publier
+
+.logtime.json
+
+.logtime.json.*
+
+*.bak
+
+*.tmp
+
+*.corrupt-*
+
+# éditeurs et systèmes
+
+*.swp
+
+*~
+
+.DS_Store
+
+Thumbs.db
+

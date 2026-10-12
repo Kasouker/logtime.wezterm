@@ -1,0 +1,1 @@
+-- plugin/logtime/color/gradient.lua : dégradé : 0 h transparent, clair vers foncé jusqu'à 24 h

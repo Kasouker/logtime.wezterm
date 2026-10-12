@@ -1,0 +1,1 @@
+-- plugin/logtime/config/keys.lua : raccourcis (F2, F4)

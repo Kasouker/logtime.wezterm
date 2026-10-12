@@ -1,0 +1,1 @@
+-- plugin/logtime/i18n/en.lua : textes en anglais
