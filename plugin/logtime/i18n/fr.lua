@@ -13,4 +13,6 @@ return {
 	goal_unit = "j",
 	today = "* = aujourd'hui",
 	page_help = "← → ou h l : mois   t : aujourd'hui   r : rafraîchir   q : fermer",
+    too_small = "Fenêtre trop petite",
+    too_small_hint = "Agrandis-la : il faut au moins %d colonnes sur %d lignes.",
 }

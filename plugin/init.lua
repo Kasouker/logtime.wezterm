@@ -7,7 +7,7 @@ local wezterm = require("wezterm")
 local sep = package.config:sub(1, 1)
 
 local M = {}
-M.version = "2.1.0-etape5"
+M.version = "2.2.0-reglages"
 
 -- ------------------------------------------------------------
 -- Retrouver le dossier du plugin
@@ -84,6 +84,7 @@ local storage = load_module("storage/days")
 local platform = load_module("system/platform")
 local calendar_page = load_module("pages/calendar_page")
 local keys = load_module("config/keys")
+local settings = load_module("settings/store")
 
 -- Options provisoires : elles iront dans config/defaults.lua à une étape suivante.
 local cfg = {
@@ -99,11 +100,30 @@ lang = "fr", -- "fr" ou "en"
 open_key = "F2", -- la touche qui ouvre le calendrier
 }
 
-function M.setup(opts)
-for key, value in pairs(opts or {}) do
-cfg[key] = value
+-- Les noms d'options valables en plus de ceux du schéma des réglages (settings/schema.lua).
+local EXTRA_OPTIONS = { "normal_gap", "sleep_limit", "settle_time", "day_offset", "save_every", "data_file", "settings_file", "open_key", "cell_color", "heat", "thresholds" }
+
+-- Le fichier des réglages choisis par l'utilisateur : <dossier personnel>/.logtime_settings.json
+local function settings_path()
+	return cfg.settings_file or (wezterm.home_dir .. sep .. ".logtime_settings.json")
 end
-return M
+
+-- Les réglages, par ordre de priorité croissante : valeurs par défaut du plugin, options de wezterm.lua, fichier de réglages.
+-- Un réglage du fichier qui est inconnu ou incorrect est ignoré et signalé dans les journaux de WezTerm.
+function M.setup(opts)
+	if type(opts) == "table" then
+		for key, value in pairs(opts) do
+			cfg[key] = value
+		end
+	end
+	local saved, _, problems = settings.load(settings_path())
+	for key, value in pairs(saved) do
+		cfg[key] = value
+	end
+	for _, problem in ipairs(problems) do
+		wezterm.log_error("logtime : réglages : " .. problem)
+	end
+	return M
 end
 
 local function data_path()
@@ -344,9 +364,16 @@ end
 --   require("logtime_plugin").apply_to_config(config)
 -- Ajoute la touche qui ouvre le calendrier (F2), les touches de la page et le redessin au redimensionnement.
 -- Une erreur ici ne casse jamais ta configuration : elle est écrite dans les journaux de WezTerm.
-function M.apply_to_config(config, opts)
-local ok, err = pcall(function()
-M.setup(opts)
+function M.apply_to_config(config, opts, ...)
+	local extra = select("#", ...)
+	local ok, err = pcall(function()
+		for _, message in ipairs(settings.check_options(opts, EXTRA_OPTIONS)) do
+			wezterm.log_error("logtime : " .. message)
+		end
+		if extra > 0 then
+			wezterm.log_error("logtime : apply_to_config reçoit deux arguments (config, réglages) ; " .. extra .. " argument(s) en trop ignoré(s). Mets tous tes réglages dans UNE seule table : apply_to_config(config, { ... })")
+		end
+		M.setup(opts)
 local page = calendar_page.create({
 wezterm = wezterm,
 G = G,

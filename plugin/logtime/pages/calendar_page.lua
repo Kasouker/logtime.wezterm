@@ -91,7 +91,16 @@ curve = cfg.gradient_curve,
 			plan = layout.plan(dims.cols, dims.rows, cfg.max_months)
 		end
 		if plan.count <= 1 then
-			return help .. "\n" .. assemble.render_month(ctx.days(), year, month, ctx.today_key(), cfg, labels), 1, layout.BLOCK_WIDTH
+			local text = help .. "\n" .. assemble.render_month(ctx.days(), year, month, ctx.today_key(), cfg, labels)
+			if dims then
+				-- Même un seul mois ne tient pas en entier : un message à la place d'un calendrier coupé.
+				local needed = select(2, text:gsub("\n", "\n")) + 1
+				if (tonumber(dims.cols) or 0) < layout.BLOCK_WIDTH or (tonumber(dims.rows) or 0) < needed then
+					local title, hint = labels.too_small, string.format(labels.too_small_hint, layout.BLOCK_WIDTH, needed)
+					return title .. "\n" .. hint, 0, math.max(layout.visible_width(title), layout.visible_width(hint))
+				end
+			end
+			return text, 1, layout.BLOCK_WIDTH
 		end
 		local days, today = ctx.days(), ctx.today_key()
 		local blocks = {}

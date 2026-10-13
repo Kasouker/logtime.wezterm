@@ -13,4 +13,6 @@ return {
 	goal_unit = "d",
 	today = "* = today",
 	page_help = "← → or h l: month   t: today   r: refresh   q: close",
+    too_small = "Window too small",
+    too_small_hint = "Please enlarge it: at least %d columns by %d rows are needed.",
 }
