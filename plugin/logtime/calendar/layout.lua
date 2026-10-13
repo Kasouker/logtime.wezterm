@@ -103,4 +103,33 @@ while index <= #blocks do
 	return out
 end
 
+-- Centre un texte (une liste de lignes) dans une fenêtre de cols x rows : ajoute des espaces devant chaque ligne et des
+-- lignes vides en haut. body_width est la largeur du calendrier lui-même (c'est lui qu'on centre ; l'aide ou les totaux,
+-- parfois plus larges, dépassent un peu à droite). La marge est réduite si une ligne ne tenait plus dans la fenêtre :
+-- centrer ne doit jamais couper quelque chose qui tenait avant. Une taille inconnue ne donne aucune marge.
+function M.center(lines, body_width, cols, rows)
+local widest = 0
+for _, line in ipairs(lines) do
+widest = math.max(widest, M.visible_width(line))
+end
+local left, top = 0, 0
+cols, rows = tonumber(cols), tonumber(rows)
+if cols then
+left = math.floor((cols - body_width) / 2)
+left = math.max(0, math.min(left, math.floor(cols - widest)))
+end
+if rows then
+top = math.max(0, math.floor((rows - #lines) / 2))
+end
+local out = {}
+for _ = 1, top do
+out[#out + 1] = ""
+end
+local margin = string.rep(" ", left)
+for _, line in ipairs(lines) do
+out[#out + 1] = (line == "") and "" or (margin .. line)
+end
+return out
+end
+
 return M

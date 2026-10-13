@@ -231,7 +231,7 @@ check("F2 : le mois en cours est dessiné", text:find("Logtime : Octobre 2026", 
 check("F2 : tes heures du 10 octobre (4h13) viennent du fichier", text:find("4h13", 1, true) ~= nil, true)
 check("F2 : tes heures du 11 octobre (0h31) viennent du fichier", text:find("0h31", 1, true) ~= nil, true)
 check("F2 : sous Windows, l'onglet est gardé ouvert par ping", e.w.spawned[1].spec.args[3], "ping -n 86400 127.0.0.1>nul")
-check("F2 : la ligne d'aide est en première ligne", text:match("^(.-)\n"), "  Logtime   ← → ou h l : mois   t : aujourd'hui   r : rafraîchir   q : fermer")
+check("F2 : la ligne d'aide est la première ligne affichée (le dessin est centré)", (text:gsub("^\n+", "")):match("^%s*(.-)\n"), "Logtime   ← → ou h l : mois   t : aujourd'hui   r : rafraîchir   q : fermer")
 check("F2 : lire les heures n'écrit rien (rien de nouveau à sauvegarder)", read(e.home .. "/.logtime.json"), HISTORY)
 check("F2 : aucune erreur", #e.w.logs.error, 0)
 

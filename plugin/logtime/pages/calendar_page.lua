@@ -16,7 +16,7 @@ M.TABLE_NAME = "logtime_page"
 --   num(v)        convertit une valeur lue dans GLOBAL en vrai nombre (nil si elle est absente)
 --   days()        les heures par jour (table { ["2026-10-12"] = secondes })
 --   today_key()   la date du jour ("2026-10-12")
---   cfg()         les réglages (week_starts_on, goal_hours, day_offset, max_months, months_anchor...)
+--   cfg()         les réglages (week_starts_on, goal_hours, day_offset, max_months, months_anchor, center...)
 --   labels()      les textes dans la langue choisie
 --   blocker_args() le programme qui garde l'onglet ouvert
 function M.create(ctx)
@@ -56,147 +56,162 @@ local page = {}
 	end
 
 	-- Le texte de la page : une ligne d'aide, puis le ou les mois. Le nombre de mois dépend de la taille de la fenêtre
--- (dims = { cols, rows } ; sans taille, un seul mois). Renvoie le texte et le nombre de mois affichés.
-function page.build_text(dims)
-local labels, cfg = ctx.labels(), ctx.cfg()
-local year, month = selected_month()
-local help = "  " .. labels.title .. "   " .. labels.page_help
-local plan = { count = 1 }
-if dims then
-plan = layout.plan(dims.cols, dims.rows, cfg.max_months)
-end
-if plan.count <= 1 then
-return help .. "\n" .. assemble.render_month(ctx.days(), year, month, ctx.today_key(), cfg, labels), 1
-end
-local days, today = ctx.days(), ctx.today_key()
-local blocks = {}
-for _, shown in ipairs(layout.months(year, month, plan.count, cfg.months_anchor)) do
-local selected = shown.year == year and shown.month == month
-blocks[#blocks + 1] = assemble.month_block(days, shown.year, shown.month, today, cfg, labels, selected)
-end
-local body = layout.arrange(blocks, plan.columns, layout.GAP)
-return help .. "\n\n" .. table.concat(body, "\n") .. "\n\n" .. assemble.legend(cfg, labels), plan.count
-end
+-- (dims = { cols, rows } ; sans taille, un seul mois). Renvoie le texte, le nombre de mois affichés et la largeur
+-- du calendrier (la largeur qu'on centre).
+	function page.build_text(dims)
+		local labels, cfg = ctx.labels(), ctx.cfg()
+		local year, month = selected_month()
+		local help = "  " .. labels.title .. "   " .. labels.page_help
+		local plan = { count = 1 }
+		if dims then
+			plan = layout.plan(dims.cols, dims.rows, cfg.max_months)
+		end
+		if plan.count <= 1 then
+			return help .. "\n" .. assemble.render_month(ctx.days(), year, month, ctx.today_key(), cfg, labels), 1, layout.BLOCK_WIDTH
+		end
+		local days, today = ctx.days(), ctx.today_key()
+		local blocks = {}
+		for _, shown in ipairs(layout.months(year, month, plan.count, cfg.months_anchor)) do
+			local selected = shown.year == year and shown.month == month
+			blocks[#blocks + 1] = assemble.month_block(days, shown.year, shown.month, today, cfg, labels, selected)
+		end
+		local body = layout.arrange(blocks, plan.columns, layout.GAP)
+		local width = plan.columns * layout.BLOCK_WIDTH + (plan.columns - 1) * layout.GAP
+		return help .. "\n\n" .. table.concat(body, "\n") .. "\n\n" .. assemble.legend(cfg, labels), plan.count, width
+	end
 
-local function redraw(pane, first)
-local year, month = selected_month()
-local text, count = page.build_text(dims_of(pane))
-safe.trace(wezterm, string.format("logtime : dessin du mois %d-%02d dans le panneau %s (%d mois)", year, month, tostring(pane:pane_id()), count))
-ui.draw(pane, text, first)
-end
+	-- Le texte, centré dans la fenêtre (réglage center = false pour le garder en haut à gauche).
+	local function centered(text, dims, width)
+		if not dims or ctx.cfg().center == false then
+			return text
+		end
+		local lines = {}
+		for line in (text .. "\n"):gmatch("(.-)\n") do
+			lines[#lines + 1] = line
+		end
+		return table.concat(layout.center(lines, width, dims.cols, dims.rows), "\n")
+	end
 
--- Ce panneau est-il la page ?
-function page.is_page(pane)
-local id = page_id()
-return id ~= nil and pane:pane_id() == id
-end
+	local function redraw(pane, first)
+		local year, month = selected_month()
+		local dims = dims_of(pane)
+		local text, count, width = page.build_text(dims)
+		safe.trace(wezterm, string.format("logtime : dessin du mois %d-%02d dans le panneau %s (%d mois)", year, month, tostring(pane:pane_id()), count))
+		ui.draw(pane, centered(text, dims, width), first)
+	end
 
--- Redessine plus tard, mais seulement si la page existe toujours.
-local function redraw_later(pane_id, delays)
-ui.later(pane_id, delays, function(pane)
+	-- Ce panneau est-il la page ?
+	function page.is_page(pane)
+		local id = page_id()
+		return id ~= nil and pane:pane_id() == id
+	end
+
+	-- Redessine plus tard, mais seulement si la page existe toujours.
+	local function redraw_later(pane_id, delays)
+		ui.later(pane_id, delays, function(pane)
 if page_id() == pane:pane_id() then
-redraw(pane, false)
-end
-end)
-end
+				redraw(pane, false)
+			end
+		end)
+	end
 
--- Ouvre la page dans un nouvel onglet (ou remet devant celle qui existe déjà).
-function page.open(window, pane)
-local existing = ui.find_pane(page_id())
-if existing then
-pcall(function()
-existing:tab():activate()
-end)
-keytable.activate(wezterm, window, existing, M.TABLE_NAME)
-redraw(existing, false)
-return
-end
--- panneau périmé (onglet fermé autrement qu'avec q) : on l'oublie et on ouvre une nouvelle page
+	-- Ouvre la page dans un nouvel onglet (ou remet devant celle qui existe déjà).
+	function page.open(window, pane)
+		local existing = ui.find_pane(page_id())
+		if existing then
+			pcall(function()
+				existing:tab():activate()
+			end)
+			keytable.activate(wezterm, window, existing, M.TABLE_NAME)
+			redraw(existing, false)
+			return
+		end
+		-- panneau périmé (onglet fermé autrement qu'avec q) : on l'oublie et on ouvre une nouvelle page
 G.logtime_page_pane = nil
 
 local tab, page_pane = window:mux_window():spawn_tab({
 domain = { DomainName = "local" },
 args = ctx.blocker_args(),
-})
-pcall(function()
-tab:activate()
-end)
+		})
+		pcall(function()
+			tab:activate()
+		end)
 
-G.logtime_page_pane = page_pane:pane_id()
-G.logtime_page_year, G.logtime_page_month = current_month()
-safe.trace(wezterm, "logtime : page ouverte dans le panneau " .. tostring(page_pane:pane_id()))
+		G.logtime_page_pane = page_pane:pane_id()
+		G.logtime_page_year, G.logtime_page_month = current_month()
+		safe.trace(wezterm, "logtime : page ouverte dans le panneau " .. tostring(page_pane:pane_id()))
 
-redraw(page_pane, true)
-redraw_later(page_pane:pane_id(), { 0.4, 1.2 })
-keytable.activate(wezterm, window, page_pane, M.TABLE_NAME)
-end
+		redraw(page_pane, true)
+		redraw_later(page_pane:pane_id(), { 0.4, 1.2 })
+		keytable.activate(wezterm, window, page_pane, M.TABLE_NAME)
+	end
 
-local function show(year, month, pane)
-if year < 1970 or year > 2200 then
-return
-end
-G.logtime_page_year, G.logtime_page_month = year, month
-redraw(pane, false)
-end
+	local function show(year, month, pane)
+		if year < 1970 or year > 2200 then
+			return
+		end
+		G.logtime_page_year, G.logtime_page_month = year, month
+		redraw(pane, false)
+	end
 
-local function shift_month(delta)
-return function(window, pane)
-local year, month = selected_month()
-month = month + delta
-if month < 1 then
-month, year = 12, year - 1
-elseif month > 12 then
-month, year = 1, year + 1
-end
-show(year, month, pane)
-end
-end
+	local function shift_month(delta)
+		return function(window, pane)
+			local year, month = selected_month()
+			month = month + delta
+			if month < 1 then
+				month, year = 12, year - 1
+			elseif month > 12 then
+				month, year = 1, year + 1
+			end
+			show(year, month, pane)
+		end
+	end
 
-local function go_today(window, pane)
-local year, month = current_month()
-show(year, month, pane)
-end
+	local function go_today(window, pane)
+		local year, month = current_month()
+		show(year, month, pane)
+	end
 
-local function refresh(window, pane)
-redraw(pane, false)
-end
+	local function refresh(window, pane)
+		redraw(pane, false)
+	end
 
-local function close(window, pane)
-G.logtime_page_pane = nil
-keytable.leave(wezterm, window, pane)
-window:perform_action(act.CloseCurrentTab({ confirm = false }), pane)
-end
+	local function close(window, pane)
+		G.logtime_page_pane = nil
+		keytable.leave(wezterm, window, pane)
+		window:perform_action(act.CloseCurrentTab({ confirm = false }), pane)
+	end
 
--- Les touches de la page.
-function page.bindings()
-return {
-{ key = "h", run = shift_month(-1) },
-{ key = "LeftArrow", run = shift_month(-1) },
-{ key = "l", run = shift_month(1) },
-{ key = "RightArrow", run = shift_month(1) },
-{ key = "t", run = go_today },
-{ key = "r", run = refresh },
-{ key = "q", run = close },
-{ key = "Escape", run = close },
-}
-end
+	-- Les touches de la page.
+	function page.bindings()
+		return {
+			{ key = "h", run = shift_month(-1) },
+			{ key = "LeftArrow", run = shift_month(-1) },
+			{ key = "l", run = shift_month(1) },
+			{ key = "RightArrow", run = shift_month(1) },
+			{ key = "t", run = go_today },
+			{ key = "r", run = refresh },
+			{ key = "q", run = close },
+			{ key = "Escape", run = close },
+		}
+	end
 
-function page.key_table()
-return keytable.build(wezterm, page.bindings(), page.is_page, "logtime-page")
-end
+	function page.key_table()
+		return keytable.build(wezterm, page.bindings(), page.is_page, "logtime-page")
+	end
 
--- La fenêtre a changé de taille : on redessine la page (tout de suite, puis après les repeints du système).
-function page.on_resize(window, pane)
-local id = page_id()
-local page_pane = ui.find_pane(id)
-if not page_pane then
-return
-end
-redraw(page_pane, false)
-redraw_later(id, { 0.3, 1.0 })
-end
+	-- La fenêtre a changé de taille : on redessine la page (tout de suite, puis après les repeints du système).
+	function page.on_resize(window, pane)
+		local id = page_id()
+		local page_pane = ui.find_pane(id)
+		if not page_pane then
+			return
+		end
+		redraw(page_pane, false)
+		redraw_later(id, { 0.3, 1.0 })
+	end
 
-return page
+	return page
 end
 
 return M
