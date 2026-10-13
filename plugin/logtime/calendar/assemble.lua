@@ -132,7 +132,10 @@ end
 -- La légende des couleurs en une ligne (seulement pour les quatre niveaux par défaut, sinon juste l'étoile)
 local function legend_line(cfg, labels)
 if cfg.cell_color then
-return "  " .. labels.today
+	if cfg.legend_text then
+		return "  " .. cfg.legend_text .. "     " .. labels.today
+	end
+	return "  " .. labels.today
 end
 local t = cfg.thresholds
 local legend = {

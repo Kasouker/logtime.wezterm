@@ -5,6 +5,7 @@ local layout = load("calendar/layout")
 local screen = load("ui/screen")
 local keytable = load("ui/keytable")
 local safe = load("ui/safe")
+local gradient = load("color/gradient")
 
 local M = {}
 
@@ -16,7 +17,7 @@ M.TABLE_NAME = "logtime_page"
 --   num(v)        convertit une valeur lue dans GLOBAL en vrai nombre (nil si elle est absente)
 --   days()        les heures par jour (table { ["2026-10-12"] = secondes })
 --   today_key()   la date du jour ("2026-10-12")
---   cfg()         les réglages (week_starts_on, goal_hours, day_offset, max_months, months_anchor, center...)
+--   cfg()         les réglages (week_starts_on, goal_hours, day_offset, max_months, months_anchor, center, gradient...)
 --   labels()      les textes dans la langue choisie
 --   blocker_args() le programme qui garde l'onglet ouvert
 function M.create(ctx)
@@ -44,6 +45,29 @@ local page = {}
 		return year, month
 	end
 
+	-- Les réglages, avec le dégradé de couleurs si gradient = true : il remplace les quatre niveaux de couleur.
+	-- Un cell_color donné explicitement dans les réglages est prioritaire. gradient_color, gradient_light, gradient_dark,
+	-- gradient_hours et gradient_curve règlent le dégradé (voir color/gradient.lua).
+	local function with_gradient(cfg)
+		if not cfg.gradient or cfg.cell_color then
+			return cfg
+		end
+		local made = gradient.make({
+color = cfg.gradient_color,
+light = cfg.gradient_light,
+dark = cfg.gradient_dark,
+max_hours = cfg.gradient_hours,
+curve = cfg.gradient_curve,
+})
+		local copy = {}
+		for key, value in pairs(cfg) do
+			copy[key] = value
+		end
+		copy.cell_color = made.color
+		copy.legend_text = made.legend()
+		return copy
+	end
+
 	-- La taille de la fenêtre du panneau : { cols, rows } (nil si on ne peut pas la lire).
 	local function dims_of(pane)
 		local ok, dims = pcall(function()
@@ -59,7 +83,7 @@ local page = {}
 -- (dims = { cols, rows } ; sans taille, un seul mois). Renvoie le texte, le nombre de mois affichés et la largeur
 -- du calendrier (la largeur qu'on centre).
 	function page.build_text(dims)
-		local labels, cfg = ctx.labels(), ctx.cfg()
+		local labels, cfg = ctx.labels(), with_gradient(ctx.cfg())
 		local year, month = selected_month()
 		local help = "  " .. labels.title .. "   " .. labels.page_help
 		local plan = { count = 1 }
