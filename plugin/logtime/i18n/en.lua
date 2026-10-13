@@ -12,4 +12,5 @@ return {
 	goal = "Goal reached",
 	goal_unit = "d",
 	today = "* = today",
+	page_help = "← → or h l: month   t: today   r: refresh   q: close",
 }

@@ -12,4 +12,5 @@ return {
 	goal = "Objectif atteint",
 	goal_unit = "j",
 	today = "* = aujourd'hui",
+	page_help = "← → ou h l : mois   t : aujourd'hui   r : rafraîchir   q : fermer",
 }
