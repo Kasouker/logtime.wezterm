@@ -190,7 +190,7 @@ check("100 x 100 : quatre mois empilés", count, 4)
 check("100 x 100 : un mois par rangée", line_of(text, "Juillet 2026") ~= line_of(text, "Août 2026") and line_of(text, "Août 2026") ~= line_of(text, "Septembre 2026"), true)
 text, count = page.build_text({ cols = 400, rows = 25 })
 text = strip(text)
-check("400 x 25 : quatre mois côte à côte sur une seule rangée", count == 4 and line_of(text, "Juillet 2026") == line_of(text, "Octobre 2026"), true)
+check("400 x 25 : cinq mois côte à côte sur une seule rangée", count == 5 and line_of(text, "Juillet 2026") == line_of(text, "Octobre 2026"), true)
 
 -- jamais plus large ni plus haut que la fenêtre
 local fits = true

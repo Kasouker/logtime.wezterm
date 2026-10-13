@@ -6,7 +6,7 @@ M.BLOCK_WIDTH = 65 -- largeur d'un mois (c'est assemble.WIDTH)
 M.BLOCK_HEIGHT = 21 -- hauteur du plus grand mois : titre, en-tête, 6 semaines de 3 lignes, totaux
 M.GAP = 3 -- espaces entre deux mois côte à côte
 M.RESERVED_ROWS = 4 -- lignes prises par l'aide (1), une ligne vide, une ligne vide, la légende (1)
-M.MAX_MONTHS = 4 -- nombre de mois affichés au maximum, même dans une très grande fenêtre
+M.MAX_MONTHS = 12 -- nombre de mois affichés au maximum : par défaut autant que la fenêtre peut en contenir, jusqu'à une année entière
 
 local function strip_ansi(text)
 return (text:gsub("\27%[[%?%d;]*%a", ""))

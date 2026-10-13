@@ -266,7 +266,7 @@ raw_text, count, width = page.build_text({ cols = 140, rows = 60 })
 check("build_text avec taille : le texte lui-même n'est pas centré (c'est le dessin qui le fait)", lines_of(raw_text)[1]:sub(1, 11), "  Logtime  ")
 check("build_text : quatre mois, 2 x 65 + 3 de largeur", count == 4 and width == 133, true)
 raw_text, count, width = page.build_text({ cols = 400, rows = 25 })
-check("build_text : quatre mois sur une rangée, 4 x 65 + 3 x 3 de largeur", count == 4 and width == 269, true)
+check("build_text : cinq mois sur une rangée, 5 x 65 + 4 x 3 de largeur", count == 5 and width == 337, true)
 
 -- plusieurs mois : 2 x 2 dans 140 x 60
 w, page, pane = open({}, 140, 60)
