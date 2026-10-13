@@ -3,6 +3,7 @@ local load = ...
 local assemble = load("calendar/assemble")
 local screen = load("ui/screen")
 local keytable = load("ui/keytable")
+local safe = load("ui/safe")
 
 local M = {}
 
@@ -51,6 +52,8 @@ return "  " .. labels.title .. "   " .. labels.page_help .. "\n" .. calendar
 end
 
 local function redraw(pane, first)
+local year, month = selected_month()
+safe.trace(wezterm, string.format("logtime : dessin du mois %d-%02d dans le panneau %s", year, month, tostring(pane:pane_id())))
 ui.draw(pane, page.build_text(), first)
 end
 
@@ -93,6 +96,7 @@ end)
 
 G.logtime_page_pane = page_pane:pane_id()
 G.logtime_page_year, G.logtime_page_month = current_month()
+safe.trace(wezterm, "logtime : page ouverte dans le panneau " .. tostring(page_pane:pane_id()))
 
 redraw(page_pane, true)
 redraw_later(page_pane:pane_id(), { 0.4, 1.2 })

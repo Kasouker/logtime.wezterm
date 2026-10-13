@@ -19,7 +19,7 @@ function M.apply(config, wezterm, opts)
 key = opts.open_key,
 action = wezterm.action_callback(safe.wrap(wezterm, "ouverture", function(window, pane)
 opts.page.open(window, pane)
-end)),
+end, true)),
 })
 
 	config.key_tables = config.key_tables or {}
