@@ -45,11 +45,11 @@ local page = {}
 		return year, month
 	end
 
-	-- Les réglages, avec le dégradé de couleurs si gradient = true : il remplace les quatre niveaux de couleur.
+	-- Les réglages, avec le dégradé de couleurs (sauf si gradient = false) : il remplace les quatre niveaux de couleur.
 	-- Un cell_color donné explicitement dans les réglages est prioritaire. gradient_color, gradient_light, gradient_dark,
 	-- gradient_hours et gradient_curve règlent le dégradé (voir color/gradient.lua).
 	local function with_gradient(cfg)
-		if not cfg.gradient or cfg.cell_color then
+		if cfg.gradient == false or cfg.cell_color then
 			return cfg
 		end
 		local made = gradient.make({

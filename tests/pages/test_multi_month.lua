@@ -102,7 +102,7 @@ local function fire(w, action, window, pane)
 end
 local DAYS = { ["2026-10-10"] = 15231, ["2026-10-12"] = 3600, ["2026-09-14"] = 7200, ["2026-08-03"] = 3600, ["2026-07-21"] = 20000 }
 local function new_page(w, cfg, labels)
-	local settings = { week_starts_on = "monday", day_offset = 0 }
+	local settings = { week_starts_on = "monday", day_offset = 0, gradient = false }
 	for k, v in pairs(cfg or {}) do
 		settings[k] = v
 	end

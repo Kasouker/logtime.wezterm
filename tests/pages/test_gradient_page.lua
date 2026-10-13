@@ -1,5 +1,5 @@
--- tests/pages/test_gradient_page.lua : teste que la page utilise le dégradé de couleurs quand gradient = true (et
--- seulement alors), avec ses réglages et sa légende. Fausse API WezTerm.
+-- tests/pages/test_gradient_page.lua : teste que la page utilise le dégradé de couleurs par défaut (sauf si gradient = false,
+-- qui rend les quatre niveaux), avec ses réglages et sa légende. Fausse API WezTerm.
 -- Lancer :   lua5.4 tests/pages/test_gradient_page.lua
 local root = (arg and arg[0] or ""):match("^(.*)[/\\]tests[/\\]pages[/\\]test_gradient_page%.lua$") or "."
 
@@ -124,35 +124,40 @@ end
 local HEAT3 = convert.bg("#8C7A4A") -- le fond du niveau « 3 à 6 h » des quatre niveaux, pour 4h13
 
 -- ============================================================
--- par défaut : les quatre niveaux, comme avant
--- ============================================================
-local page = new_page({})
-local raw, n = page.build_text({ cols = 120, rows = 40 })
-check("par défaut : les quatre niveaux (le fond du niveau 3 est là)", raw:find(HEAT3, 1, true) ~= nil, true)
-check("par défaut : la légende des quatre niveaux", strip(raw):find("<1h", 1, true) ~= nil, true)
-page = new_page({ gradient = false })
-raw = page.build_text({ cols = 120, rows = 40 })
-check("gradient = false : comme par défaut", raw:find(HEAT3, 1, true) ~= nil and strip(raw):find("<1h", 1, true) ~= nil, true)
-
--- ============================================================
--- gradient = true : un mois
+-- par défaut : le dégradé
 -- ============================================================
 local made = gradient.make({})
-page = new_page({ gradient = true })
-raw, n = page.build_text({ cols = 120, rows = 40 })
-check("dégradé : un seul mois dans cette fenêtre", n, 1)
-check("dégradé : le fond du 10 octobre (4h13) vient du dégradé", raw:find(convert.bg(made.color(15231)), 1, true) ~= nil, true)
-check("dégradé : le fond du 12 octobre (1h00) vient du dégradé", raw:find(convert.bg(made.color(3600)), 1, true) ~= nil, true)
-check("dégradé : les anciens niveaux ne sont plus utilisés", raw:find(HEAT3, 1, true) == nil, true)
+local page = new_page({})
+local raw, n = page.build_text({ cols = 120, rows = 40 })
+check("par défaut : un seul mois dans cette fenêtre", n, 1)
+check("par défaut : le fond du 10 octobre (4h13) vient du dégradé", raw:find(convert.bg(made.color(15231)), 1, true) ~= nil, true)
+check("par défaut : le fond du 12 octobre (1h00) vient du dégradé", raw:find(convert.bg(made.color(3600)), 1, true) ~= nil, true)
+check("par défaut : les anciens niveaux ne sont plus utilisés", raw:find(HEAT3, 1, true) == nil, true)
 local text_lines = lines_of(strip(raw))
 local legend = text_lines[#text_lines]
-check("dégradé : la légende est la barre du dégradé", legend:sub(1, 5), "  0h ")
-check("dégradé : la légende finit par l'étoile", legend:sub(-15), "* = aujourd'hui")
-check("dégradé : la légende va jusqu'à 24h", legend:find(" 24h", 1, true) ~= nil, true)
-check("dégradé : l'ancienne légende (<1h) a disparu", legend:find("<1h", 1, true), nil)
-check("dégradé : exactement 4 fonds de couleur (2 jours avec du temps, 2 lignes chacun) : rien pour les jours à zéro", count(raw, "\27[48;2;"), 4)
-check("dégradé : la légende utilise des couleurs de texte, pas de fond", count(raw, "\27[38;2;") > 0, true)
+check("par défaut : la légende est la barre du dégradé", legend:sub(1, 5), "  0h ")
+check("par défaut : la légende finit par l'étoile", legend:sub(-15), "* = aujourd'hui")
+check("par défaut : la légende va jusqu'à 24h", legend:find(" 24h", 1, true) ~= nil, true)
+check("par défaut : l'ancienne légende (<1h) a disparu", legend:find("<1h", 1, true), nil)
+check("par défaut : exactement 4 fonds de couleur (2 jours avec du temps, 2 lignes chacun) : rien pour les jours à zéro", count(raw, "\27[48;2;"), 4)
+check("par défaut : la légende utilise des couleurs de texte, pas de fond", count(raw, "\27[38;2;") > 0, true)
+page = new_page({ gradient = true })
+check("gradient = true : identique au réglage par défaut", page.build_text({ cols = 120, rows = 40 }), raw)
+page = new_page({ gradient = nil })
+check("gradient = nil : identique au réglage par défaut", page.build_text({ cols = 120, rows = 40 }), raw)
 
+-- gradient = false : les quatre niveaux, comme avant le dégradé
+page = new_page({ gradient = false })
+local levels = page.build_text({ cols = 120, rows = 40 })
+check("gradient = false : les quatre niveaux (le fond du niveau 3 est là)", levels:find(HEAT3, 1, true) ~= nil, true)
+check("gradient = false : la légende des quatre niveaux", strip(levels):find("<1h", 1, true) ~= nil, true)
+check("gradient = false : aucun fond du dégradé", levels:find(convert.bg(made.color(15231)), 1, true) == nil, true)
+check("gradient = false : plus de barre 0h à 24h", strip(levels):find("0h ", 1, true) == nil, true)
+check("gradient = false : exactement 4 fonds de couleur, comme le dégradé", count(levels, "\27[48;2;"), 4)
+
+-- ============================================================
+-- les réglages du dégradé, sur un mois
+-- ============================================================
 -- les réglages
 page = new_page({ gradient = true, gradient_color = "#3366CC" })
 raw = page.build_text({ cols = 120, rows = 40 })
@@ -180,6 +185,10 @@ check("cell_color explicite : il est utilisé", calls > 0 and raw:find(convert.b
 check("cell_color explicite : le dégradé n'est pas utilisé", raw:find(convert.bg(made.color(15231)), 1, true) == nil, true)
 text_lines = lines_of(strip(raw))
 check("cell_color explicite : légende réduite à l'étoile (pas de barre du dégradé)", text_lines[#text_lines], "  * = aujourd'hui")
+calls = 0
+page = new_page({ cell_color = function(secs) calls = calls + 1; return secs > 0 and "#112233" or nil end })
+raw = page.build_text({ cols = 120, rows = 40 })
+check("cell_color explicite, sans réglage gradient : il est prioritaire sur le dégradé par défaut", calls > 0 and raw:find(convert.bg("#112233"), 1, true) ~= nil and raw:find(convert.bg(made.color(15231)), 1, true) == nil, true)
 
 -- ============================================================
 -- gradient = true : plusieurs mois et dessin complet
@@ -194,17 +203,17 @@ text_lines = lines_of(strip(raw))
 check("dégradé, plusieurs mois : la barre du dégradé est la dernière ligne", text_lines[#text_lines]:sub(1, 5) == "  0h " and text_lines[#text_lines]:sub(-15) == "* = aujourd'hui", true)
 
 local w
-page, w = new_page({ gradient = true })
+page, w = new_page({})
 local win = new_window(w, 120, 40)
 page.open(win, w.new_pane())
 local frame = w.spawned[1].injected[#w.spawned[1].injected]
-check("page ouverte : le dessin envoyé à l'onglet utilise le dégradé", frame:find(convert.bg(made.color(15231)), 1, true) ~= nil, true)
+check("page ouverte par défaut : le dessin envoyé à l'onglet utilise le dégradé", frame:find(convert.bg(made.color(15231)), 1, true) ~= nil, true)
 check("page ouverte : aucune erreur", #w.logs.error, 0)
-page, w = new_page({})
+page, w = new_page({ gradient = false })
 win = new_window(w, 120, 40)
 page.open(win, w.new_pane())
 frame = w.spawned[1].injected[#w.spawned[1].injected]
-check("page ouverte sans dégradé : les quatre niveaux", frame:find(HEAT3, 1, true) ~= nil, true)
+check("page ouverte avec gradient = false : les quatre niveaux", frame:find(HEAT3, 1, true) ~= nil and frame:find(convert.bg(made.color(15231)), 1, true) == nil, true)
 
 -- ============================================================
 -- effets de bord
