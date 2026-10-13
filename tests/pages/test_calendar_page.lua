@@ -41,6 +41,15 @@ local fr = load_module("i18n/fr")
 local en = load_module("i18n/en")
 
 local passed, failed = 0, 0
+-- Comme WezTerm : émettre un événement appelle les gestionnaires dans l'ordre, jusqu'à ce que l'un renvoie false
+local current_w
+local function fire(action, window, pane)
+	for _, handler in ipairs(current_w.events[action.name] or {}) do
+		if handler(window, pane) == false then
+			return
+		end
+	end
+end
 local label = ""
 local function check(name, got, want)
 	name = label .. name
@@ -111,8 +120,10 @@ end
 -- ---- une fausse API WezTerm
 local function new_wezterm()
 	local w = { logs = { error = {} }, events = {}, timers = {}, panes = {}, spawned = {}, GLOBAL = hostile_global(), target_triple = "x86_64-pc-windows-msvc" }
+	current_w = w
 	w.log_error = function(m) w.logs.error[#w.logs.error + 1] = m end
 	w.action = {
+		EmitEvent = function(name) return { kind = "EmitEvent", name = name } end,
 		ActivateKeyTable = function(t) return { kind = "ActivateKeyTable", args = t } end,
 		SendKey = function(t) return { kind = "SendKey", args = t } end,
 		CloseCurrentTab = function(t) return { kind = "CloseCurrentTab", args = t } end,
@@ -189,7 +200,7 @@ local function new_page(w, extra)
 end
 local function binding(page, key)
 	for _, b in ipairs(page.key_table()) do
-		if b.key == key then return b.action.fn end
+		if b.key == key then return function(window, pane) fire(b.action, window, pane) end end
 	end
 end
 local function month_of(w)
@@ -399,7 +410,7 @@ check("keys : la table de touches de la page existe, avec 8 touches", #config.ke
 check("keys : un gestionnaire de redimensionnement est installé", w.events["window-resized"] ~= nil and #w.events["window-resized"], 1)
 check("keys : aucune erreur de configuration", #w.logs.error, 0)
 win = new_window(w)
-config.keys[2].action.fn(win, w.new_pane())
+fire(config.keys[2].action, win, w.new_pane())
 check("keys : F2 ouvre la page", #w.spawned, 1)
 local bare = keys.apply({}, w, { page = page, open_key = "F2", table_name = "t" })
 check("keys : une configuration sans touches ni tables est complétée", #bare.keys == 1 and bare.key_tables.t ~= nil, true)
@@ -419,7 +430,7 @@ w = new_wezterm()
 page = new_page(w)
 config = keys.apply({}, w, { page = page, open_key = "F2", table_name = "logtime_page" })
 win = new_window(w, { spawn_fails = true })
-local ok_press = pcall(config.keys[1].action.fn, win, w.new_pane())
+local ok_press = pcall(fire, config.keys[1].action, win, w.new_pane())
 check("F2 qui échoue : pas de plantage", ok_press, true)
 check("F2 qui échoue : erreur journalisée", #w.logs.error, 1)
 check("F2 qui échoue : notification affichée", #win.toasts, 1)

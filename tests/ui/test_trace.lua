@@ -33,6 +33,15 @@ local platform = load_module("system/platform")
 local fr = load_module("i18n/fr")
 
 local passed, failed = 0, 0
+-- Comme WezTerm : émettre un événement appelle les gestionnaires dans l'ordre, jusqu'à ce que l'un renvoie false
+local current_w
+local function fire(action, window, pane)
+	for _, handler in ipairs(current_w.events[action.name] or {}) do
+		if handler(window, pane) == false then
+			return
+		end
+	end
+end
 local function check(name, got, want)
 	if got == want then
 		passed = passed + 1
@@ -44,11 +53,13 @@ end
 
 local function new_wezterm(with_log_info)
 	local w = { logs = { error = {}, info = {} }, events = {}, timers = {}, panes = {}, spawned = {}, GLOBAL = {} }
+	current_w = w
 	w.log_error = function(m) w.logs.error[#w.logs.error + 1] = m end
 	if with_log_info ~= false then
 		w.log_info = function(m) w.logs.info[#w.logs.info + 1] = m end
 	end
 	w.action = {
+		EmitEvent = function(name) return { kind = "EmitEvent", name = name } end,
 		ActivateKeyTable = function(t) return { kind = "ActivateKeyTable", args = t } end,
 		SendKey = function(t) return { kind = "SendKey", args = t } end,
 		CloseCurrentTab = function(t) return { kind = "CloseCurrentTab", args = t } end,
@@ -151,11 +162,11 @@ w = new_wezterm()
 local page_pane, other_pane = w.new_pane(), w.new_pane()
 local table_ = keytable.build(w, { { key = "h", run = function() end }, { key = "q", run = function() end } }, function(p) return p == page_pane end)
 win = new_window(w)
-table_[1].action.fn(win, page_pane)
+fire(table_[1].action, win, page_pane)
 check("touche dans la page : trois lignes (appelée, touche, terminée)", #w.logs.info, 3)
 check("touche dans la page : la touche, le panneau et « est la page »", w.logs.info[2], "logtime (page) : touche h, panneau " .. page_pane.id .. ", est la page : true")
 check("touche dans la page : terminée", w.logs.info[3], "logtime (page) : terminée")
-table_[2].action.fn(new_window(w), other_pane)
+fire(table_[2].action, new_window(w), other_pane)
 check("touche ailleurs : « est la page : false » est noté", find(w.logs.info, "touche q, panneau " .. other_pane.id .. ", est la page : false"), 1)
 check("touche ailleurs : aucune erreur", #w.logs.error, 0)
 
@@ -171,7 +182,7 @@ check("retrait : tracé", find(w.logs.info, "retirées"), 1)
 w = new_wezterm()
 page_pane = w.new_pane()
 local only = keytable.build(w, { { key = "h", run = function() end } }, function() return true end)
-only[1].action.fn(new_window(w), page_pane)
+fire(only[1].action, new_window(w), page_pane)
 local leaked_text = false
 for _, line in ipairs(w.logs.info) do
 	if line:find("mot de passe", 1, true) then
@@ -187,7 +198,7 @@ w = new_wezterm()
 local page = new_page(w)
 local config = keys.apply({}, w, { page = page, open_key = "F2", table_name = "logtime_page" })
 win = new_window(w)
-config.keys[1].action.fn(win, w.new_pane())
+fire(config.keys[1].action, win, w.new_pane())
 check("F2 : « appelée » et « terminée » sont tracés", find(w.logs.info, "logtime (ouverture) : appelée") == 1 and find(w.logs.info, "logtime (ouverture) : terminée") == 1, true)
 check("F2 : la page ouverte est tracée avec son panneau", find(w.logs.info, "page ouverte dans le panneau " .. w.spawned[1].id), 1)
 check("F2 : le premier dessin est tracé (mois 2026-10)", find(w.logs.info, "dessin du mois 2026-10 dans le panneau " .. w.spawned[1].id) >= 1, true)
@@ -197,7 +208,7 @@ check("F2 : l'activation des touches est tracée", find(w.logs.info, "touches de
 local before = #w.logs.info
 local h = nil
 for _, b in ipairs(config.key_tables.logtime_page) do
-if b.key == "h" then h = b.action.fn end
+if b.key == "h" then h = function(window, pane) fire(b.action, window, pane) end end
 end
 w.GLOBAL.logtime_page_pane = w.spawned[1].id
 h(new_window(w), w.spawned[1])

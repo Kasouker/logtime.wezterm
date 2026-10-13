@@ -29,6 +29,15 @@ local keytable = load_module("ui/keytable")
 local resize = load_module("ui/resize")
 
 local passed, failed = 0, 0
+-- Comme WezTerm : émettre un événement appelle les gestionnaires dans l'ordre, jusqu'à ce que l'un renvoie false
+local current_w
+local function fire(action, window, pane)
+	for _, handler in ipairs(current_w.events[action.name] or {}) do
+		if handler(window, pane) == false then
+			return
+		end
+	end
+end
 local function check(name, got, want)
 	if got == want then
 		passed = passed + 1
@@ -41,10 +50,12 @@ end
 -- ---- une fausse API WezTerm qui se comporte comme la vraie
 local function new_wezterm()
 	local w = { logs = { error = {} }, events = {}, timers = {}, panes = {} }
+	current_w = w
 	w.log_error = function(m)
 		w.logs.error[#w.logs.error + 1] = m
 	end
 	w.action = {
+		EmitEvent = function(name) return { kind = "EmitEvent", name = name } end,
 		ActivateKeyTable = function(t) return { kind = "ActivateKeyTable", args = t } end,
 		SendKey = function(t) return { kind = "SendKey", args = t } end,
 		PopKeyTable = { kind = "PopKeyTable" },
@@ -208,17 +219,17 @@ local table_ = keytable.build(w, {
 }, function(p) return p == page_pane end)
 check("build : une entrée par touche", #table_, 3)
 check("build : les touches, dans l'ordre", table_[1].key .. "," .. table_[2].key .. "," .. table_[3].key, "h,LeftArrow,q")
-check("build : chaque action est un rappel WezTerm", table_[1].action.kind, "callback")
+check("build : chaque action est un rappel WezTerm", table_[1].action.kind, "EmitEvent")
 
 win = new_window()
-table_[2].action.fn(win, page_pane)
+fire(table_[2].action, win, page_pane)
 check("build : dans la page, la touche exécute son action", table.concat(ran, ","), "gauche")
 check("build : dans la page, aucune action WezTerm supplémentaire", #win.performed, 0)
 
 for i, key in ipairs({ "h", "LeftArrow", "q" }) do
 win = new_window()
 local before = #ran
-table_[i].action.fn(win, other_pane)
+fire(table_[i].action, win, other_pane)
 check("build : " .. key .. " ailleurs : touches retirées puis touche rendue", kinds(win), "PopKeyTable,SendKey")
 check("build : " .. key .. " ailleurs : la bonne touche est rendue", win.performed[2].action.args.key, key)
 check("build : " .. key .. " ailleurs : l'action de la page n'est pas exécutée", #ran, before)
@@ -228,11 +239,11 @@ w = new_wezterm()
 local boom_pane = w.new_pane(10)
 local boom = keytable.build(w, { { key = "x", run = function() error("touche cassée") end } }, function() return true end)
 win = new_window()
-boom[1].action.fn(win, boom_pane)
+fire(boom[1].action, win, boom_pane)
 check("build : une erreur dans une touche est signalée (journaux)", #w.logs.error, 1)
 check("build : une erreur dans une touche est signalée (notification)", #win.toasts, 1)
 local picky = keytable.build(w, { { key = "x", run = function() end } }, function() error("is_page cassé") end)
-picky[1].action.fn(new_window(), boom_pane)
+fire(picky[1].action, new_window(), boom_pane)
 check("build : une erreur dans is_page est signalée aussi", #w.logs.error, 2)
 
 win = new_window()

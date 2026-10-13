@@ -39,6 +39,15 @@ io.open = function(path, mode)
 end
 
 local passed, failed = 0, 0
+-- Comme WezTerm : émettre un événement appelle les gestionnaires dans l'ordre, jusqu'à ce que l'un renvoie false
+local current_w
+local function fire(action, window, pane)
+	for _, handler in ipairs(current_w.events[action.name] or {}) do
+		if handler(window, pane) == false then
+			return
+		end
+	end
+end
 local label = ""
 local function check(name, got, want)
 	name = label .. name
@@ -120,9 +129,11 @@ if opts.file ~= false then
 write(home .. "/.logtime.json", opts.file or HISTORY)
 end
 local w = { logs = { error = {}, info = {} }, events = {}, timers = {}, panes = {}, spawned = {}, GLOBAL = hostile_global(), home_dir = home, target_triple = opts.triple or "x86_64-pc-windows-msvc" }
+current_w = w
 w.log_error = function(m) w.logs.error[#w.logs.error + 1] = m end
 w.log_info = function(m) w.logs.info[#w.logs.info + 1] = m end
 w.action = {
+	EmitEvent = function(name) return { kind = "EmitEvent", name = name } end,
 ActivateKeyTable = function(t) return { kind = "ActivateKeyTable", args = t } end,
 SendKey = function(t) return { kind = "SendKey", args = t } end,
 CloseCurrentTab = function(t) return { kind = "CloseCurrentTab", args = t } end,
@@ -178,14 +189,14 @@ end
 local function open_binding(config, key)
 for _, b in ipairs(config.keys or {}) do
 if b.key == key then
-return b.action.fn
+return function(window, pane) fire(b.action, window, pane) end
 end
 end
 end
 local function page_binding(config, key)
 for _, b in ipairs(config.key_tables and config.key_tables.logtime_page or {}) do
 if b.key == key then
-return b.action.fn
+return function(window, pane) fire(b.action, window, pane) end
 end
 end
 end
