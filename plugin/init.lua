@@ -1,5 +1,5 @@
 -- plugin/init.lua : point d'entrée du plugin logtime.
--- Étape 4 : le compteur dans la barre d'onglets, avec sauvegarde des heures dans .logtime.json.
+-- Le compteur dans la barre d'onglets, la sauvegarde des heures dans .logtime.json, et la page du calendrier (touche F2).
 --
 -- Ce fichier est chargé par logtime_plugin.lua, qui lui transmet le dossier du plugin :
 --   local logtime = chunk(dossier_du_plugin)
@@ -7,7 +7,7 @@ local wezterm = require("wezterm")
 local sep = package.config:sub(1, 1)
 
 local M = {}
-M.version = "2.0.0-etape4b"
+M.version = "2.1.0-etape5"
 
 -- ------------------------------------------------------------
 -- Retrouver le dossier du plugin
@@ -81,6 +81,9 @@ local day = load_module("core/day")
 local counter = load_module("core/counter")
 local status = load_module("status/status")
 local storage = load_module("storage/days")
+local platform = load_module("system/platform")
+local calendar_page = load_module("pages/calendar_page")
+local keys = load_module("config/keys")
 
 -- Options provisoires : elles iront dans config/defaults.lua à une étape suivante.
 local cfg = {
@@ -90,6 +93,10 @@ settle_time = 60, -- secondes d'utilisation continue avant de rendre le budget d
 	day_offset = 0, -- 0 : la journée change à minuit
 	save_every = 10, -- sauvegarde dans le fichier toutes les 10 secondes (s'il y a du nouveau)
 data_file = nil, -- nil : <dossier personnel>/.logtime.json
+week_starts_on = "monday", -- ou "sunday"
+goal_hours = nil, -- nombre d'heures par jour qui comptent pour « objectif atteint » (nil : pas d'objectif)
+lang = "fr", -- "fr" ou "en"
+open_key = "F2", -- la touche qui ouvre le calendrier
 }
 
 function M.setup(opts)
@@ -123,11 +130,11 @@ end
 local G = wezterm.GLOBAL
 
 local function num(v, default)
-	if type(v) == "number" then
-		return v
-	end
-	if v ~= nil then
-		local ok, n = pcall(function()
+if type(v) == "number" then
+return v
+end
+if v ~= nil then
+local ok, n = pcall(function()
 			return v + 0
 		end)
 		if ok and type(n) == "number" then
@@ -239,19 +246,25 @@ G.logtime_save_failed = true
 end
 end
 
+-- Lit le fichier d'heures si ce n'est pas encore fait (ou si la dernière tentative a échoué il y a plus d'une minute).
+local function ensure_synced(now)
+if G.logtime_storage_ready then
+return
+end
+local retry_at = num(G.logtime_sync_retry_at)
+if not retry_at or now >= retry_at or retry_at > now + 3600 then
+sync_from_file(now)
+end
+end
+
 -- ------------------------------------------------------------
 -- Le comptage
 -- ------------------------------------------------------------
 local function compute()
 local now = os.time()
 local days = get_days()
-if not G.logtime_storage_ready then
-local retry_at = num(G.logtime_sync_retry_at)
-if not retry_at or now >= retry_at or retry_at > now + 3600 then
-sync_from_file(now)
+ensure_synced(now)
 days = get_days()
-end
-end
 
 local last = num(G.logtime_last)
 local state = { budget = num(G.logtime_budget, 0), calm = num(G.logtime_calm, 0) }
@@ -300,6 +313,62 @@ if G.logtime_save_failed then
 text = text .. " ⚠"
 end
 return text
+end
+
+-- Les heures par jour, à jour (le fichier est lu si ce n'est pas encore fait). La page du calendrier s'en sert.
+local function days_for_page()
+get_days()
+ensure_synced(os.time())
+return get_days()
+end
+
+-- Une copie des heures par jour : { ["2026-10-12"] = secondes, ... }
+function M.days_snapshot()
+local copy = {}
+for key, secs in pairs(days_for_page()) do
+copy[key] = secs
+end
+return copy
+end
+
+-- Les textes dans la langue choisie (le français si la langue demandée n'existe pas).
+local function labels()
+local ok, found = pcall(load_module, "i18n/" .. tostring(cfg.lang))
+if ok then
+return found
+end
+return load_module("i18n/fr")
+end
+
+-- À appeler dans wezterm.lua, APRÈS les autres réglages de touches (keys.lua remplace config.keys) :
+--   require("logtime_plugin").apply_to_config(config)
+-- Ajoute la touche qui ouvre le calendrier (F2), les touches de la page et le redessin au redimensionnement.
+-- Une erreur ici ne casse jamais ta configuration : elle est écrite dans les journaux de WezTerm.
+function M.apply_to_config(config, opts)
+local ok, err = pcall(function()
+M.setup(opts)
+local page = calendar_page.create({
+wezterm = wezterm,
+G = G,
+num = num,
+days = days_for_page,
+today_key = function()
+return day.key(os.time(), cfg.day_offset)
+end,
+cfg = function()
+return cfg
+end,
+labels = labels,
+blocker_args = function()
+return platform.blocker_args(platform.os_name(wezterm.target_triple))
+end,
+})
+keys.apply(config, wezterm, { page = page, open_key = cfg.open_key, table_name = calendar_page.TABLE_NAME })
+end)
+if not ok then
+wezterm.log_error("logtime : apply_to_config a échoué : " .. tostring(err))
+end
+return config
 end
 
 if wezterm.log_info then
