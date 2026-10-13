@@ -381,7 +381,7 @@ count = #page_pane.injected
 page.on_resize(win, w.new_pane())
 check("redimensionnement : la page est redessinée", #page_pane.injected, count + 1)
 local drawn = page_pane.injected[#page_pane.injected]
-check("redimensionnement : à la nouvelle hauteur (8 lignes)", select(2, drawn:gsub("\r\n", "")), 7)
+check("redimensionnement : à 8 lignes, le message « fenêtre trop petite » remplace le calendrier", drawn:find("Fenêtre trop petite", 1, true) ~= nil, true)
 check("redimensionnement : deux redessins différés (0,3 s et 1 s)", #w.timers == 2 and w.timers[1].seconds == 0.3 and w.timers[2].seconds == 1.0, true)
 w.run_timers()
 check("redimensionnement : les redessins différés ont lieu", #page_pane.injected, count + 3)
