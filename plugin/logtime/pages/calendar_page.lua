@@ -1,6 +1,7 @@
 -- plugin/logtime/pages/calendar_page.lua : la page du calendrier (un onglet où l'on change de mois avec les flèches).
 local load = ...
 local assemble = load("calendar/assemble")
+local layout = load("calendar/layout")
 local screen = load("ui/screen")
 local keytable = load("ui/keytable")
 local safe = load("ui/safe")
@@ -15,7 +16,7 @@ M.TABLE_NAME = "logtime_page"
 --   num(v)        convertit une valeur lue dans GLOBAL en vrai nombre (nil si elle est absente)
 --   days()        les heures par jour (table { ["2026-10-12"] = secondes })
 --   today_key()   la date du jour ("2026-10-12")
---   cfg()         les réglages (week_starts_on, goal_hours, day_offset...)
+--   cfg()         les réglages (week_starts_on, goal_hours, day_offset, max_months, months_anchor...)
 --   labels()      les textes dans la langue choisie
 --   blocker_args() le programme qui garde l'onglet ouvert
 function M.create(ctx)
@@ -43,18 +44,45 @@ local page = {}
 		return year, month
 	end
 
-	-- Le texte de la page : une ligne d'aide, puis le mois choisi.
-function page.build_text()
-local labels = ctx.labels()
+	-- La taille de la fenêtre du panneau : { cols, rows } (nil si on ne peut pas la lire).
+	local function dims_of(pane)
+		local ok, dims = pcall(function()
+			return pane:get_dimensions()
+		end)
+		if ok and dims then
+			return { cols = dims.cols, rows = dims.viewport_rows }
+		end
+		return nil
+	end
+
+	-- Le texte de la page : une ligne d'aide, puis le ou les mois. Le nombre de mois dépend de la taille de la fenêtre
+-- (dims = { cols, rows } ; sans taille, un seul mois). Renvoie le texte et le nombre de mois affichés.
+function page.build_text(dims)
+local labels, cfg = ctx.labels(), ctx.cfg()
 local year, month = selected_month()
-local calendar = assemble.render_month(ctx.days(), year, month, ctx.today_key(), ctx.cfg(), labels)
-return "  " .. labels.title .. "   " .. labels.page_help .. "\n" .. calendar
+local help = "  " .. labels.title .. "   " .. labels.page_help
+local plan = { count = 1 }
+if dims then
+plan = layout.plan(dims.cols, dims.rows, cfg.max_months)
+end
+if plan.count <= 1 then
+return help .. "\n" .. assemble.render_month(ctx.days(), year, month, ctx.today_key(), cfg, labels), 1
+end
+local days, today = ctx.days(), ctx.today_key()
+local blocks = {}
+for _, shown in ipairs(layout.months(year, month, plan.count, cfg.months_anchor)) do
+local selected = shown.year == year and shown.month == month
+blocks[#blocks + 1] = assemble.month_block(days, shown.year, shown.month, today, cfg, labels, selected)
+end
+local body = layout.arrange(blocks, plan.columns, layout.GAP)
+return help .. "\n\n" .. table.concat(body, "\n") .. "\n\n" .. assemble.legend(cfg, labels), plan.count
 end
 
 local function redraw(pane, first)
 local year, month = selected_month()
-safe.trace(wezterm, string.format("logtime : dessin du mois %d-%02d dans le panneau %s", year, month, tostring(pane:pane_id())))
-ui.draw(pane, page.build_text(), first)
+local text, count = page.build_text(dims_of(pane))
+safe.trace(wezterm, string.format("logtime : dessin du mois %d-%02d dans le panneau %s (%d mois)", year, month, tostring(pane:pane_id()), count))
+ui.draw(pane, text, first)
 end
 
 -- Ce panneau est-il la page ?
@@ -154,7 +182,7 @@ return {
 end
 
 function page.key_table()
-return keytable.build(wezterm, page.bindings(), page.is_page)
+return keytable.build(wezterm, page.bindings(), page.is_page, "logtime-page")
 end
 
 -- La fenêtre a changé de taille : on redessine la page (tout de suite, puis après les repeints du système).
