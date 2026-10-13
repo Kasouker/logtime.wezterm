@@ -22,11 +22,11 @@ function M.apply(config, wezterm, opts)
 	local open = safe.wrap(wezterm, "ouverture", function(window, pane)
 opts.page.open(window, pane)
 end, true)
-	wezterm.on(M.OPEN_EVENT, function(window, pane)
+	wezterm.on(opts.open_event or M.OPEN_EVENT, function(window, pane)
 open(window, pane)
 return false -- si la config est appliquée deux fois, la page ne s'ouvre qu'une fois
 end)
-	table.insert(config.keys, { key = opts.open_key, action = wezterm.action.EmitEvent(M.OPEN_EVENT) })
+	table.insert(config.keys, { key = opts.open_key, action = wezterm.action.EmitEvent(opts.open_event or M.OPEN_EVENT) })
 
 	config.key_tables = config.key_tables or {}
 	config.key_tables[opts.table_name] = opts.page.key_table()

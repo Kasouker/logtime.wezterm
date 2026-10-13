@@ -85,6 +85,7 @@ local platform = load_module("system/platform")
 local calendar_page = load_module("pages/calendar_page")
 local keys = load_module("config/keys")
 local settings = load_module("settings/store")
+local settings_page = load_module("pages/settings_page")
 
 -- Options provisoires : elles iront dans config/defaults.lua à une étape suivante.
 local cfg = {
@@ -98,10 +99,11 @@ week_starts_on = "monday", -- ou "sunday"
 goal_hours = nil, -- nombre d'heures par jour qui comptent pour « objectif atteint » (nil : pas d'objectif)
 lang = "fr", -- "fr" ou "en"
 open_key = "F2", -- la touche qui ouvre le calendrier
+settings_key = "F4", -- la touche qui ouvre la page de personnalisation
 }
 
 -- Les noms d'options valables en plus de ceux du schéma des réglages (settings/schema.lua).
-local EXTRA_OPTIONS = { "normal_gap", "sleep_limit", "settle_time", "day_offset", "save_every", "data_file", "settings_file", "open_key", "cell_color", "heat", "thresholds" }
+local EXTRA_OPTIONS = { "normal_gap", "sleep_limit", "settle_time", "day_offset", "save_every", "data_file", "settings_file", "settings_key", "open_key", "cell_color", "heat", "thresholds" }
 
 -- Le fichier des réglages choisis par l'utilisateur : <dossier personnel>/.logtime_settings.json
 local function settings_path()
@@ -391,6 +393,29 @@ return platform.blocker_args(platform.os_name(wezterm.target_triple))
 end,
 })
 keys.apply(config, wezterm, { page = page, open_key = cfg.open_key, table_name = calendar_page.TABLE_NAME })
+local settings_view = settings_page.create({
+	wezterm = wezterm,
+	G = G,
+	num = num,
+	cfg = function()
+		return cfg
+	end,
+	labels = labels,
+	blocker_args = function()
+		return platform.blocker_args(platform.os_name(wezterm.target_triple))
+	end,
+	store = settings,
+	settings_path = settings_path,
+	apply = function(changes)
+		for key, value in pairs(changes) do
+			cfg[key] = value
+		end
+	end,
+	refresh_calendar = function(window, pane)
+		page.on_resize(window, pane)
+	end,
+})
+keys.apply(config, wezterm, { page = settings_view, open_key = cfg.settings_key, table_name = settings_page.TABLE_NAME, open_event = "logtime-settings-open" })
 end)
 if not ok then
 wezterm.log_error("logtime : apply_to_config a échoué : " .. tostring(err))

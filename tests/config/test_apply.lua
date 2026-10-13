@@ -216,9 +216,9 @@ local e = new_env()
 local config = { keys = { { key = "d", mods = "CTRL|SHIFT", action = "split" } } }
 local returned = e.M.apply_to_config(config)
 check("apply : renvoie la même configuration", returned, config)
-check("apply : ses touches sont ajoutées à la suite des tiennes", #config.keys == 2 and config.keys[1].key == "d" and config.keys[2].key == "F2", true)
+check("apply : ses touches sont ajoutées à la suite des tiennes (le calendrier F2, puis la personnalisation F4)", #config.keys == 3 and config.keys[1].key == "d" and config.keys[2].key == "F2" and config.keys[3].key == "F4", true)
 check("apply : la table de touches de la page, avec 8 touches", #config.key_tables.logtime_page, 8)
-check("apply : un gestionnaire de redimensionnement", e.w.events["window-resized"] ~= nil and #e.w.events["window-resized"], 1)
+check("apply : un gestionnaire de redimensionnement par page (calendrier et personnalisation)", e.w.events["window-resized"] ~= nil and #e.w.events["window-resized"], 2)
 check("apply : aucune erreur", #e.w.logs.error, 0)
 
 -- F2 avant même le premier tick : les heures viennent du fichier
@@ -295,9 +295,9 @@ cleanup(e)
 
 e = new_env()
 config = e.M.apply_to_config({})
-check("configuration vide : complétée", #config.keys == 1 and config.key_tables.logtime_page ~= nil, true)
+check("configuration vide : complétée (F2 et F4, les deux tables de touches)", #config.keys == 2 and config.key_tables.logtime_page ~= nil and config.key_tables.logtime_settings ~= nil, true)
 e.M.apply_to_config(config)
-check("appliqué deux fois : pas de plantage, la touche en double est signalée", #config.keys == 2 and #e.w.logs.error == 1 and e.w.logs.error[1]:find("F2", 1, true) ~= nil, true)
+check("appliqué deux fois : pas de plantage, les touches en double sont signalées (F2 et F4)", #config.keys == 4 and #e.w.logs.error == 2 and e.w.logs.error[1]:find("F2", 1, true) ~= nil and e.w.logs.error[2]:find("F4", 1, true) ~= nil, true)
 cleanup(e)
 
 -- fichier abîmé : la page s'ouvre quand même (mois vide), le fichier est mis de côté
