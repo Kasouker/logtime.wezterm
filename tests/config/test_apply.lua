@@ -230,6 +230,18 @@ local function new_env(opts)
 		w.panes[pane.id] = pane
 		return pane
 	end
+	-- les plugins installés (wezterm.plugin.list) et tabline.wez (wezterm.plugin.require), pour le compteur automatique
+	w.plugin = {
+		list = function()
+			return opts.plugins or {}
+		end,
+		require = function(url)
+			if opts.tabline and url == opts.tabline.url then
+				return opts.tabline.module
+			end
+			error("plugin inconnu : " .. tostring(url))
+		end,
+	}
 	package.loaded["wezterm"] = w
 	local env = { home = home, w = w }
 	function env.load()
@@ -242,6 +254,10 @@ local function new_env(opts)
 		end
 		function win:toast_notification(title, message)
 			self.toasts[#self.toasts + 1] = message
+		end
+		function win:set_right_status(text)
+			self.right = text
+			self.right_count = (self.right_count or 0) + 1
 		end
 		function win:mux_window()
 			return {
@@ -488,6 +504,193 @@ local function scenarios()
 		end
 	end
 	check("wezterm.GLOBAL : seulement des clés logtime_*", table.concat(foreign, ","), "")
+	cleanup(e)
+
+	-- ============================================================
+	-- le compteur automatique : il compte et s'affiche sans rien à brancher
+	-- ============================================================
+	-- Comme WezTerm : chaque mise à jour appelle les gestionnaires d'update-status, dans l'ordre, tant qu'aucun ne
+	-- renvoie false. Renvoie true si l'un d'eux a renvoyé false (il aurait bloqué tabline.wez).
+	local function update(env, win)
+		local blocked = false
+		for _, handler in ipairs(env.w.events["update-status"] or {}) do
+			if handler(win, env.w.new_pane()) == false then
+				blocked = true
+			end
+		end
+		return blocked
+	end
+	local HMS = "%d%d:%d%d:%d%d"
+
+	-- la barre normale de WezTerm : un nouvel utilisateur, qui n'a rien branché
+	clock.now = T0
+	e = new_env({ file = false })
+	config = e.M.apply_to_config({})
+	check("automatique : une mise à jour par seconde", config.status_update_interval, 1000)
+	check("automatique : un gestionnaire d'update-status", #(e.w.events["update-status"] or {}), 1)
+	local win = e.window()
+	check(
+		"automatique : le gestionnaire ne renvoie jamais false (il bloquerait les autres barres)",
+		update(e, win),
+		false
+	)
+	check(
+		"automatique : le compteur à droite de la barre, tout seul",
+		type(win.right) == "string" and win.right:find(HMS) ~= nil,
+		true
+	)
+	clock.now = T0 + 1
+	update(e, win)
+	check("automatique : sans aucun tick(), le temps compte (1 s)", e.M.today_seconds(), 1)
+	update(e, win)
+	update(e, win)
+	check("automatique : trois mises à jour dans la même seconde comptent une seule fois", e.M.today_seconds(), 1)
+	clock.now = T0 + 2
+	e.M.tick(win)
+	update(e, win)
+	check(
+		"automatique : tick() et la mise à jour dans la même seconde comptent une seule fois",
+		e.M.today_seconds(),
+		2
+	)
+	cleanup(e)
+	-- une barre déjà plus rapide n'est pas ralentie ; une plus lente est accélérée
+	e = new_env({ file = false })
+	check(
+		"automatique : 500 ms gardées",
+		e.M.apply_to_config({ status_update_interval = 500 }).status_update_interval,
+		500
+	)
+	check(
+		"automatique : 5 s ramenées à 1 s",
+		e.M.apply_to_config({ status_update_interval = 5000 }).status_update_interval,
+		1000
+	)
+	cleanup(e)
+
+	-- status = false : rien n'est affiché, mais le temps compte quand même
+	clock.now = T0
+	e = new_env({ file = false })
+	e.M.apply_to_config({}, { status = false })
+	check("status = false : option connue (pas de message d'erreur)", #e.w.logs.error, 0)
+	win = e.window()
+	update(e, win)
+	clock.now = T0 + 1
+	update(e, win)
+	check("status = false : rien dans la barre", win.right, nil)
+	check("status = false : le temps compte quand même", e.M.today_seconds(), 1)
+	cleanup(e)
+
+	-- l'utilisateur affiche déjà le compteur (il appelle tick() dans sa barre) : pas de second compteur
+	clock.now = T0
+	e = new_env({ file = false })
+	e.M.apply_to_config({})
+	win = e.window()
+	e.M.tick(win)
+	update(e, win)
+	check("tick() appelé ailleurs : le plugin n'écrit pas dans la barre", win.right, nil)
+	clock.now = T0 + 3
+	update(e, win)
+	check("tick() appelé il y a 3 s : toujours rien", win.right, nil)
+	clock.now = T0 + 4
+	update(e, win)
+	check("plus de tick() depuis 4 s : le plugin reprend l'affichage", win.right ~= nil, true)
+	cleanup(e)
+
+	-- tabline.wez installé : le compteur s'ajoute à sa barre (après 3 s, le temps de voir si tick() est déjà appelé)
+	local TABLINE = "https://github.com/michaelbrusegard/tabline.wez"
+	local function fake_tabline()
+		local opts = { sections = { tabline_x = {}, tabline_y = { "datetime" } } }
+		return { url = TABLINE, opts = opts, module = {
+			get_config = function()
+				return opts
+			end,
+		} }
+	end
+	clock.now = T0
+	local tl = fake_tabline()
+	e = new_env({
+		file = false,
+		plugins = { { url = "https://github.com/x/autre.wez" }, { url = TABLINE } },
+		tabline = tl,
+	})
+	e.M.apply_to_config({})
+	win = e.window()
+	update(e, win)
+	check("tabline : au démarrage, on attend (rien d'ajouté)", #tl.opts.sections.tabline_x, 0)
+	check("tabline : jamais dans la barre de droite (c'est celle de tabline)", win.right, nil)
+	clock.now = T0 + 3
+	update(e, win)
+	check("tabline : après 3 s, le compteur est ajouté à tabline_x", #tl.opts.sections.tabline_x, 1)
+	check(
+		"tabline : ajouté une fois, c'est noté dans les journaux",
+		#e.w.logs.info >= 1 and e.w.logs.info[#e.w.logs.info]:find("tabline", 1, true) ~= nil,
+		true
+	)
+	local shown = tl.opts.sections.tabline_x[1](win)
+	check("tabline : le compteur ajouté affiche le temps", type(shown) == "string" and shown:find(HMS) ~= nil, true)
+	clock.now = T0 + 4
+	update(e, win)
+	update(e, win)
+	check("tabline : toujours un seul compteur ajouté", #tl.opts.sections.tabline_x, 1)
+	check("tabline : les autres sections ne bougent pas", #tl.opts.sections.tabline_y, 1)
+	clock.now = T0 + 20
+	update(e, win)
+	check(
+		"tabline : le compteur ajouté ne compte pas comme un tick() venu d'ailleurs (il reste)",
+		#tl.opts.sections.tabline_x,
+		1
+	)
+	check("tabline : toujours rien dans la barre de droite", win.right, nil)
+	-- WezTerm réévalue la config (en ouvrant un onglet…) : tabline repart d'une liste neuve, sans le compteur.
+	-- Le compteur affiché par tabline juste avant ne doit pas passer pour un tick() venu d'ailleurs : sinon il
+	-- disparaîtrait 3 s à chaque nouvel onglet.
+	tl.opts.sections.tabline_x[1](win) -- tabline vient d'afficher le compteur ajouté
+	tl.opts.sections.tabline_x = {} -- la config est réévaluée
+	update(e, win)
+	check(
+		"tabline, config réévaluée : le compteur est remis tout de suite (pas 3 s sans compteur)",
+		#tl.opts.sections.tabline_x,
+		1
+	)
+	check("tabline : aucune erreur", #e.w.logs.error, 0)
+	cleanup(e)
+
+	-- tabline.wez + tick() déjà branché dans tabline (ta configuration) : rien n'est ajouté
+	clock.now = T0
+	tl = fake_tabline()
+	e = new_env({ file = false, plugins = { { url = TABLINE } }, tabline = tl })
+	e.M.apply_to_config({})
+	win = e.window()
+	for s = 0, 10 do
+		clock.now = T0 + s
+		e.M.tick(win) -- comme ta section tabline_y qui appelle logtime.tick
+		update(e, win)
+	end
+	check("tabline + tick() branché : rien n'est ajouté (pas de second compteur)", #tl.opts.sections.tabline_x, 0)
+	check("tabline + tick() branché : le temps compte normalement (10 s)", e.M.today_seconds(), 10)
+	cleanup(e)
+
+	-- tabline.wez installé mais illisible : pas de plantage
+	clock.now = T0
+	e =
+		new_env({ file = false, plugins = { { url = TABLINE } }, tabline = { url = TABLINE, module = "pas un module" } })
+	e.M.apply_to_config({})
+	win = e.window()
+	clock.now = T0 + 5
+	check("tabline illisible : le gestionnaire ne renvoie pas false", update(e, win), false)
+	check("tabline illisible : aucune erreur", #e.w.logs.error, 0)
+	cleanup(e)
+	-- la liste des plugins plante : on fait comme sans tabline
+	clock.now = T0
+	e = new_env({ file = false })
+	e.w.plugin.list = function()
+		error("boum")
+	end
+	e.M.apply_to_config({})
+	win = e.window()
+	update(e, win)
+	check("liste des plugins illisible : le compteur à droite quand même", win.right ~= nil, true)
 	cleanup(e)
 end
 

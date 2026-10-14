@@ -80,6 +80,7 @@ end
 local day = load_module("core/day")
 local counter = load_module("core/counter")
 local status = load_module("status/status")
+local auto = load_module("status/auto")
 local storage = load_module("storage/days")
 local platform = load_module("system/platform")
 local calendar_page = load_module("pages/calendar_page")
@@ -117,6 +118,7 @@ local EXTRA_OPTIONS = {
 	"cell_color",
 	"heat",
 	"thresholds",
+	"status", -- false : ne pas afficher le compteur dans la barre (il compte quand même)
 }
 
 -- Le fichier des réglages choisis par l'utilisateur : <dossier personnel>/.logtime_settings.json
@@ -340,10 +342,11 @@ function M.today_seconds()
 	return days[day.key(os.time(), cfg.day_offset)] or 0
 end
 
--- À appeler chaque seconde par la barre d'onglets : fait avancer le compteur et renvoie le texte à afficher.
+-- Fait avancer le compteur et renvoie le texte à afficher. Plusieurs appels dans la même seconde ne comptent le
+-- temps qu'une fois (counter.advance ne compte rien si l'instant n'a pas changé).
 -- Une erreur ne doit jamais casser la barre : elle est écrite dans les journaux de WezTerm, une seule fois tant que
 -- c'est la même (et de nouveau si elle revient après un passage normal).
-function M.tick(window)
+local function status_text()
 	local ok, result = pcall(compute)
 	if not ok then
 		local message = tostring(result)
@@ -361,6 +364,55 @@ function M.tick(window)
 		text = text .. " ⚠"
 	end
 	return text
+end
+
+-- Pour ceux qui affichent le compteur eux-mêmes dans leur barre (inutile sinon : le plugin l'affiche tout seul).
+-- Fait avancer le compteur et renvoie le texte à afficher. Le plugin note l'appel : il sait alors que quelqu'un
+-- affiche déjà le compteur, et ne l'ajoute pas une seconde fois.
+function M.tick(window)
+	G.logtime_external_tick = os.time()
+	return status_text()
+end
+
+-- Le compteur que le plugin ajoute lui-même à la barre de tabline.wez (il ne compte pas comme un appel venu d'ailleurs).
+local function tabline_component(window)
+	return status_text()
+end
+
+-- À chaque mise à jour de WezTerm (update-status) : compter, puis afficher le compteur là où il faut (status/auto.lua).
+-- Ne renvoie jamais false : ça empêcherait les autres (tabline.wez…) de dessiner leur barre.
+local function on_update_status(window, pane, tabline_url)
+	local text = status_text()
+	local now = os.time()
+	if not num(G.logtime_status_started) then
+		G.logtime_status_started = now -- le premier passage depuis le démarrage de WezTerm (survit aux rechargements)
+	end
+	local mode = auto.choose({
+		enabled = cfg.status ~= false,
+		now = now,
+		external_at = num(G.logtime_external_tick),
+		started_at = num(G.logtime_status_started),
+		has_tabline = tabline_url ~= nil,
+	})
+	if mode == "right" then
+		window:set_right_status(text)
+	elseif mode == "tabline" then
+		local ok, tabline = pcall(wezterm.plugin.require, tabline_url)
+		if ok and type(tabline) == "table" and type(tabline.get_config) == "function" then
+			if auto.ensure_component(tabline.get_config(), tabline_component) then
+				wezterm.log_info("logtime : compteur ajouté à la barre de tabline.wez")
+			end
+		end
+	end
+end
+
+-- L'adresse de tabline.wez s'il est installé (nil sinon, ou si la liste des plugins n'est pas lisible).
+local function installed_tabline()
+	if not (wezterm.plugin and wezterm.plugin.list) then
+		return nil
+	end
+	local ok, plugins = pcall(wezterm.plugin.list)
+	return ok and auto.find_tabline(plugins) or nil
 end
 
 -- Les heures par jour, à jour (le fichier est lu si ce n'est pas encore fait). La page du calendrier s'en sert.
@@ -473,6 +525,19 @@ function M.apply_to_config(config, opts, ...)
 		})
 		wezterm.on("window-config-reloaded", function(window, pane)
 			pcall(settings_view.on_config_loaded, window, pane)
+		end)
+		-- Le compteur, sans rien à brancher : une mise à jour au moins chaque seconde (sans ralentir une barre plus
+		-- rapide), et à chaque mise à jour, compter et afficher (voir on_update_status).
+		if not config.status_update_interval or config.status_update_interval > 1000 then
+			config.status_update_interval = 1000
+		end
+		local tabline_url = installed_tabline()
+		wezterm.on("update-status", function(window, pane)
+			local ok_status, status_err = pcall(on_update_status, window, pane, tabline_url)
+			if not ok_status and G.logtime_error_message ~= tostring(status_err) then
+				G.logtime_error_message = tostring(status_err)
+				wezterm.log_error("logtime : " .. tostring(status_err))
+			end
 		end)
 	end)
 	if not ok then
