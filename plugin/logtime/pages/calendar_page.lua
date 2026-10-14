@@ -23,6 +23,7 @@ M.VIEW = { MONTHS = 1, YEAR = 2, DAY = 3 }
 --   num(v)        convertit une valeur lue dans GLOBAL en vrai nombre (nil si elle est absente)
 --   days()        les heures par jour (table { ["2026-10-12"] = secondes })
 --   idle_days()   le temps inactif par jour, même forme (facultatif)
+--   projects()    le temps actif par projet et par jour : { ["2026-10-12"] = { [projet] = secondes } } (facultatif)
 --   today_key()   la date du jour ("2026-10-12")
 --   cfg()         les réglages (week_starts_on, goal_hours, day_offset, max_months, months_anchor, center, gradient...)
 --   labels()      les textes dans la langue choisie
@@ -107,7 +108,8 @@ function M.create(ctx)
 		local help = "  " .. labels.title .. "   " .. labels.day_help
 		local key = dates.key(selected_day())
 		local idle_days = ctx.idle_days and ctx.idle_days() or nil
-		local lines, width = day_detail.render(ctx.days(), idle_days, key, ctx.today_key(), cfg, labels)
+		local projects = ctx.projects and ctx.projects() or nil
+		local lines, width = day_detail.render(ctx.days(), idle_days, key, ctx.today_key(), cfg, labels, projects)
 		local needed = #lines + 2
 		if dims and ((tonumber(dims.cols) or 0) < width or (tonumber(dims.rows) or 0) < needed) then
 			local title, hint = labels.too_small, string.format(labels.too_small_hint, width, needed)

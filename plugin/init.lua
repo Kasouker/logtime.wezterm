@@ -80,9 +80,11 @@ end
 local day = load_module("core/day")
 local counter = load_module("core/counter")
 local idle = load_module("core/idle")
+local activity = load_module("core/activity")
 local status = load_module("status/status")
 local auto = load_module("status/auto")
 local storage = load_module("storage/days")
+local projects_storage = load_module("storage/projects")
 local platform = load_module("system/platform")
 local calendar_page = load_module("pages/calendar_page")
 local keys = load_module("config/keys")
@@ -100,6 +102,7 @@ local cfg = {
 	data_file = nil, -- nil : <dossier personnel>/.logtime.json
 	idle_after = 300, -- rien ne bouge dans le terminal pendant 5 min : ce temps est noté comme inactif (il compte quand même)
 	idle_file = nil, -- nil : <dossier personnel>/.logtime_idle.json (le temps inactif par jour)
+	projects_file = nil, -- nil : <dossier personnel>/.logtime_projects.json (le temps actif par projet et par jour)
 	week_starts_on = "monday", -- ou "sunday"
 	goal_hours = nil, -- nombre d'heures par jour qui comptent pour « objectif atteint » (nil : pas d'objectif)
 	lang = "fr", -- "fr" ou "en"
@@ -117,6 +120,7 @@ local EXTRA_OPTIONS = {
 	"data_file",
 	"idle_after",
 	"idle_file",
+	"projects_file",
 	"settings_file",
 	"settings_key",
 	"open_key",
@@ -313,92 +317,158 @@ local function ensure_synced(now)
 end
 
 -- ------------------------------------------------------------
--- Le temps inactif (core/idle.lua), dans son propre fichier, au même format : { "2026-10-12": secondes }
+-- Les fichiers à côté de .logtime.json : le temps inactif (core/idle.lua) et le temps par projet (core/activity.lua)
 -- ------------------------------------------------------------
---   logtime_idle_json      : le temps inactif par jour, en texte
---   logtime_idle_ready     : le fichier a été lu et fusionné dans cette session
---   logtime_idle_broken    : le fichier est illisible et n'a pas pu être mis de côté : on ne l'écrit pas
---   logtime_idle_dirty, logtime_idle_saved, logtime_idle_save_failed : la sauvegarde
---   logtime_last_activity  : la dernière fois que quelque chose a bougé dans un terminal
---   logtime_idle_marked    : la dernière activité dont l'inactivité est déjà notée
-local function idle_path()
-	return cfg.idle_file or (wezterm.home_dir .. sep .. ".logtime_idle.json")
-end
-
-local idle_mem = nil
-
--- Le temps inactif par jour. Le fichier est lu une fois par session et fusionné (la plus grande des deux valeurs) ;
--- un fichier illisible est mis de côté. Si la lecture plante, on réessaiera (et on n'écrit rien d'ici là).
-local function get_idle()
-	if not idle_mem then
-		local text = G.logtime_idle_json
-		idle_mem = (type(text) == "string" and storage.decode(text)) or {}
+-- Chaque fichier a dans wezterm.GLOBAL, avec son préfixe (logtime_idle, logtime_projects) :
+--   <préfixe>_json   : son contenu, en texte
+--   <préfixe>_ready  : le fichier a été lu et fusionné dans cette session
+--   <préfixe>_broken : le fichier est illisible et n'a pas pu être mis de côté : on ne l'écrit pas
+--   <préfixe>_dirty, <préfixe>_saved, <préfixe>_save_failed : la sauvegarde
+-- Et pour l'activité :
+--   logtime_last_activity : la dernière fois que quelque chose a bougé dans un terminal
+--   logtime_idle_marked   : la dernière activité dont l'inactivité est déjà notée
+--   logtime_label         : le projet de l'onglet affiché (le temps compté va à ce projet)
+--
+-- side_file(o) : o.prefix, o.what (pour les messages), o.path(), o.decode(texte), o.encode(table),
+-- o.merge(mémoire, fichier) (garder la plus grande des deux valeurs : jamais compter deux fois).
+local function side_file(o)
+	local mem = nil
+	local file = {}
+	local function key(name)
+		return o.prefix .. "_" .. name
 	end
-	if not G.logtime_idle_ready and not G.logtime_idle_broken then
-		local ok, from_file, state, err = pcall(storage.load, idle_path())
-		if ok then
-			if state == "corrupt" then
-				local moved_ok, moved = pcall(storage.quarantine, idle_path())
-				if not (moved_ok and moved) then
-					G.logtime_idle_broken = true -- surtout ne pas l'écraser
+
+	-- Le contenu. Le fichier est lu une fois par session et fusionné ; un fichier illisible est mis de côté. Si la
+	-- lecture plante, on réessaiera (et on n'écrit rien d'ici là).
+	function file.get()
+		if not mem then
+			local text = G[key("json")]
+			mem = (type(text) == "string" and o.decode(text)) or {}
+		end
+		if not G[key("ready")] and not G[key("broken")] then
+			local ok, from_file, state, err = pcall(storage.load, o.path(), o.decode)
+			if ok then
+				if state == "corrupt" then
+					local moved_ok, moved = pcall(storage.quarantine, o.path())
+					if not (moved_ok and moved) then
+						G[key("broken")] = true -- surtout ne pas l'écraser
+						wezterm.log_error(
+							"logtime : le fichier "
+								.. o.what
+								.. " est illisible ("
+								.. tostring(err)
+								.. ") et n'a pas pu être mis de côté : il n'est pas sauvegardé"
+						)
+						return mem
+					end
 					wezterm.log_error(
-						"logtime : le fichier du temps inactif est illisible ("
+						"logtime : le fichier "
+							.. o.what
+							.. " était illisible ("
 							.. tostring(err)
-							.. ") et n'a pas pu être mis de côté : le temps inactif n'est pas sauvegardé"
+							.. ") : mis de côté dans "
+							.. moved
 					)
-					return idle_mem
+					from_file = {}
 				end
-				wezterm.log_error(
-					"logtime : le fichier du temps inactif était illisible ("
-						.. tostring(err)
-						.. ") : mis de côté dans "
-						.. moved
-				)
-				from_file = {}
+				o.merge(mem, from_file)
+				G[key("json")] = o.encode(mem)
+				G[key("ready")] = true
 			end
-			for key, secs in pairs(from_file) do
-				if (idle_mem[key] or 0) < secs then
-					idle_mem[key] = secs
-				end
-			end
-			G.logtime_idle_json = storage.encode(idle_mem)
-			G.logtime_idle_ready = true
+		end
+		return mem
+	end
+
+	-- Le contenu a changé : le garder dans GLOBAL et le sauvegarder bientôt.
+	function file.changed()
+		G[key("json")] = o.encode(file.get())
+		G[key("dirty")] = true
+	end
+
+	-- Sauvegarde au plus toutes les save_every secondes, une fois le fichier lu.
+	function file.maybe_save(now)
+		if not G[key("dirty")] or not G[key("ready")] then
+			return
+		end
+		local last_save = num(G[key("saved")])
+		if last_save and last_save <= now and now - last_save < cfg.save_every then
+			return
+		end
+		local ok, saved, err = pcall(storage.save, o.path(), file.get(), o.encode)
+		G[key("saved")] = now
+		if ok and saved then
+			G[key("dirty")] = false
+			G[key("save_failed")] = false
+		elseif not G[key("save_failed")] then
+			G[key("save_failed")] = true
+			wezterm.log_error(
+				"logtime : sauvegarde du fichier " .. o.what .. " impossible : " .. tostring(ok and err or saved)
+			)
 		end
 	end
-	return idle_mem
+	return file
 end
 
--- Du temps vient d'être compté, de `from` à `to` : la part inactive va aussi dans le temps inactif.
-local function note_idle(from, to)
+local idle_file = side_file({
+	prefix = "logtime_idle",
+	what = "du temps inactif",
+	path = function()
+		return cfg.idle_file or (wezterm.home_dir .. sep .. ".logtime_idle.json")
+	end,
+	decode = storage.decode,
+	encode = storage.encode,
+	merge = function(mem, from_file)
+		for k, secs in pairs(from_file) do
+			if (mem[k] or 0) < secs then
+				mem[k] = secs
+			end
+		end
+	end,
+})
+local get_idle = idle_file.get
+
+local projects_file = side_file({
+	prefix = "logtime_projects",
+	what = "du temps par projet",
+	path = function()
+		return cfg.projects_file or (wezterm.home_dir .. sep .. ".logtime_projects.json")
+	end,
+	decode = projects_storage.decode,
+	encode = projects_storage.encode,
+	merge = function(mem, from_file)
+		for k, of_file_day in pairs(from_file) do
+			local of_day = mem[k] or {}
+			mem[k] = of_day
+			for label, secs in pairs(of_file_day) do
+				if (of_day[label] or 0) < secs then
+					of_day[label] = secs
+				end
+			end
+		end
+	end,
+})
+local get_projects = projects_file.get
+
+-- Le projet en cours (celui de l'onglet affiché à la dernière mise à jour).
+local function current_label()
+	local label = G.logtime_label
+	return type(label) == "string" and label or activity.OTHER
+end
+
+-- Du temps vient d'être compté, de `from` à `to` : il va au projet en cours, et sa part inactive va dans le temps
+-- inactif (et elle est retirée du projet : le temps par projet est du temps actif).
+local function note_counted(from, to)
+	local label = current_label()
+	activity.add(get_projects(), label, from, to, cfg.day_offset)
 	local last_activity = num(G.logtime_last_activity)
 	local start = idle.span(last_activity, num(G.logtime_idle_marked), from, to, cfg.idle_after)
-	if not start then
-		return
+	if start then
+		G.logtime_idle_marked = last_activity
+		day.add_interval(get_idle(), start, to, cfg.day_offset)
+		idle_file.changed()
+		activity.add(get_projects(), label, start, to, cfg.day_offset, -1)
 	end
-	G.logtime_idle_marked = last_activity
-	local idle_days = get_idle()
-	day.add_interval(idle_days, start, to, cfg.day_offset)
-	G.logtime_idle_json = storage.encode(idle_days)
-	G.logtime_idle_dirty = true
-end
-
-local function maybe_save_idle(now)
-	if not G.logtime_idle_dirty or not G.logtime_idle_ready then
-		return
-	end
-	local last_save = num(G.logtime_idle_saved)
-	if last_save and last_save <= now and now - last_save < cfg.save_every then
-		return
-	end
-	local ok, saved, err = pcall(storage.save, idle_path(), get_idle())
-	G.logtime_idle_saved = now
-	if ok and saved then
-		G.logtime_idle_dirty = false
-		G.logtime_idle_save_failed = false
-	elseif not G.logtime_idle_save_failed then
-		G.logtime_idle_save_failed = true
-		wezterm.log_error("logtime : sauvegarde du temps inactif impossible : " .. tostring(ok and err or saved))
-	end
+	projects_file.changed()
 end
 
 -- L'empreinte de ce qu'on voit dans un panneau : si elle change, il y a de l'activité. Chaque morceau est lu à part
@@ -425,10 +495,31 @@ local function pane_fingerprint(pane)
 	return table.concat(parts, "\n")
 end
 
+-- Le projet d'un panneau : les pages du plugin comptent pour « logtime » ; sinon son dossier, ou son titre.
+-- Le dossier est un objet Url dans les WezTerm récents, du texte dans les anciens : tostring donne l'adresse dans
+-- les deux cas.
+local function pane_label(pane)
+	local ok_id, id = pcall(function()
+		return pane:pane_id()
+	end)
+	if ok_id and id ~= nil and (id == num(G.logtime_page_pane) or id == num(G.logtime_settings_pane)) then
+		return "logtime"
+	end
+	local ok_cwd, cwd = pcall(function()
+		local url = pane:get_current_working_dir()
+		return url ~= nil and tostring(url) or nil
+	end)
+	local ok_title, title = pcall(function()
+		return pane:get_title()
+	end)
+	return activity.label(ok_cwd and cwd or nil, ok_title and title or nil)
+end
+
 -- La dernière empreinte de chaque fenêtre (elle se perd au rechargement de la config : ça compte comme une activité).
 local fingerprints = {}
 
--- À chaque mise à jour : quelque chose a-t-il bougé dans le panneau actif de cette fenêtre ?
+-- À chaque mise à jour : quelque chose a-t-il bougé dans le panneau actif de cette fenêtre ? Et, si la fenêtre est
+-- celle qu'on utilise (elle a le focus), le projet en cours devient celui de son onglet.
 local function note_activity(window, pane)
 	local ok, id = pcall(function()
 		return window:window_id()
@@ -437,6 +528,12 @@ local function note_activity(window, pane)
 	local current = pane_fingerprint(pane)
 	G.logtime_last_activity = idle.note(fingerprints[key], current, num(G.logtime_last_activity), os.time())
 	fingerprints[key] = current
+	local ok_focus, focused = pcall(function()
+		return window:is_focused()
+	end)
+	if not ok_focus or focused then
+		G.logtime_label = pane_label(pane)
+	end
 end
 
 -- ------------------------------------------------------------
@@ -455,7 +552,7 @@ local function compute()
 	if added then
 		remember(days)
 		G.logtime_dirty = true
-		note_idle(last, last + counted)
+		note_counted(last, last + counted)
 	end
 	G.logtime_budget = state.budget
 	G.logtime_calm = state.calm
@@ -467,7 +564,8 @@ local function compute()
 	if G.logtime_storage_ready then
 		maybe_save(now, days)
 	end
-	maybe_save_idle(now)
+	idle_file.maybe_save(now)
+	projects_file.maybe_save(now)
 	return days[day.key(now, cfg.day_offset)] or 0
 end
 
@@ -647,6 +745,7 @@ function M.apply_to_config(config, opts, ...)
 			num = num,
 			days = days_for_page,
 			idle_days = get_idle,
+			projects = get_projects,
 			today_key = function()
 				return day.key(os.time(), cfg.day_offset)
 			end,

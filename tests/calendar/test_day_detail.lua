@@ -165,6 +165,84 @@ check("anglais : objectif 7h30", p[3], "  Total     10h04   ✓ 7h30 goal reache
 check("anglais : semaine validée", p[7], "  Week      24h16   ✓ week validated (2/2 days)")
 check("anglais : idle", p[5]:sub(1, 10), "  Idle    ")
 
+-- ---- par projet
+local projects = {
+	["2026-10-14"] = {
+		["Projet_Perso/logtime.wezterm"] = 4 * 3600 + 600,
+		["42/C05"] = 3 * 3600,
+		["un nom de projet beaucoup trop long pour la colonne"] = 1200,
+		logtime = 300,
+		["?"] = 200,
+		["a/b"] = 100,
+		["c/d"] = 40,
+	},
+}
+local pp = plain((detail.render(week, idle, "2026-10-14", "2026-10-14", cfg, fr, projects)))
+check("projets : après l'inactif, une ligne vide", pp[6], "")
+check("projets : le titre", pp[7], "  Par projet (temps actif)")
+check(
+	"projets : le plus grand d'abord, sa part du total du jour (4h10 sur 10h04 = 41 %)",
+	pp[8],
+	"    Projet_Perso/logtime.wezterm    4h10   █████░░░░░░░   41 %"
+)
+check(
+	"projets : le suivant",
+	pp[9],
+	"    42/C05                          3h00   ████░░░░░░░░   30 %"
+)
+check("projets : un nom trop long est coupé", pp[10]:find("    un nom de projet beaucoup tr… ", 1, true), 1)
+check("projets : coupé avec …", pp[10]:find("…", 1, true) ~= nil, true)
+check(
+	"projets : 5 projets, puis « autres » (le reste et l'inconnu : 40 s + 200 s)",
+	pp[13],
+	"    autres                          0h04   ░░░░░░░░░░░░    1 %"
+)
+check("projets : puis la semaine", pp[15], "  Semaine   24h16   2/5 jours à l'objectif")
+check("projets : 15 lignes", #pp, 15)
+check(
+	"projets : la barre a la couleur du jour",
+	table.concat(detail.render(week, idle, "2026-10-14", "x", cfg, fr, projects), "\n"):find(
+		convert.fg(assemble.day_color(36240, cfg)) .. "█████" .. convert.fg(detail.BAR_EMPTY_COLOR),
+		1,
+		true
+	) ~= nil,
+	true
+)
+check(
+	"projets : un autre jour sans projets, pas de section",
+	#plain((detail.render(week, idle, "2026-10-13", "2026-10-14", cfg, fr, projects))),
+	7
+)
+check(
+	"projets : un jour sans temps compté, pas de section (même avec des projets)",
+	table
+		.concat(plain((detail.render({}, nil, "2026-10-14", "x", cfg, fr, projects))), "\n")
+		:find("Par projet", 1, true),
+	nil
+)
+check(
+	"projets : un projet plus grand que le jour (fichiers fusionnés) : 100 % au plus",
+	plain((detail.render({ ["2026-10-14"] = 60 }, nil, "2026-10-14", "x", cfg, fr, { ["2026-10-14"] = { a = 999 } })))[8],
+	"    a                               0h01   ████████████  100 %"
+)
+local pe = plain((detail.render(week, idle, "2026-10-14", "x", cfg, en, projects)))
+check("projets : anglais", pe[7], "  By project (active time)")
+check("projets : anglais, autres", pe[13]:sub(1, 10), "    others")
+local framed =
+	plain((detail.render(week, idle, "2026-10-14", "x", gradient.apply_to({ borders = true }), fr, projects)))
+check(
+	"projets encadrés : chaque ligne de la même largeur",
+	(function()
+		for i, l in ipairs(framed) do
+			if utf8.len(l) ~= utf8.len(framed[1]) then
+				return i
+			end
+		end
+		return true
+	end)(),
+	true
+)
+
 -- ---- avec les encadrés
 local boxed, boxed_width =
 	detail.render(week, idle, "2026-10-14", "2026-10-14", gradient.apply_to({ borders = true, goal_hours = 8 }), fr)

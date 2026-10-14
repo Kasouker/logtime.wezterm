@@ -383,8 +383,10 @@ local function scenarios()
 	e = new_env({ file = broken })
 	local real_rename = os.rename
 	local rename_calls = 0
-	os.rename = function()
-		rename_calls = rename_calls + 1
+	os.rename = function(from)
+		if tostring(from):find("%.logtime%.json$") then -- seulement le fichier d'heures (pas les autres fichiers)
+			rename_calls = rename_calls + 1
+		end
 		return nil, "refusé"
 	end
 	reset_writes()
@@ -393,7 +395,7 @@ local function scenarios()
 	check("fichier abîmé non déplaçable : le fichier n'est PAS écrasé", read(e.path), broken)
 	check(
 		"fichier abîmé non déplaçable : aucune écriture dans le fichier",
-		writes_matching("%.logtime%.json$") + writes_matching("%.tmp$"),
+		writes_matching("%.logtime%.json$") + writes_matching("%.logtime%.json%.tmp$"),
 		0
 	)
 	check(
@@ -565,9 +567,9 @@ local function scenarios()
 		names[#names + 1] = n
 	end
 	check(
-		"dossier personnel : seulement le fichier d'heures et sa copie de sécurité",
+		"dossier personnel : seulement le fichier d'heures, sa copie de sécurité et le temps par projet",
 		table.concat(names, ","),
-		FILE .. "," .. FILE .. ".bak"
+		FILE .. "," .. FILE .. ".bak,.logtime_projects.json"
 	)
 	cleanup(e)
 end

@@ -7,6 +7,7 @@ local stats = load("calendar/stats")
 local convert = load("color/convert")
 local idle = load("core/idle")
 local status = load("status/status")
+local activity = load("core/activity")
 
 local M = {}
 
@@ -14,6 +15,9 @@ M.BAR = 20 -- la largeur des barres
 M.LABEL = 9 -- la colonne des noms (« Inactif » et des espaces)
 M.MIN_WIDTH = 46 -- la largeur du contenu au minimum (sans cadre)
 M.BAR_EMPTY_COLOR = "#3B404C"
+M.PROJECTS = 5 -- les plus gros projets affichés (le reste dans « autres »)
+M.PROJECT_NAME = 30 -- la colonne des noms de projets
+M.PROJECT_BAR = 12 -- la largeur de leurs barres
 M.IDLE_COLOR = "#8B8E99"
 
 local function visible_len(s)
@@ -41,14 +45,46 @@ function M.title(key, labels)
 	return (labels.detail_date:gsub("{([%w_]+)}", fields))
 end
 
--- Une barre de M.BAR caractères, remplie selon part / total.
-local function bar(part, total, color)
-	local filled = total > 0 and math.floor(part * M.BAR / total + 0.5) or 0
+-- Une barre de `size` caractères (M.BAR par défaut), remplie selon part / total.
+local function bar(part, total, color, size)
+	size = size or M.BAR
+	local filled = total > 0 and math.floor(part * size / total + 0.5) or 0
 	return convert.fg(color)
 		.. string.rep("█", filled)
 		.. convert.fg(M.BAR_EMPTY_COLOR)
-		.. string.rep("░", M.BAR - filled)
+		.. string.rep("░", size - filled)
 		.. convert.RESET
+end
+
+-- Un nom coupé ou complété à `width` caractères.
+local function fit(text, width)
+	local len = utf8.len(text) or #text
+	if len > width then
+		return text:sub(1, utf8.offset(text, width) - 1) .. "…"
+	end
+	return text .. string.rep(" ", width - len)
+end
+
+-- « Par projet » : les plus gros projets du jour, en temps actif, avec leur part du total du jour (total > 0).
+local function project_lines(of_day, total, color, labels)
+	local list = activity.top(of_day, M.PROJECTS)
+	if #list == 0 then
+		return {}
+	end
+	local out = { labels.detail_projects }
+	for _, item in ipairs(list) do
+		local name = item.label == activity.OTHER and labels.detail_other or item.label
+		local secs = math.min(item.secs, total) -- jamais plus que le jour (deux fichiers fusionnés peuvent se contredire)
+		local value = stats.hm(secs)
+		out[#out + 1] = "  "
+			.. fit(name, M.PROJECT_NAME - 1)
+			.. string.rep(" ", 6 - #value + 1)
+			.. value
+			.. "   "
+			.. bar(secs, total, color, M.PROJECT_BAR)
+			.. string.format("  %3d %%", math.floor(secs * 100 / total + 0.5))
+	end
+	return out
 end
 
 -- « Inactif    1h30 »
@@ -73,8 +109,9 @@ function M.week(days, key, cfg)
 	return total, reached
 end
 
--- Dessine le détail du jour `key`. idle_days peut manquer. Renvoie les lignes et la largeur (celle qu'on centre).
-function M.render(days, idle_days, key, today_key, cfg, labels)
+-- Dessine le détail du jour `key`. idle_days et projects (le temps par projet : { [date] = { [projet] = secondes } })
+-- peuvent manquer. Renvoie les lignes et la largeur (celle qu'on centre).
+function M.render(days, idle_days, key, today_key, cfg, labels, projects)
 	local total = math.floor(math.max(0, days[key] or 0))
 	local idle_secs, idle_percent = idle.share(total, idle_days and idle_days[key])
 	local active = total - idle_secs
@@ -109,6 +146,13 @@ function M.render(days, idle_days, key, today_key, cfg, labels)
 			.. "   "
 			.. bar(idle_secs, total, M.IDLE_COLOR)
 			.. string.format("  %3d %%", idle_percent)
+		local by_project = project_lines(projects and projects[key], total, color, labels)
+		if #by_project > 0 then
+			content[#content + 1] = ""
+			for _, l in ipairs(by_project) do
+				content[#content + 1] = l
+			end
+		end
 	else
 		content[#content + 1] = labels.detail_empty
 	end

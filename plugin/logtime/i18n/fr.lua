@@ -40,6 +40,8 @@ return {
 	detail_idle = "Inactif",
 	detail_week = "Semaine",
 	detail_empty = "Aucun temps compté ce jour-là.",
+	detail_projects = "Par projet (temps actif)",
+	detail_other = "autres",
 	detail_goal_reached = "✓ objectif %s atteint",
 	detail_goal_missing = "objectif %s : il manque %s",
 	detail_goal_failed = "objectif %s non atteint (−%s)",

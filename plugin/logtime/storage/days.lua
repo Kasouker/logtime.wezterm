@@ -76,14 +76,15 @@ end
 --   "absent"  : le fichier n'existe pas (historique vide, normal au premier lancement) ;
 --   "ok"      : lu correctement ;
 --   "corrupt" : le fichier existe mais n'est pas lisible : il ne faut PAS l'écraser sans le mettre de côté.
-function M.load(path)
+-- decode (facultatif) : un autre format de fichier (par défaut M.decode).
+function M.load(path, decode)
 	local f = io.open(path, "rb")
 	if not f then
 		return {}, "absent"
 	end
 	local text = f:read("*a")
 	f:close()
-	local days, err = M.decode(text)
+	local days, err = (decode or M.decode)(text)
 	if not days then
 		return {}, "corrupt", err
 	end
@@ -93,8 +94,9 @@ end
 -- Écrit le fichier : d'abord dans un fichier temporaire (relu pour vérifier), puis mis à sa place.
 -- Renvoie true, ou false et la raison. En cas d'échec, l'ancien fichier n'est pas touché
 -- (sauf dans le dernier recours Windows décrit plus bas, où le contenu reste dans le fichier .tmp).
-function M.save(path, days)
-	local text = M.encode(days)
+-- encode (facultatif) : un autre format de fichier (par défaut M.encode).
+function M.save(path, days, encode)
+	local text = (encode or M.encode)(days)
 	local tmp = path .. ".tmp"
 
 	local f, err = io.open(tmp, "wb")

@@ -913,12 +913,15 @@ local function scenarios()
 	-- ============================================================
 	-- le temps inactif : rien ne bouge dans le terminal pendant 5 min
 	-- ============================================================
-	-- un panneau qui reste le même : on décide nous-mêmes quand son texte change
-	local function screen_pane(env)
+	-- un panneau qui reste le même : on décide nous-mêmes quand son texte change (et son dossier, son titre)
+	local function screen_pane(env, cwd, title)
 		local pane = env.w.new_pane()
 		pane.text = "$ "
 		function pane:get_title()
-			return "zsh"
+			return title or "zsh"
+		end
+		function pane:get_current_working_dir()
+			return cwd
 		end
 		function pane:get_cursor_position()
 			return { x = #self.text, y = 0 }
@@ -1044,6 +1047,118 @@ local function scenarios()
 	)
 	check("inactif, fichier abîmé : un nouveau fichier", read(e.home .. "/.logtime_idle.json"), '{"2026-10-13":400}')
 	cleanup(e)
+	-- ============================================================
+	-- le temps par projet
+	-- ============================================================
+	clock.now = T0
+	e = new_env({ file = false })
+	config = e.M.apply_to_config({})
+	win = e.window()
+	local c05 = screen_pane(e, "file:///C:/Users/max/42/C05/ex02/", "zsh")
+	local claude = screen_pane(e, "file:///C:/Users/max/", "◑ Claude Code")
+	live(e, win, c05, 0, 600, true) -- 10 min dans 42/C05
+	live(e, win, claude, 601, 900, true) -- 5 min dans Claude (le dossier personnel : c'est le titre qui compte)
+	live(e, win, claude, 901, 4500, false) -- 1 h de pause dans Claude
+	live(e, win, claude, 4501, 4560, true) -- 1 min de reprise
+	-- une seconde fenêtre, qui n'a pas le focus : ce qu'on y voit ne change pas le projet en cours
+	local other_win = e.window()
+	function other_win:is_focused()
+		return false
+	end
+	function win:is_focused()
+		return true
+	end
+	local other = screen_pane(e, "file:///C:/Users/max/autre/projet/", "zsh")
+	for s_ = 4561, 4620 do
+		clock.now = T0 + s_
+		claude.text = "$ " .. s_
+		other.text = "$ " .. s_
+		for _, handler in ipairs(e.w.events["update-status"] or {}) do
+			handler(win, claude)
+			handler(other_win, other)
+		end
+	end
+	-- la page du calendrier : son temps va à « logtime » (et pas à PING)
+	open_binding(config, "F2")(win, claude)
+	local project_page = e.w.spawned[#e.w.spawned].pane
+	function project_page:get_title() -- comme dans la réalité : l'onglet est gardé ouvert par ping
+		return "PING.EXE"
+	end
+	live(e, win, project_page, 4621, 4700, false)
+	local saved = assert(read(e.home .. "/.logtime_projects.json"))
+	-- relu avec le lecteur du plugin (storage/projects.lua)
+	local modules = {}
+	local function module(name)
+		modules[name] = modules[name] or assert(loadfile(root .. "/plugin/logtime/" .. name .. ".lua"))(module)
+		return modules[name]
+	end
+	local p_day = assert(module("storage/projects").decode(saved))["2026-10-13"]
+	check("projets : 42/C05 (les 10 premières minutes, plus la seconde du changement d'onglet)", p_day["42/C05"], 601)
+	check(
+		"projets : Claude Code (5 min, la reprise et la 2de fenêtre, sans l'heure de pause ; plus la seconde vers la page)",
+		p_day["Claude Code"],
+		299 + 59 + 60 + 1
+	)
+	check("projets : rien pour la fenêtre sans le focus", p_day["autre/projet"], nil)
+	check("projets : la page du calendrier compte pour logtime", p_day.logtime ~= nil and p_day.logtime >= 60, true)
+	check("projets : jamais pour PING", saved:find("PING", 1, true), nil)
+	-- la page de personnalisation aussi
+	open_binding(config, "F4")(win, claude)
+	local settings_pane = e.w.spawned[#e.w.spawned].pane
+	function settings_pane:get_title()
+		return "PING.EXE"
+	end
+	live(e, win, settings_pane, 4701, 4760, false)
+	local p_after = module("storage/projects").decode(read(e.home .. "/.logtime_projects.json"))["2026-10-13"]
+	check("projets : la page F4 compte aussi pour logtime (jamais pour PING)", p_after.PING, nil)
+	check("projets : la page F4, le temps va bien quelque part (logtime)", p_after.logtime >= 100, true)
+	check("projets : aucune erreur", #e.w.logs.error, 0)
+	page_binding(config, "Enter")(win, project_page)
+	check(
+		"projets : dans le détail du jour",
+		last_text(project_page):find("Par projet (temps actif)", 1, true) ~= nil
+			and last_text(project_page):find("42/C05", 1, true) ~= nil
+			and last_text(project_page):find("Claude Code", 1, true) ~= nil,
+		true
+	)
+	cleanup(e)
+	-- un fichier de projets abîmé : mis de côté, comme les autres
+	clock.now = T0
+	e = new_env({ file = false })
+	write(e.home .. "/.logtime_projects.json", '{"2026-10-13":5}')
+	e.M.apply_to_config({})
+	screen = screen_pane(e, "file:///C:/Users/max/a/b/")
+	live(e, win, screen, 0, 30, true)
+	check("projets, fichier abîmé : signalé", #e.w.logs.error, 1)
+	check(
+		"projets, fichier abîmé : mis de côté",
+		io.popen("ls -a '" .. e.home .. "'"):read("*a"):find(".logtime_projects.json.corrupt-", 1, true) ~= nil,
+		true
+	)
+	check(
+		"projets, fichier abîmé : un nouveau fichier",
+		read(e.home .. "/.logtime_projects.json"):find('"a/b"', 1, true) ~= nil,
+		true
+	)
+	cleanup(e)
+
+	-- le fichier des projets ne se lit pas tout de suite : le temps attend en mémoire, puis s'ajoute au fichier
+	clock.now = T0
+	e = new_env({ file = false })
+	write(e.home .. "/.logtime_projects.json", '{"2026-10-12":{"vieux":7200},"2026-10-13":{"a/b":50,"c/d":9}}')
+	e.M.apply_to_config({})
+	screen = screen_pane(e, "file:///C:/Users/max/a/b/")
+	open_fails[1] = "logtime_projects"
+	live(e, win, screen, 0, 400, true)
+	open_fails[1] = nil
+	live(e, win, screen, 401, 421, true)
+	check(
+		"projets, lus en retard : la mémoire (421 s) l'emporte, les autres projets et jours sont gardés",
+		read(e.home .. "/.logtime_projects.json"),
+		'{"2026-10-12":{"vieux":7200},"2026-10-13":{"a/b":421,"c/d":9}}'
+	)
+	cleanup(e)
+
 	-- le fichier ne se lit pas tout de suite : le temps inactif attend en mémoire, puis s'ajoute au fichier
 	clock.now = T0
 	e = new_env({ file = false })
