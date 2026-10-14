@@ -575,7 +575,7 @@ check("onglet Calendrier : ligne 2, l'aide", cal_plain[2], "  " .. fr.settings_c
 check("onglet Calendrier : ligne 3, l'aide", cal_plain[3], "  " .. fr.settings_calendar_help2)
 check("onglet Calendrier : ligne 5, l'intitulé", cal_plain[5], "  Réglages du calendrier")
 check("onglet Calendrier : ligne 7, le réglage choisi et sa valeur alignée", cal_plain[7], "▸ Mois affichés au maximum      ◀ 12")
-check("onglet Calendrier : ligne 13, l'explication du réglage choisi", cal_plain[13], "  " .. fr.settings_hints.max_months)
+check("onglet Calendrier : ligne 14, l'explication du réglage choisi", cal_plain[14], "  " .. fr.settings_hints.max_months)
 check("onglet Calendrier : ligne 23 vide (aucun message)", cal_plain[23], "")
 check("onglet Calendrier : le message « enregistré »", strip(render({ tab = 2, row = 1, values = { max_months = 6 }, message = settings_page.MESSAGE.SETTING_SAVED })[23]), "  " .. fr.settings_setting_saved)
 check("onglet Calendrier : le message d'échec", strip(render({ tab = 2, row = 1, values = { max_months = 6 }, message = settings_page.MESSAGE.FAILED })[23]), "  " .. fr.settings_failed)
@@ -719,7 +719,8 @@ check("ligne 9 : le début de la semaine, choisi (▸)", four_plain[9], "▸ Dé
 check("ligne 10 : les encadrés, « non » par défaut", four_plain[10], "  Encadrés des cases            ◀ non ▶")
 check("ligne 11 : le style du trait, avec un aperçu", four_plain[11], "  Style du trait                ◀ arrondi ╭─╮ ▶")
 check("le centrage n'apparaît pas dans la page", table.concat(four_plain, "\n"):find("centr", 1, true), nil)
-check("ligne 13 : l'explication du réglage choisi (le 3e)", four_plain[13], "  " .. fr.settings_hints.week_starts_on)
+check("ligne 12 : la couleur du trait, grise par défaut, avec un aperçu", four_plain[12], "  Couleur du trait              ◀ Gris ╭─╮ ▶")
+check("ligne 14 : l'explication du réglage choisi (le 3e)", four_plain[14], "  " .. fr.settings_hints.week_starts_on)
 local boxed = render({ tab = 2, row = 4, values = { borders = false, border_style = "heavy" }, message = 0 })
 check("encadrés « non » reste « non » (false n'est pas remplacé par la valeur par défaut)", strip(boxed[10]), "▸ Encadrés des cases            ◀ non ▶")
 check("encadrés « oui »", strip(render({ tab = 2, row = 1, values = { borders = true }, message = 0 })[10]), "  Encadrés des cases            ◀ oui ▶")
@@ -786,10 +787,24 @@ press(e, "l", e.pane)
 check("→ sur le style : « simple » est enregistré", read(e.path), '{\n  "week_starts_on": "monday",\n  "borders": true,\n  "border_style": "single"\n}\n')
 check("→ sur le style : la page montre l'aperçu", setting_line(e, "Style du trait"):find("◀ simple ┌─┐ ▶", 1, true) ~= nil, true)
 press(e, "j", e.pane)
-check("↓ au dernier réglage (le style) : il reste choisi", setting_line(e, "Style du trait"):find("▸", 1, true) ~= nil, true)
+check("↓ : la couleur du trait", setting_line(e, "Couleur du trait"):find("▸", 1, true) ~= nil, true)
+check("couleur : l'aperçu suit le style choisi (simple)", setting_line(e, "Couleur du trait"):find("◀ Gris ┌─┐ ▶", 1, true) ~= nil, true)
+press(e, "l", e.pane)
+check("→ sur la couleur : du gris au rouge (la 1re de la palette)", e.cfg.border_color, palette.COLORS[1])
+check("→ sur la couleur : enregistrée", read(e.path):find('"border_color": "' .. palette.COLORS[1] .. '"', 1, true) ~= nil, true)
+check("→ sur la couleur : la page montre son nom", setting_line(e, "Couleur du trait"):find("◀ Rouge ┌─┐ ▶", 1, true) ~= nil, true)
+check("→ sur la couleur : l'aperçu est dans cette couleur", frame_of(e.pane):find(convert.fg(palette.COLORS[1]) .. "┌─┐", 1, true) ~= nil, true)
+press(e, "h", e.pane)
+press(e, "h", e.pane)
+check("← ← : du rouge au gris, puis au dernier choix (en boucle)", e.cfg.border_color, palette.COLORS[16])
+press(e, "d", e.pane)
+check("d sur la couleur : le gris", e.cfg.border_color, "#8B8E99")
+press(e, "j", e.pane)
+check("↓ au dernier réglage (la couleur) : il reste choisi", setting_line(e, "Couleur du trait"):find("▸", 1, true) ~= nil, true)
+press(e, "k", e.pane)
 press(e, "k", e.pane)
 press(e, "d", e.pane)
-check("d sur les encadrés : « non » (la valeur par défaut) est écrit", read(e.path), '{\n  "week_starts_on": "monday",\n  "borders": false,\n  "border_style": "single"\n}\n')
+check("d sur les encadrés : « non » (la valeur par défaut) est écrit", read(e.path), '{\n  "week_starts_on": "monday",\n  "borders": false,\n  "border_style": "single",\n  "border_color": "#8B8E99"\n}\n')
 for _ = 1, 5 do
 	press(e, "k", e.pane)
 end
@@ -906,6 +921,29 @@ check("langue → : la page est redessinée en anglais", shown_text(e):find("[Ge
 check("langue → : la langue garde son nom (English)", shown_text(e):find("◀ English ▶", 1, true) ~= nil, true)
 press(e, "d", e.pane)
 check("langue d : retour au français", shown_text(e):find("◀ français ▶", 1, true) ~= nil, true)
+
+-- la couleur du trait : les choix et le défilement (fonctions pures)
+local choices = settings_page.border_choices(palette.COLORS, fr.palette, "Gris")
+check("choix : 17 couleurs (le gris puis la palette)", #choices.colors, 17)
+check("choix : le gris d'abord", choices.colors[1] .. " " .. choices.names[1], "#8B8E99 Gris")
+check("choix : puis la palette, avec ses noms", choices.colors[4] .. " " .. choices.names[4], palette.COLORS[3] .. " Or")
+check("step_choice : du gris, → la 1re couleur", settings_page.step_choice(choices, "#8B8E99", 1), palette.COLORS[1])
+check("step_choice : sans tenir compte des minuscules", settings_page.step_choice(choices, "#8b8e99", 1), palette.COLORS[1])
+check("step_choice : de la dernière, → le gris", settings_page.step_choice(choices, palette.COLORS[16], 1), "#8B8E99")
+check("step_choice : une couleur écrite à la main, → on repart du gris", settings_page.step_choice(choices, "#123456", 1), palette.COLORS[1])
+check("couleur écrite à la main : affichée telle quelle", strip(render({ tab = 2, row = 1, values = { border_color = "#123456" }, border_choices = choices, message = 0 })[12]), "  Couleur du trait              ◀ #123456 ╭─╮ ▶")
+check("anglais : la couleur du trait", strip(render({ tab = 2, row = 1, values = { border_color = "#8B8E99" }, border_choices = settings_page.border_choices(palette.COLORS, en.palette, en.settings_values.border_gray), message = 0 }, en)[12]), "  Border color                  ◀ Gray ╭─╮ ▶")
+check("aucune ligne de l'onglet Calendrier ne dépasse 57 colonnes, même avec le plus long nom de couleur", (function()
+	local long = settings_page.border_choices(palette.COLORS, fr.palette_theme, "Gris")
+	for i = 1, #long.colors do
+		for _, line in ipairs(render({ tab = 2, row = 6, values = { border_color = long.colors[i], border_style = "double" }, border_choices = long, message = 4 })) do
+			if utf8.len(strip(line)) > 57 then
+				return strip(line)
+			end
+		end
+	end
+	return true
+end)(), true)
 
 -- rouvrir la page : on revient à l'onglet Couleurs
 e = open({})

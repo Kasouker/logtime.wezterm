@@ -426,6 +426,23 @@ env2.page.on_config_loaded(env2.window, env2.w.new_pane())
 return #env2.w.logs.info == 1 and env2.w.logs.info[1]:find("notification", 1, true) ~= nil
 end)(), true)
 
+-- la couleur du trait : avec les couleurs du thème acceptées, ce sont elles qui défilent
+e = open({ consent = true })
+press(e, "Tab", e.pane)
+for _ = 1, 5 do
+	press(e, "j", e.pane)
+end
+press(e, "l", e.pane)
+check("couleur du trait avec le thème : → donne la 1re couleur du thème", e.cfg.border_color, THEME[1])
+check("couleur du trait avec le thème : son nom de thème", line_containing(e.pane, "Couleur du trait"):find("◀ Noir ╭─╮ ▶", 1, true) ~= nil, true)
+e = open({ consent = false })
+press(e, "Tab", e.pane)
+for _ = 1, 5 do
+	press(e, "j", e.pane)
+end
+press(e, "l", e.pane)
+check("couleur du trait sans le thème : la palette classique", e.cfg.border_color, palette.COLORS[1])
+
 cleanup()
 local leaked = {}
 for k in pairs(_G) do

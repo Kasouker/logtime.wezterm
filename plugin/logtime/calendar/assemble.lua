@@ -19,7 +19,7 @@ M.BORDER_STYLES = {
 	double = { tl = "╔", tr = "╗", bl = "╚", br = "╝", h = "═", v = "║", t = "╦", b = "╩", l = "╠", r = "╣", x = "╬" },
 	heavy = { tl = "┏", tr = "┓", bl = "┗", br = "┛", h = "━", v = "┃", t = "┳", b = "┻", l = "┣", r = "┫", x = "╋" },
 }
-M.BORDER_COLOR = "#8B8E99" -- le gris des jours vides (la couleur sera réglable à l'étape suivante)
+M.BORDER_COLOR = "#8B8E99" -- la couleur des traits par défaut : le gris des jours vides (réglage border_color)
 
 local function borders_on(cfg)
 	return (cfg or {}).borders == true
@@ -50,7 +50,11 @@ local function border_of(cfg)
 	if not borders_on(cfg) then
 		return nil
 	end
-	return M.BORDER_STYLES[cfg.border_style] or M.BORDER_STYLES.rounded, convert.fg(M.BORDER_COLOR)
+	local color = cfg.border_color
+	if type(color) ~= "string" or not color:match("^#%x%x%x%x%x%x$") then
+		color = M.BORDER_COLOR -- une couleur absente ou mal écrite : le gris
+	end
+	return M.BORDER_STYLES[cfg.border_style] or M.BORDER_STYLES.rounded, convert.fg(color)
 end
 
 -- Le haut ou le bas du cadre d'un mois.

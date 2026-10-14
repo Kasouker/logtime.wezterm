@@ -15,6 +15,7 @@ local gradient = load("color/gradient")
 local palette = load("color/palette")
 local convert = load("color/convert")
 local schema = load("settings/schema")
+local assemble = load("calendar/assemble")
 
 local M = {}
 
@@ -33,7 +34,7 @@ M.TAB_COUNT = 3
 
 -- Les réglages de l'onglet Calendrier, dans l'ordre d'affichage (leurs limites viennent de settings/schema.lua).
 -- Pas de réglage du centrage : le calendrier est toujours centré (center = false reste possible dans wezterm.lua).
-M.CALENDAR_SETTINGS = { "max_months", "months_anchor", "week_starts_on", "borders", "border_style" }
+M.CALENDAR_SETTINGS = { "max_months", "months_anchor", "week_starts_on", "borders", "border_style", "border_color" }
 -- Les réglages de l'onglet Général.
 M.GENERAL_SETTINGS = { "lang", "goal_hours", "goal_days" }
 
@@ -100,7 +101,7 @@ end
 -- shown : le texte à afficher (la valeur traduite) ; par défaut, la valeur elle-même.
 function M.format_value(definition, value, shown)
 	shown = shown or tostring(value)
-	if definition.kind == "enum" or definition.kind == "boolean" then
+	if definition.kind == "enum" or definition.kind == "boolean" or definition.kind == "color" then
 		return "◀ " .. shown .. " ▶"
 	end
 	local lowest = (definition.none ~= nil) and definition.none or definition.min
@@ -139,6 +140,34 @@ function M.step(definition, value, delta)
 	return math.tointeger(next_value) or next_value
 end
 
+-- Les choix de la couleur du trait : le gris par défaut, puis les 16 couleurs de la palette proposée (la classique, ou
+-- celles du thème). Renvoie { colors = { ... }, names = { ... } }.
+function M.border_choices(colors, names, gray_name)
+	local out = { colors = { assemble.BORDER_COLOR }, names = { gray_name or "gris" } }
+	for i, color in ipairs(colors or {}) do
+		out.colors[#out.colors + 1] = color
+		out.names[#out.names + 1] = (names or {})[i] or color
+	end
+	return out
+end
+
+-- La position d'une couleur dans les choix (sans tenir compte des majuscules), ou nil.
+local function choice_index(choices, value)
+	for i, color in ipairs(choices.colors) do
+		if type(value) == "string" and color:upper() == value:upper() then
+			return i
+		end
+	end
+	return nil
+end
+
+-- La couleur suivante (delta = 1) ou précédente (-1) dans les choix, en boucle. Une couleur qui n'y est pas (écrite à
+-- la main) : on repart du gris.
+function M.step_choice(choices, value, delta)
+	local position = choice_index(choices, value) or 1
+	return choices.colors[(position - 1 + delta) % #choices.colors + 1]
+end
+
 -- Une durée en heures, comme dans le calendrier : 7.5 -> « 7h30 », 8 -> « 8h00 ».
 local function hours_text(hours)
 	local minutes = math.floor(hours * 60 + 0.5)
@@ -147,9 +176,17 @@ end
 
 -- Le texte affiché pour une valeur : sa traduction (settings_values dans i18n), sinon la valeur elle-même.
 -- Les oui/non sont rangés sous les clés « yes » et « no », la valeur « aucun » sous « none ».
-local function value_text(key, value, labels)
+local function value_text(key, value, labels, state)
 	local texts = labels.settings_values or {}
 	local definition = schema.get(key) or {}
+	if key == "border_color" then
+		-- son nom, puis un aperçu du trait dans cette couleur et dans le style choisi
+		local choices = state.border_choices or M.border_choices({}, {}, texts.border_gray)
+		local index = choice_index(choices, value)
+		local b = assemble.BORDER_STYLES[state.values.border_style] or assemble.BORDER_STYLES.rounded
+		local name = index and choices.names[index] or value
+		return name .. " " .. convert.fg(value) .. b.tl .. b.h .. b.tr .. convert.RESET
+	end
 	if type(value) == "boolean" then
 		return (texts.boolean or {})[value and "yes" or "no"] or tostring(value)
 	end
@@ -201,7 +238,7 @@ local function render_list(state, labels)
 		end
 		local name = names[key] or key
 		local padding = string.rep(" ", math.max(1, NAME_WIDTH - (utf8.len(name) or #name)))
-		lines[#lines + 1] = (i == state.row and "▸ " or "  ") .. name .. padding .. M.format_value(definition, value, value_text(key, value, labels))
+		lines[#lines + 1] = (i == state.row and "▸ " or "  ") .. name .. padding .. M.format_value(definition, value, value_text(key, value, labels, state))
 	end
 	lines[#lines + 1] = ""
 	local selected = list.settings[state.row]
@@ -307,6 +344,14 @@ end
 return { kind = "classic", colors = palette.COLORS, unavailable = given and given.unavailable or nil }
 end
 
+-- Les choix de la couleur du trait : le gris, puis la palette proposée, avec ses noms.
+local function border_choices()
+local labels = ctx.labels()
+local active = active_palette()
+local names = (active.kind == "theme" and labels.palette_theme) or labels.palette
+return M.border_choices(active.colors, names, (labels.settings_values or {}).border_gray)
+end
+
 -- Le numéro de cette couleur dans la palette proposée (exact, sinon le plus proche), ou nil.
 local function position_in(color, colors)
 return color and (palette.index_of(color, colors) or palette.nearest(color, colors)) or nil
@@ -398,6 +443,7 @@ local lines, width = M.render({
 tab = current_tab(),
 row = current_row(),
 values = values,
+border_choices = border_choices(),
 index = selected_index(),
 current = current_color(),
 gradient_off = ctx.cfg().gradient == false,
@@ -510,7 +556,12 @@ if list then
 		redraw(pane, false)
 	else
 		local key = list[current_row()]
-		change_setting(window, pane, key, M.step(schema.get(key), setting_value(key), delta_col))
+		local definition = schema.get(key)
+		if definition.kind == "color" then
+			change_setting(window, pane, key, M.step_choice(border_choices(), setting_value(key), delta_col))
+		else
+			change_setting(window, pane, key, M.step(definition, setting_value(key), delta_col))
+		end
 	end
 	return
 end

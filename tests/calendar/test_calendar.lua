@@ -435,6 +435,23 @@ check("mois choisi encadré : le titre en gras, aligné comme les autres (pas de
 check("mois choisi encadré : le gras est bien là", selected_block.lines[2]:find("\27[1m", 1, true) ~= nil, true)
 check("février 2021 (4 semaines) encadré : 24 lignes aussi", #assemble.month_block({}, 2021, 2, "x", grid_cfg, fr, false).lines, 24)
 check("sans objectif, encadré : la ligne des validés est vide (dans le cadre)", strip(assemble.month_block(days, 2026, 10, "x", grid_cfg, fr, false).lines[23]), "  │                                                              │")
+local blue = render(days, 2026, 10, "2026-10-12", { borders = true, border_color = "#3366CC" })
+check("couleur du trait : le cadre du mois dans cette couleur", blue:find(convert.fg("#3366CC") .. "╭", 1, true) ~= nil, true)
+check("couleur du trait : la grille des cases aussi", blue:find(convert.fg("#3366CC") .. "├────────┬", 1, true) ~= nil and blue:find(convert.fg("#3366CC") .. "│", 1, true) ~= nil, true)
+-- (le gris reste celui du texte des jours vides : on ne cherche que les traits en gris)
+local function gray_border(text)
+	for _, c in ipairs({ "╭", "╮", "╰", "╯", "│", "├", "┤", "─" }) do
+		if text:find(convert.fg(assemble.BORDER_COLOR) .. c, 1, true) then
+			return c
+		end
+	end
+	return nil
+end
+check("couleur du trait : plus aucun trait gris", gray_border(blue), nil)
+check("couleur du trait mal écrite : le gris", render(days, 2026, 10, "2026-10-12", { borders = true, border_color = "bleu" }):find(convert.fg(assemble.BORDER_COLOR) .. "╭", 1, true) ~= nil, true)
+check("couleur du trait en minuscules : acceptée", render(days, 2026, 10, "2026-10-12", { borders = true, border_color = "#3366cc" }):find(convert.fg("#3366CC") .. "╭", 1, true) ~= nil, true)
+local blue_block = table.concat(assemble.month_block(days, 2026, 10, "x", { borders = true, border_color = "#3366CC" }, fr, true).lines, "\n")
+check("couleur du trait : plusieurs mois aussi", blue_block:find(convert.fg("#3366CC") .. "╰", 1, true) ~= nil and gray_border(blue_block) == nil, true)
 check("assemble.width / height : sans encadrés", assemble.width({}) .. "x" .. assemble.height({}), "65x21")
 check("assemble.width / height : avec", assemble.width(grid_cfg) .. "x" .. assemble.height(grid_cfg), "66x24")
 check("sans encadrés : aucune ligne de trait", render(days, 2026, 10, "2026-10-12", {}):find("─", 1, true), nil)

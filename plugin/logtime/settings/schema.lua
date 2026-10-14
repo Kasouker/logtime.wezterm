@@ -18,6 +18,7 @@ M.DEFINITIONS = {
 	{ key = "center", kind = "boolean", default = true },
 	{ key = "borders", kind = "boolean", default = false },
 	{ key = "border_style", kind = "enum", values = { "rounded", "single", "double", "heavy" }, default = "rounded" },
+	{ key = "border_color", kind = "color", default = "#8B8E99" },
 	{ key = "gradient", kind = "boolean", default = true },
 	{ key = "gradient_color", kind = "color", default = "#C9AB6B" },
 	{ key = "gradient_light", kind = "number", min = 0, max = 1, default = 0.8 },
