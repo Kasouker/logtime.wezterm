@@ -45,28 +45,8 @@ local page = {}
 		return year, month
 	end
 
-	-- Les réglages, avec le dégradé de couleurs (sauf si gradient = false) : il remplace les quatre niveaux de couleur.
-	-- Un cell_color donné explicitement dans les réglages est prioritaire. gradient_color, gradient_light, gradient_dark,
-	-- gradient_hours et gradient_curve règlent le dégradé (voir color/gradient.lua).
-	local function with_gradient(cfg)
-		if cfg.gradient == false or cfg.cell_color then
-			return cfg
-		end
-		local made = gradient.make({
-color = cfg.gradient_color,
-light = cfg.gradient_light,
-dark = cfg.gradient_dark,
-max_hours = cfg.gradient_hours,
-curve = cfg.gradient_curve,
-})
-		local copy = {}
-		for key, value in pairs(cfg) do
-			copy[key] = value
-		end
-		copy.cell_color = made.color
-		copy.legend_text = made.legend()
-		return copy
-	end
+	-- Les réglages, avec le dégradé de couleurs (voir color/gradient.lua, apply_to).
+	local with_gradient = gradient.apply_to
 
 	-- La taille de la fenêtre du panneau : { cols, rows } (nil si on ne peut pas la lire).
 	local function dims_of(pane)

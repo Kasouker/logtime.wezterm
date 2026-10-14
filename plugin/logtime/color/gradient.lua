@@ -111,4 +111,28 @@ end
 return g
 end
 
+-- Les réglages du calendrier, avec le dégradé de couleurs (sauf si gradient = false) : il remplace les quatre niveaux de
+-- couleur. Un cell_color donné explicitement dans les réglages est prioritaire. gradient_color, gradient_light,
+-- gradient_dark, gradient_hours et gradient_curve règlent le dégradé. Renvoie une copie (cfg n'est pas modifié).
+-- Utilisé par la page du calendrier et par l'aperçu de la page de personnalisation : le même dessin aux deux endroits.
+function M.apply_to(cfg)
+	if cfg.gradient == false or cfg.cell_color then
+		return cfg
+	end
+	local made = M.make({
+		color = cfg.gradient_color,
+		light = cfg.gradient_light,
+		dark = cfg.gradient_dark,
+		max_hours = cfg.gradient_hours,
+		curve = cfg.gradient_curve,
+	})
+	local copy = {}
+	for key, value in pairs(cfg) do
+		copy[key] = value
+	end
+	copy.cell_color = made.color
+	copy.legend_text = made.legend()
+	return copy
+end
+
 return M

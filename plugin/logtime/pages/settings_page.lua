@@ -269,6 +269,63 @@ function M.frame(lines, width, b, color)
 	return out, width + 2
 end
 
+M.PREVIEW_GAP = 3 -- espaces entre les réglages et l'aperçu du mois, quand il est à droite
+
+-- Place l'aperçu du mois à côté des réglages, selon la taille de la fenêtre (cols x rows). Les réglages passent toujours
+-- avant l'aperçu :
+--   "right"   : l'aperçu à droite des réglages, si la fenêtre est assez large et assez haute ;
+--   "below"   : sinon l'aperçu sous les réglages (une ligne vide entre les deux), si elle est assez haute ;
+--   "message" : sinon les réglages, et juste en dessous un message qui dit la taille qu'il faudrait pour l'aperçu ;
+--   "alone"   : sinon les réglages seuls (pas même la place du message).
+-- Renvoie les lignes, leur largeur (celle qu'on centre) et le cas choisi.
+function M.place(settings, settings_width, preview, preview_width, cols, rows, labels)
+	local function pad(line, width)
+		return line .. string.rep(" ", math.max(0, width - layout.visible_width(line)))
+	end
+	local right_cols = settings_width + M.PREVIEW_GAP + preview_width
+	local right_rows = math.max(#settings, #preview)
+	local below_cols = math.max(settings_width, preview_width)
+	local below_rows = #settings + 1 + #preview
+	if cols >= right_cols and rows >= right_rows then
+		local out = {}
+		for i = 1, right_rows do
+			out[i] = pad(settings[i] or "", settings_width) .. string.rep(" ", M.PREVIEW_GAP) .. (preview[i] or "")
+		end
+		return out, right_cols, "right"
+	end
+	if cols >= below_cols and rows >= below_rows then
+		local out = {}
+		for _, line in ipairs(settings) do
+			out[#out + 1] = line
+		end
+		out[#out + 1] = ""
+		for _, line in ipairs(preview) do
+			out[#out + 1] = line
+		end
+		return out, below_cols, "below"
+	end
+	local message = {
+		"  " .. labels.settings_preview_small,
+		"  " .. string.format(labels.settings_preview_small_hint, right_cols, right_rows, below_cols, below_rows),
+	}
+	if rows >= #settings + 1 + #message then
+		local out = {}
+		for _, line in ipairs(settings) do
+			out[#out + 1] = line
+		end
+		out[#out + 1] = ""
+		for _, line in ipairs(message) do
+			out[#out + 1] = line
+		end
+		local width = settings_width
+		for _, line in ipairs(message) do
+			width = math.max(width, layout.visible_width(line))
+		end
+		return out, width, "message"
+	end
+	return settings, settings_width, "alone"
+end
+
 -- Le texte de la page, sous forme de lignes. Toujours le même nombre de lignes (les lignes facultatives restent vides),
 -- pour que la page ne saute pas quand un message apparaît.
 --   state.tab = l'onglet affiché (M.TAB.COLORS par défaut) ; pour l'onglet Calendrier, voir render_calendar.
@@ -323,7 +380,9 @@ lines[#lines + 1] = message_line(state.message, labels)
 return lines, M.GRID_WIDTH
 end
 
--- ctx fournit ce que la page ne sait pas faire seule :
+-- ctx fournit ce que la page ne sait pas faire seule (days et today_key sont facultatifs : sans eux, pas d'aperçu) :
+--   days()              les heures par jour { ["2026-10-12"] = secondes, ... }, pour l'aperçu du mois actuel
+--   today_key()         la date du jour "AAAA-MM-JJ"
 --   wezterm, G (wezterm.GLOBAL), num(v)
 --   cfg()               les réglages en cours (gradient_color, gradient)
 --   labels()            les textes dans la langue choisie
@@ -481,7 +540,33 @@ local title = labels.settings_too_small
 local hint = string.format(labels.settings_too_small_hint, width, #lines)
 return { title, hint }, math.max(layout.visible_width(title), layout.visible_width(hint)), false
 end
+-- l'aperçu du mois actuel, s'il y a la place (les réglages passent avant)
+local preview = dims and page.preview_block(labels, active) or nil
+if preview then
+	lines, width = M.place(lines, width, preview.lines, preview.width, tonumber(dims.cols) or 0, tonumber(dims.rows) or 0, labels)
+end
 return lines, width, true
+end
+
+-- L'aperçu : le mois actuel, avec les vraies heures, dessiné comme dans le calendrier avec les réglages en cours.
+-- Dans l'onglet Couleurs, avec la couleur sous le curseur (avant même Entrée). Sans ctx.days ou ctx.today_key : nil.
+function page.preview_block(labels, active)
+	if not ctx.days or not ctx.today_key then
+		return nil
+	end
+	local key = ctx.today_key()
+	local year, month = tostring(key):match("^(%d+)-(%d+)")
+	if not year then
+		return nil
+	end
+	local cfg = {}
+	for k, value in pairs(ctx.cfg()) do
+		cfg[k] = value
+	end
+	if current_tab() == M.TAB.COLORS then
+		cfg.gradient_color = (active or active_palette()).colors[selected_index()]
+	end
+	return assemble.month_block(ctx.days(), tonumber(year), tonumber(month), key, gradient.apply_to(cfg), labels, false)
 end
 
 local function redraw(pane, first)

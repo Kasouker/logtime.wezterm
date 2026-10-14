@@ -269,6 +269,8 @@ cfg = function() return env.cfg end,
 			end
 		end,
 		refresh_calendar = opts.refresh or function(window, pane) env.refreshed = env.refreshed + 1 end,
+		days = opts.days and function() return opts.days end or nil,
+		today_key = opts.days and function() return opts.today or "2026-10-14" end or nil,
 	})
 	env.table = env.page.key_table()
 	return env
@@ -322,7 +324,7 @@ got, got_width, fits = env.page.build_lines({ cols = 57, rows = 23 })
 check("57 x 23 : la page tient (taille exacte)", fits, true)
 got, got_width, fits = env.page.build_lines({ cols = 56, rows = 40 })
 check("56 colonnes : trop étroit : message", fits == false and #got == 2, true)
-check("56 colonnes : le message dit la taille nécessaire", strip(got[2]), "Il faut au moins 57 colonnes sur 23 lignes.")
+check("56 colonnes : le message dit la taille nécessaire", strip(got[2]), "Agrandis-la : il faut au moins 57 colonnes sur 23 lignes pour les réglages.")
 check("56 colonnes : le titre du message", strip(got[1]), "Fenêtre trop petite")
 got, got_width, fits = env.page.build_lines({ cols = 120, rows = 22 })
 check("22 lignes : trop bas : message", fits, false)
@@ -975,7 +977,7 @@ end)(), true)
 check("encadrés : la page a besoin de 59 x 26", select(3, e.page.build_lines({ cols = 59, rows = 26 })), true)
 check("encadrés : 58 colonnes, trop étroit", select(3, e.page.build_lines({ cols = 58, rows = 40 })), false)
 check("encadrés : 25 lignes, trop bas", select(3, e.page.build_lines({ cols = 120, rows = 25 })), false)
-check("encadrés : le message dit 59 x 26", strip(e.page.build_lines({ cols = 58, rows = 40 })[2]), "Il faut au moins 59 colonnes sur 26 lignes.")
+check("encadrés : le message dit 59 x 26", strip(e.page.build_lines({ cols = 58, rows = 40 })[2]), "Agrandis-la : il faut au moins 59 colonnes sur 26 lignes pour les réglages.")
 e.cfg.border_style = "double"
 e.cfg.border_color = "#3366CC"
 e.page.on_resize(e.window, e.pane)
@@ -991,6 +993,79 @@ press(e, "l", e.pane)
 check("encadrés « oui » depuis la page : le cadre revient tout de suite", frame_of(e.pane):find("╔══════", 1, true) ~= nil, true)
 e = open({})
 check("sans encadrés : pas de cadre autour de la page", frame_of(e.pane):find("╭", 1, true), nil)
+
+-- ============================================================
+-- l'aperçu du mois actuel, à côté des réglages
+-- ============================================================
+local S = { "  réglage 1", "  réglage 2", "  réglage 3" } -- 3 lignes, largeur 10
+local P = { "mois 1", "mois 2", "mois 3", "mois 4" } -- 4 lignes, largeur 6 (plus haut que le message, comme un vrai mois)
+local placed, placed_width, mode = settings_page.place(S, 10, P, 6, 19, 4, fr)
+check("place : à droite, si 10 + 3 + 6 = 19 colonnes et 4 lignes", mode .. " " .. placed_width, "right 19")
+check("place : à droite, chaque ligne des réglages complétée puis l'aperçu ; sous les réglages, l'aperçu continue", placed[1] .. "|" .. placed[4], "  réglage 1   mois 1|             mois 4")
+_, _, mode = settings_page.place(S, 10, P, 6, 18, 8, fr)
+check("place : 18 colonnes, assez haut (3 + 1 + 4 = 8) : dessous", mode, "below")
+placed, placed_width = settings_page.place(S, 10, P, 6, 18, 8, fr)
+check("place : dessous, une ligne vide entre les deux", table.concat(placed, "|") .. " " .. placed_width, "  réglage 1|  réglage 2|  réglage 3||mois 1|mois 2|mois 3|mois 4 10")
+_, _, mode = settings_page.place(S, 10, P, 6, 18, 7, fr)
+check("place : 7 lignes, ni à droite ni dessous, mais la place du message (3 + 1 + 2) : le message", mode, "message")
+placed = settings_page.place(S, 10, P, 6, 18, 7, fr)
+check("place : le message juste sous les réglages", placed[4] .. "|" .. placed[5], "|  Aperçu du calendrier : fenêtre trop petite.")
+check("place : le message dit les deux tailles possibles", placed[6], "  Il faut 19 × 4 (à droite) ou 10 × 8 (dessous).")
+_, _, mode = settings_page.place(S, 10, P, 6, 18, 6, fr)
+check("place : 6 lignes, juste la place du message", mode, "message")
+_, _, mode = settings_page.place(S, 10, P, 6, 18, 5, fr)
+check("place : 5 lignes, pas la place du message : les réglages seuls", mode, "alone")
+_, _, mode = settings_page.place(S, 10, P, 12, 11, 50, fr)
+check("place : assez large pour les réglages (10) mais pas pour l'aperçu (12), très haut : le message (jamais un aperçu coupé)", mode, "message")
+_, _, mode = settings_page.place(S, 10, P, 6, 100, 2, fr)
+check("place : très large mais moins haut que les réglages : les réglages seuls (jamais coupés)", mode, "alone")
+
+-- dans la page, avec de vraies heures
+local month_days = { ["2026-10-05"] = 8 * 3600, ["2026-10-06"] = 2 * 3600, ["2026-09-30"] = 4 * 3600 }
+e = open({ days = month_days, cols = 200, rows = 60 })
+local shown_text_now = shown_text(e)
+local title_row
+for _, line in ipairs(shown_lines(e.pane)) do
+	if line:find("Personnalisation", 1, true) then
+		title_row = line
+	end
+end
+check("aperçu à droite : sur la même ligne que le titre des réglages, le titre du mois actuel", title_row:find("Octobre 2026   Total du mois : 10h00 / Jours actifs : 2", 1, true) ~= nil, true)
+check("aperçu : les vraies heures (le 5 : 8h00)", shown_text_now:find("8h00", 1, true) ~= nil, true)
+check("aperçu : pas les jours d'un autre mois (le 30 septembre : 4h00)", shown_text_now:find("4h00", 1, true), nil)
+check("aperçu : la page est plus large (57 + 3 + 65 = 125)", select(2, e.page.build_lines({ cols = 200, rows = 60 })), 125)
+-- l'onglet Couleurs : la couleur sous le curseur, avant Entrée
+local cursor_color = gradient.make({ color = palette.COLORS[4] }).color(8 * 3600)
+press(e, "l", e.pane)
+check("aperçu : la couleur sous le curseur (4, jaune) colore déjà les jours", frame_of(e.pane):find(convert.bg(cursor_color), 1, true) ~= nil, true)
+check("aperçu : rien n'est enregistré pour autant", read(e.path), nil)
+-- les réglages du calendrier changent l'aperçu tout de suite
+press(e, "Tab", e.pane)
+for _ = 1, 3 do
+	press(e, "j", e.pane)
+end
+press(e, "l", e.pane)
+check("aperçu : les encadrés apparaissent dans l'aperçu dès qu'on les active", shown_text(e):find("╭─ Octobre 2026", 1, true) ~= nil, true)
+press(e, "k", e.pane)
+press(e, "l", e.pane)
+check("aperçu : le début de la semaine suit (dimanche d'abord)", shown_text(e):find("├──Dim───┬──Lun", 1, true) ~= nil, true)
+-- les tailles de fenêtre
+e = open({ days = month_days, cols = 124, rows = 60 })
+local _, w124 = e.page.build_lines({ cols = 124, rows = 60 })
+check("124 colonnes, 60 lignes : l'aperçu passe dessous (largeur 65)", w124, 65)
+local below_lines = e.page.build_lines({ cols = 124, rows = 60 })
+check("dessous : les réglages (23 lignes), une ligne vide, puis le mois (21)", #below_lines, 23 + 1 + 21)
+local msg_lines = e.page.build_lines({ cols = 100, rows = 30 })
+check("100 x 30 : les réglages entiers, puis le message", strip(msg_lines[1]):find("Personnalisation", 1, true) ~= nil and strip(msg_lines[25]) == "  Aperçu du calendrier : fenêtre trop petite.", true)
+check("100 x 30 : le message dit 125 × 23 ou 65 × 45", strip(msg_lines[26]), "  Il faut 125 × 23 (à droite) ou 65 × 45 (dessous).")
+local narrow = e.page.build_lines({ cols = 60, rows = 80 })
+check("60 x 80 : les réglages tiennent (57), pas le mois (65) : le message, pas d'aperçu coupé", strip(narrow[25]), "  Aperçu du calendrier : fenêtre trop petite.")
+local alone = e.page.build_lines({ cols = 100, rows = 24 })
+check("100 x 24 : la place des réglages, pas du message : les réglages seuls", #alone, 23)
+local tiny, _, tiny_fits = e.page.build_lines({ cols = 40, rows = 60 })
+check("40 colonnes : trop petit même pour les réglages : le message de la page", tiny_fits == false and strip(tiny[1]) == "Fenêtre trop petite", true)
+check("sans heures (ctx.days absent) : jamais d'aperçu", #open({}).page.build_lines({ cols = 200, rows = 60 }), 23)
+check("anglais : le message de l'aperçu", strip(settings_page.place(S, 10, P, 6, 18, 7, en)[5]), "  Calendar preview: window too small.")
 
 -- rouvrir la page : on revient à l'onglet Couleurs
 e = open({})

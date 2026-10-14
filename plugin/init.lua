@@ -406,6 +406,10 @@ local settings_view = settings_page.create({
 		return platform.blocker_args(platform.os_name(wezterm.target_triple))
 	end,
 	store = settings,
+	days = days_for_page, -- pour l'aperçu du mois actuel
+	today_key = function()
+		return day.key(os.time(), cfg.day_offset)
+	end,
 	palette = function()
 		if cfg.theme_colors == true then
 			local colors, reason = theme.extract(config, wezterm)
