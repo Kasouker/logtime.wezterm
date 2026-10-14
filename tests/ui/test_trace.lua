@@ -186,8 +186,23 @@ end
 -- ============================================================
 -- ui/safe.lua
 -- ============================================================
+-- par défaut (debug = false) : aucune trace, mais les erreurs restent écrites et notifiées
+check("debug : éteint par défaut", safe.debug, false)
 local w = new_wezterm()
 local win = new_window(w)
+safe.wrap(w, "essai", function() end, true)(win, nil)
+safe.trace(w, "message")
+check("debug éteint : aucune trace dans les journaux", #w.logs.info, 0)
+safe.wrap(w, "essai", function()
+	error("boum")
+end, true)(win, nil)
+check("debug éteint : l'erreur est quand même écrite", #w.logs.error, 1)
+check("debug éteint : et notifiée", #win.toasts, 1)
+check("debug éteint : toujours aucune trace", #w.logs.info, 0)
+
+safe.debug = true -- la suite vérifie les traces elles-mêmes
+w = new_wezterm()
+win = new_window(w)
 safe.wrap(w, "essai", function() end, true)(win, nil)
 check("trace : deux lignes pour un appel réussi", #w.logs.info, 2)
 check("trace : d'abord « appelée »", w.logs.info[1], "logtime (essai) : appelée")

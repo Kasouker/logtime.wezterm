@@ -91,6 +91,7 @@ local keys = load_module("config/keys")
 local settings = load_module("settings/store")
 local settings_page = load_module("pages/settings_page")
 local theme = load_module("color/theme")
+local safe = load_module("ui/safe")
 
 -- Options provisoires : elles iront dans config/defaults.lua à une étape suivante.
 local cfg = {
@@ -108,6 +109,7 @@ local cfg = {
 	lang = "fr", -- "fr" ou "en"
 	open_key = "F2", -- la touche qui ouvre le calendrier
 	settings_key = "F4", -- la touche qui ouvre la page de personnalisation
+	debug = false, -- true : chaque touche et chaque dessin des pages sont écrits dans les journaux de WezTerm
 }
 
 -- Les noms d'options valables en plus de ceux du schéma des réglages (settings/schema.lua).
@@ -128,6 +130,7 @@ local EXTRA_OPTIONS = {
 	"heat",
 	"thresholds",
 	"status", -- false : ne pas afficher le compteur dans la barre (il compte quand même)
+	"debug",
 }
 
 -- Le fichier des réglages choisis par l'utilisateur : <dossier personnel>/.logtime_settings.json
@@ -150,6 +153,7 @@ function M.setup(opts)
 	for _, problem in ipairs(problems) do
 		wezterm.log_error("logtime : réglages : " .. problem)
 	end
+	safe.debug = cfg.debug == true
 	return M
 end
 

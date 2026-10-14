@@ -25,6 +25,7 @@ local function load_module(name)
 	end
 	return cache[name]
 end
+load_module("ui/safe").debug = true -- ces tests lisent les traces du journal (éteintes par défaut)
 local calendar_page = load_module("pages/calendar_page")
 local layout = load_module("calendar/layout")
 local platform = load_module("system/platform")

@@ -15,6 +15,7 @@ local function load_module(name)
 	end
 	return cache[name]
 end
+load_module("ui/safe").debug = true -- ces tests lisent les traces du journal (éteintes par défaut)
 local settings_page = load_module("pages/settings_page")
 local palette = load_module("color/palette")
 local convert = load_module("color/convert")

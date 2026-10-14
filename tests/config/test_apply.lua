@@ -1190,6 +1190,38 @@ local function scenarios()
 	)
 	cleanup(e)
 
+	-- les traces (chaque touche, chaque dessin) : éteintes par défaut, allumées avec debug = true
+	local function traces(env)
+		local n = 0
+		for _, m in ipairs(env.w.logs.info) do
+			if
+				m:find("logtime (", 1, true)
+				or m:find("dessin du mois", 1, true)
+				or m:find("touches de la page", 1, true)
+			then
+				n = n + 1
+			end
+		end
+		return n
+	end
+	for _, debug in ipairs({ false, true }) do
+		clock.now = T0
+		e = new_env({ file = false })
+		local opts = debug and { debug = true } or {}
+		config = e.M.apply_to_config({}, opts)
+		win = e.window()
+		screen = screen_pane(e)
+		open_binding(config, "F2")(win, screen)
+		check(
+			debug and "debug = true : ouvrir le calendrier laisse des traces"
+				or "par défaut : ouvrir le calendrier ne laisse aucune trace dans les journaux",
+			traces(e) > 0,
+			debug
+		)
+		check("debug = " .. tostring(debug) .. " : aucune option inconnue signalée", #e.w.logs.error, 0)
+		cleanup(e)
+	end
+
 	-- le fichier ne se lit pas tout de suite : le temps inactif attend en mémoire, puis s'ajoute au fichier
 	clock.now = T0
 	e = new_env({ file = false })

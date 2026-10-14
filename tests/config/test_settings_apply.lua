@@ -156,8 +156,18 @@ local function new_env(dims)
 	end
 	package.loaded["wezterm"] = w
 	local env = { home = home, w = w, path = home .. "/.logtime_settings.json" }
+	-- Ces tests comptent les mois dessinés grâce aux traces du journal : debug = true sauf si le test le choisit.
 	function env.load()
-		return assert(loadfile(root .. "/plugin/init.lua"))(root)
+		local M = assert(loadfile(root .. "/plugin/init.lua"))(root)
+		local apply = M.apply_to_config
+		M.apply_to_config = function(config, opts, ...)
+			opts = opts or {}
+			if type(opts) == "table" and opts.debug == nil then
+				opts.debug = true
+			end
+			return apply(config, opts, ...)
+		end
+		return M
 	end
 	function env.window()
 		local win = { performed = {} }
@@ -417,8 +427,18 @@ cleanup(e)
 e = new_env(BIG)
 config = e.M.apply_to_config({}, "max_months = 6")
 check("réglages donnés en texte : un avertissement sur la table", errors_with(e, "doit être une table"), 1)
-frame, months = open_page(e, config)
-check("réglages donnés en texte : le plugin fonctionne avec les valeurs par défaut", months, 12)
+frame = open_page(e, config)
+-- sans table, pas d'option debug : les mois sont comptés dans le dessin (12 mois : de novembre 2025 à octobre 2026)
+check(
+	"réglages donnés en texte : le plugin fonctionne avec les valeurs par défaut (12 mois)",
+	strip(frame):find("Novembre 2025", 1, true) ~= nil and strip(frame):find("Octobre 2026", 1, true) ~= nil,
+	true
+)
+check(
+	"réglages donnés en texte : pas un mois de plus (pas d'octobre 2025)",
+	strip(frame):find("Octobre 2025", 1, true),
+	nil
+)
 cleanup(e)
 
 e = new_env(BIG)
