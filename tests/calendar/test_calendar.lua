@@ -372,72 +372,94 @@ check("plusieurs mois : le titre le plus long tient dans 65 colonnes", (function
 	end
 	return true
 end)(), true)
--- ---- les encadrés : chaque mois dans son cadre, avec la grille des cases à l'intérieur
+-- ---- les encadrés : chaque mois dans son cadre, compact (les textes sont posés sur les traits)
 local grid_cfg = { borders = true }
 local boxed = lines_of(strip(render(days, 2026, 10, "2026-10-12", grid_cfg)))
--- mois seul, octobre 2026 (5 semaines) : vide, haut du cadre, titre, en-tête, jonction, 3 lignes par semaine,
--- moyenne, meilleur jour, bas du cadre, légende
-check("cadre : le haut", boxed[2], "  ╭──────────────────────────────────────────────────────────────╮")
-check("cadre : le titre dans le cadre, sans « Logtime : »", boxed[3], "  │ Octobre 2026   Total du mois : 5h45 / Jours actifs : 3       │")
-check("cadre : l'en-tête dans le cadre, au-dessus des cases", boxed[4], "  │  Lun      Mar      Mer      Jeu      Ven      Sam      Dim   │")
-check("cadre : la jonction entre l'en-tête et les cases", boxed[5], "  ├────────┬────────┬────────┬────────┬────────┬────────┬────────┤")
-check("cadre : la 1re semaine, numéros", boxed[6], "  │        │        │        │  1     │  2     │  3     │  4     │")
-check("cadre : la 1re semaine, durées", boxed[7], "  │        │        │        │   ·    │   ·    │   ·    │   ·    │")
-check("cadre : un trait entre deux semaines", boxed[8], "  ├────────┼────────┼────────┼────────┼────────┼────────┼────────┤")
-check("cadre : la jonction après la dernière semaine", boxed[5 + 5 * 3], "  ├────────┴────────┴────────┴────────┴────────┴────────┴────────┤")
-check("cadre : la moyenne dans le cadre", boxed[21], "  │ Moyenne par jour actif : 1h55                                │")
-check("cadre : le meilleur jour dans le cadre", boxed[22], "  │ Meilleur jour : 10 (4h13)   Série en cours : 3 j             │")
-check("cadre : le bas", boxed[23], "  ╰──────────────────────────────────────────────────────────────╯")
-check("cadre : la légende des couleurs reste dehors", boxed[24], "  ██ <1h   ██ 1-3h   ██ 3-6h   ██ 6h+     * = aujourd'hui")
+-- mois seul, octobre 2026 (5 semaines) : vide, haut (titre), jonction (jours), 5 semaines de 2 lignes séparées par un
+-- trait, la fermeture de la grille, moyenne, meilleur jour, bas, légende
+check("cadre : le titre sur le haut du cadre, sans « Logtime : »", boxed[2], " ╭─ Octobre 2026   Total du mois : 5h45 / Jours actifs : 3 ─────╮")
+check("cadre : les jours de la semaine sur la jonction", boxed[3], " ├──Lun───┬──Mar───┬──Mer───┬──Jeu───┬──Ven───┬──Sam───┬──Dim───┤")
+check("cadre : la 1re semaine, numéros", boxed[4], " │        │        │        │  1     │  2     │  3     │  4     │")
+check("cadre : la 1re semaine, durées", boxed[5], " │        │        │        │   ·    │   ·    │   ·    │   ·    │")
+check("cadre : un trait entre deux semaines", boxed[6], " ├────────┼────────┼────────┼────────┼────────┼────────┼────────┤")
+check("cadre : la dernière semaine (numéros, durées), puis directement la fermeture de la grille", boxed[16]:find(" │ 26", 1, true) == 1 and boxed[17]:find("├", 1, true) == nil and boxed[18]:find("┴", 1, true) ~= nil, true)
+check("cadre : la grille se ferme avant les statistiques", boxed[18], " ├────────┴────────┴────────┴────────┴────────┴────────┴────────┤")
+check("cadre : la moyenne dans le cadre", boxed[19], " │ Moyenne par jour actif : 1h55                                │")
+check("cadre : le meilleur jour dans le cadre", boxed[20], " │ Meilleur jour : 10 (4h13)   Série en cours : 3 j             │")
+check("cadre sans objectif : le bas, sans texte", boxed[21], " ╰──────────────────────────────────────────────────────────────╯")
+check("cadre : la légende des couleurs reste dehors", boxed[22], "  ██ <1h   ██ 1-3h   ██ 3-6h   ██ 6h+     * = aujourd'hui")
 check("cadre : un seul haut et un seul bas", select(2, table.concat(boxed, "\n"):gsub("╭", "")) .. select(2, table.concat(boxed, "\n"):gsub("╰", "")), "11")
-check("cadre : la 2e semaine, avec la durée du 10", boxed[10]:find("│  4h13  │", 1, true) ~= nil, true)
+check("cadre : la 2e semaine, avec la durée du 10", boxed[8]:find("│  4h13  │", 1, true) ~= nil, true)
 local boxed_goal_lines = lines_of(strip(render(days, 2026, 10, "2026-10-12", { borders = true, goal_hours = 3 })))
-check("cadre avec un objectif : les validés dans le cadre, avant le bas", boxed_goal_lines[23] .. "|" .. boxed_goal_lines[24], "  │ Semaines validées : 0/5 / Jours validés : 1/31               │|  ╰──────────────────────────────────────────────────────────────╯")
-check("cadre : toutes les lignes du cadre font 66 colonnes, pour les 4 styles", (function()
+check("cadre avec un objectif : les validés sur le bas du cadre", boxed_goal_lines[21], " ╰─ Semaines validées : 0/5 / Jours validés : 1/31 ─────────────╯")
+check("cadre : toutes les lignes du cadre font 65 colonnes, pour les 4 styles", (function()
 	for style in pairs(assemble.BORDER_STYLES) do
 		local ls = lines_of(strip(render(days, 2026, 10, "2026-10-12", { borders = true, border_style = style, goal_hours = 3 })))
 		for i = 2, #ls - 1 do
-			if utf8.len(ls[i]) ~= 66 then
+			if utf8.len(ls[i]) ~= 65 then
 				return style .. " ligne " .. i .. " : " .. utf8.len(ls[i])
 			end
 		end
 	end
 	return true
 end)(), true)
-check("cadre double : ses coins et ses jonctions", lines_of(strip(render(days, 2026, 10, "2026-10-12", { borders = true, border_style = "double" })))[2]:sub(1, 5) .. lines_of(strip(render(days, 2026, 10, "2026-10-12", { borders = true, border_style = "double" })))[5]:sub(1, 5), "  ╔  ╠")
-check("cadre épais : ses croisements", lines_of(strip(render(days, 2026, 10, "2026-10-12", { borders = true, border_style = "heavy" })))[8]:find("╋", 1, true) ~= nil, true)
-check("cadre : style inconnu, l'arrondi", lines_of(strip(render(days, 2026, 10, "2026-10-12", { borders = true, border_style = "zzz" })))[2]:sub(1, 5), "  ╭")
+local dbl = lines_of(strip(render(days, 2026, 10, "2026-10-12", { borders = true, border_style = "double" })))
+check("cadre double : ses coins, ses jonctions", dbl[2]:sub(1, 4) .. dbl[3]:sub(1, 4), " ╔ ╠")
+check("cadre épais : ses croisements", lines_of(strip(render(days, 2026, 10, "2026-10-12", { borders = true, border_style = "heavy" })))[6]:find("╋", 1, true) ~= nil, true)
+check("cadre : style inconnu, l'arrondi", lines_of(strip(render(days, 2026, 10, "2026-10-12", { borders = true, border_style = "zzz" })))[2]:sub(1, 4), " ╭")
 check("cadre : les traits sont dans leur couleur (gris)", render(days, 2026, 10, "2026-10-12", grid_cfg):find(convert.fg(assemble.BORDER_COLOR) .. "╭", 1, true) ~= nil, true)
+check("cadre : les noms des jours ne sont pas dans la couleur des traits (la couleur est remise à zéro juste avant)", render(days, 2026, 10, "2026-10-12", grid_cfg):find(convert.RESET .. "Lun", 1, true) ~= nil, true)
+check("cadre : le titre non plus", render(days, 2026, 10, "2026-10-12", grid_cfg):find(convert.RESET .. " Octobre", 1, true) ~= nil, true)
 local grid_goal = render(days, 2026, 10, "2026-10-12", { borders = true, goal_hours = 3 })
 check("cadre : ✓ et rayé toujours là", strip(grid_goal):find("✓ 4h13", 1, true) ~= nil and grid_goal:find("\27[9m0h31", 1, true) ~= nil, true)
-check("cadre : novembre 2026 (6 semaines), la jonction du bas après la 6e semaine", lines_of(strip(render({}, 2026, 11, "x", grid_cfg)))[5 + 6 * 3]:sub(1, 5), "  ├")
--- plusieurs mois : un bloc de 66 x 24
+local nov = lines_of(strip(render({}, 2026, 11, "x", grid_cfg)))
+check("cadre : novembre 2026 (6 semaines), la grille se ferme après la 6e semaine", nov[4 + 6 * 3 - 1]:sub(1, 4), " ├")
+-- plusieurs mois : un bloc de 65 x 20, toujours 6 semaines
 local grid_block = assemble.month_block(days, 2026, 10, "2026-10-12", { borders = true, goal_hours = 3 }, fr, false)
 local grid_block_plain = {}
 for i, l in ipairs(grid_block.lines) do
 	grid_block_plain[i] = strip(l)
 end
-check("plusieurs mois encadrés : 24 lignes", #grid_block.lines, 24)
-check("plusieurs mois encadrés : largeur 66", grid_block.width, 66)
-check("plusieurs mois encadrés : le haut, puis le titre", grid_block_plain[1]:sub(1, 5) .. "|" .. grid_block_plain[2], "  ╭|  │ Octobre 2026   Total du mois : 5h45 / Jours actifs : 3       │")
-check("plusieurs mois encadrés : les validés juste avant le bas", grid_block_plain[23] .. "|" .. grid_block_plain[24], "  │ Semaines validées : 0/5 / Jours validés : 1/31               │|  ╰──────────────────────────────────────────────────────────────╯")
-check("plusieurs mois encadrés : les lignes vides restent dans le cadre", grid_block_plain[22], "  │                                                              │")
-check("plusieurs mois encadrés : chaque ligne fait 66 colonnes", (function()
+check("plusieurs mois encadrés : 20 lignes", #grid_block.lines, 20)
+check("plusieurs mois encadrés : largeur 65", grid_block.width, 65)
+check("plusieurs mois encadrés : le titre sur le haut", grid_block_plain[1], " ╭─ Octobre 2026   Total du mois : 5h45 / Jours actifs : 3 ─────╮")
+check("plusieurs mois encadrés : les jours sur la jonction", grid_block_plain[2], " ├──Lun───┬──Mar───┬──Mer───┬──Jeu───┬──Ven───┬──Sam───┬──Dim───┤")
+check("plusieurs mois encadrés : une 6e semaine vide (octobre en a 5)", grid_block_plain[18] .. "|" .. grid_block_plain[19], " │        │        │        │        │        │        │        │| │        │        │        │        │        │        │        │")
+check("plusieurs mois encadrés : les validés sur le bas, avec les jonctions des cases après le texte", grid_block_plain[20], " ╰─ Semaines validées : 0/5 / Jours validés : 1/31 ────┴────────╯")
+check("plusieurs mois encadrés sans objectif : le bas avec ses jonctions", strip(assemble.month_block(days, 2026, 10, "x", grid_cfg, fr, false).lines[20]), " ╰────────┴────────┴────────┴────────┴────────┴────────┴────────╯")
+check("plusieurs mois encadrés : chaque ligne fait 65 colonnes", (function()
 	for i, l in ipairs(grid_block_plain) do
-		if utf8.len(l) ~= 66 then
+		if utf8.len(l) ~= 65 then
 			return i
 		end
 	end
 	return true
 end)(), true)
-local selected_block = assemble.month_block(days, 2026, 10, "2026-10-12", { borders = true }, fr, true)
-check("mois choisi encadré : le titre en gras, aligné comme les autres (pas de marge en trop)", strip(selected_block.lines[2]), grid_block_plain[2])
-check("mois choisi encadré : le gras est bien là", selected_block.lines[2]:find("\27[1m", 1, true) ~= nil, true)
-check("février 2021 (4 semaines) encadré : 24 lignes aussi", #assemble.month_block({}, 2021, 2, "x", grid_cfg, fr, false).lines, 24)
-check("sans objectif, encadré : la ligne des validés est vide (dans le cadre)", strip(assemble.month_block(days, 2026, 10, "x", grid_cfg, fr, false).lines[23]), "  │                                                              │")
+local selected_block = assemble.month_block(days, 2026, 10, "2026-10-12", { borders = true, goal_hours = 3 }, fr, true)
+check("mois choisi encadré : le titre en gras, aligné comme les autres", strip(selected_block.lines[1]), grid_block_plain[1])
+check("mois choisi encadré : le gras est bien là", selected_block.lines[1]:find("\27[1m", 1, true) ~= nil, true)
+check("février 2021 (4 semaines) encadré : 20 lignes aussi", #assemble.month_block({}, 2021, 2, "x", grid_cfg, fr, false).lines, 20)
+check("novembre 2026 (6 semaines) encadré : 20 lignes", #assemble.month_block({}, 2026, 11, "x", grid_cfg, fr, false).lines, 20)
+check("le titre le plus long tient sur le haut du cadre (septembre, 744h00, 30 jours actifs)", (function()
+	local long = {}
+	for d = 1, 30 do
+		long[string.format("2026-09-%02d", d)] = 89280
+	end
+	for _, labels in ipairs({ fr, en }) do
+		local first = strip(assemble.month_block(long, 2026, 9, "x", grid_cfg, labels, true).lines[1])
+		if utf8.len(first) ~= 65 or not first:find("╮$") then
+			return first
+		end
+	end
+	return true
+end)(), true)
+check("assemble.width / height : sans encadrés", assemble.width({}) .. "x" .. assemble.height({}), "65x21")
+check("assemble.width / height : avec (plus petit que sans)", assemble.width(grid_cfg) .. "x" .. assemble.height(grid_cfg), "65x20")
+check("sans encadrés : aucune ligne de trait", render(days, 2026, 10, "2026-10-12", {}):find("─", 1, true), nil)
+
 local blue = render(days, 2026, 10, "2026-10-12", { borders = true, border_color = "#3366CC" })
 check("couleur du trait : le cadre du mois dans cette couleur", blue:find(convert.fg("#3366CC") .. "╭", 1, true) ~= nil, true)
-check("couleur du trait : la grille des cases aussi", blue:find(convert.fg("#3366CC") .. "├────────┬", 1, true) ~= nil and blue:find(convert.fg("#3366CC") .. "│", 1, true) ~= nil, true)
+check("couleur du trait : la grille des cases aussi", blue:find(convert.fg("#3366CC") .. "├────────┼", 1, true) ~= nil and blue:find(convert.fg("#3366CC") .. "│", 1, true) ~= nil, true)
 -- (le gris reste celui du texte des jours vides : on ne cherche que les traits en gris)
 local function gray_border(text)
 	for _, c in ipairs({ "╭", "╮", "╰", "╯", "│", "├", "┤", "─" }) do
@@ -452,9 +474,6 @@ check("couleur du trait mal écrite : le gris", render(days, 2026, 10, "2026-10-
 check("couleur du trait en minuscules : acceptée", render(days, 2026, 10, "2026-10-12", { borders = true, border_color = "#3366cc" }):find(convert.fg("#3366CC") .. "╭", 1, true) ~= nil, true)
 local blue_block = table.concat(assemble.month_block(days, 2026, 10, "x", { borders = true, border_color = "#3366CC" }, fr, true).lines, "\n")
 check("couleur du trait : plusieurs mois aussi", blue_block:find(convert.fg("#3366CC") .. "╰", 1, true) ~= nil and gray_border(blue_block) == nil, true)
-check("assemble.width / height : sans encadrés", assemble.width({}) .. "x" .. assemble.height({}), "65x21")
-check("assemble.width / height : avec", assemble.width(grid_cfg) .. "x" .. assemble.height(grid_cfg), "66x24")
-check("sans encadrés : aucune ligne de trait", render(days, 2026, 10, "2026-10-12", {}):find("─", 1, true), nil)
 
 check("dates.key_any : le 0 octobre est le 30 septembre", dates.key_any(2026, 10, 0), "2026-09-30")
 check("dates.key_any : le 32 décembre est le 1er janvier", dates.key_any(2026, 12, 32), "2027-01-01")
