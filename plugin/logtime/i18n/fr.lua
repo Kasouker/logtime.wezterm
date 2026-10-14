@@ -24,13 +24,11 @@ return {
 		max_months = "Mois affichés au maximum",
 		months_anchor = "Place du mois choisi",
 		week_starts_on = "Début de la semaine",
-		center = "Calendrier centré",
 	},
 	settings_hints = {
 		max_months = "Selon la place dans la fenêtre, jusqu'à ce nombre.",
 		months_anchor = "Avec plusieurs mois : où se place le mois choisi.",
 		week_starts_on = "Le premier jour de chaque ligne du calendrier.",
-		center = "Centrer le calendrier dans la fenêtre.",
 	},
 	settings_values = {
 		months_anchor = { last = "à la fin", first = "au début" },

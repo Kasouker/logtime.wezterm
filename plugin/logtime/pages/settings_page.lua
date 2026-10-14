@@ -32,7 +32,8 @@ M.TAB = { COLORS = 1, CALENDAR = 2 }
 M.TAB_COUNT = 2
 
 -- Les réglages de l'onglet Calendrier, dans l'ordre d'affichage (leurs limites viennent de settings/schema.lua).
-M.CALENDAR_SETTINGS = { "max_months", "months_anchor", "week_starts_on", "center" }
+-- Pas de réglage du centrage : le calendrier est toujours centré (center = false reste possible dans wezterm.lua).
+M.CALENDAR_SETTINGS = { "max_months", "months_anchor", "week_starts_on" }
 
 -- Les messages affichés en bas de la page (gardés dans wezterm.GLOBAL sous forme de nombres).
 M.MESSAGE = { NONE = 0, SAVED = 1, FAILED = 2, CONSENT = 3, SETTING_SAVED = 4 }
