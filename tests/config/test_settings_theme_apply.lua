@@ -96,8 +96,9 @@ local function new_env(global)
 	local home = os.tmpname()
 	os.remove(home)
 	os.execute("mkdir -p '" .. home .. "'")
+	os.execute("mkdir -p '" .. home .. "/.local/share/logtime'") -- le dossier des fichiers du plugin
 	homes[#homes + 1] = home
-	write(home .. "/.logtime.json", HISTORY)
+	write(home .. "/.local/share/logtime/.logtime.json", HISTORY)
 	local w = {
 		logs = { error = {}, info = {} },
 		events = {},
@@ -106,6 +107,10 @@ local function new_env(global)
 		spawned = {},
 		GLOBAL = global or {},
 		home_dir = home,
+		run_child_process = function(args) -- crée le dossier des fichiers, comme WezTerm (storage/location.lua)
+			os.execute("mkdir -p '" .. args[#args] .. "'")
+			return true, "", ""
+		end,
 		target_triple = "x86_64-pc-windows-msvc",
 	}
 	current_w = w
@@ -170,7 +175,7 @@ local function new_env(global)
 		return pane
 	end
 	package.loaded["wezterm"] = w
-	local env = { home = home, w = w, path = home .. "/.logtime_settings.json", toasts = {} }
+	local env = { home = home, w = w, path = home .. "/.local/share/logtime/.logtime_settings.json", toasts = {} }
 	function env.load()
 		return assert(loadfile(root .. "/plugin/init.lua"))(root)
 	end

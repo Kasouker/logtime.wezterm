@@ -86,6 +86,7 @@ local auto = load_module("status/auto")
 local storage = load_module("storage/days")
 local projects_storage = load_module("storage/projects")
 local platform = load_module("system/platform")
+local location = load_module("storage/location")
 local calendar_page = load_module("pages/calendar_page")
 local keys = load_module("config/keys")
 local settings = load_module("settings/store")
@@ -133,9 +134,58 @@ local EXTRA_OPTIONS = {
 	"debug",
 }
 
--- Le fichier des réglages choisis par l'utilisateur : <dossier personnel>/.logtime_settings.json
+-- Le dossier des fichiers du plugin : <dossier personnel>/.local/share/logtime (voir storage/location.lua : un
+-- fichier écrit à côté de la config fait recharger la config). Préparé une fois par lancement de WezTerm (le résultat
+-- est gardé dans wezterm.GLOBAL) : créé s'il manque, et les fichiers de l'ancien emplacement (le dossier personnel) y
+-- sont copiés. Au moindre problème, l'ancien emplacement est gardé (jamais d'heures comptées à part) et c'est écrit
+-- dans les journaux ; la prochaine fois que WezTerm démarre, on réessaie.
+local function data_dir()
+	local G_ = wezterm.GLOBAL
+	if G_.logtime_data_dir ~= nil then
+		return tostring(G_.logtime_data_dir)
+	end
+	local home = wezterm.home_dir
+	local dir = location.dir(home, sep)
+	local chosen = dir
+	if not location.writable(dir, sep) then
+		pcall(wezterm.run_child_process, location.mkdir_args(platform.os_name(wezterm.target_triple), dir))
+	end
+	if not location.writable(dir, sep) then
+		wezterm.log_error(
+			"logtime : impossible de créer le dossier " .. dir .. " : les fichiers restent dans " .. home
+		)
+		chosen = home
+	else
+		local copied, problems = location.migrate(home, dir, sep)
+		if #problems > 0 then
+			for _, problem in ipairs(problems) do
+				wezterm.log_error(
+					"logtime : copie impossible vers " .. dir .. " : " .. problem .. " (l'original est intact)"
+				)
+			end
+			wezterm.log_error(
+				"logtime : les fichiers restent dans " .. home .. " (nouvel essai au prochain démarrage)"
+			)
+			chosen = home
+		elseif #copied > 0 then
+			wezterm.log_info(
+				"logtime : fichiers copiés dans "
+					.. dir
+					.. " : "
+					.. table.concat(copied, ", ")
+					.. ". Les originaux, dans "
+					.. home
+					.. ", ne servent plus : tu peux les supprimer."
+			)
+		end
+	end
+	G_.logtime_data_dir = chosen
+	return chosen
+end
+
+-- Le fichier des réglages choisis par l'utilisateur : <dossier des fichiers>/.logtime_settings.json
 local function settings_path()
-	return cfg.settings_file or (wezterm.home_dir .. sep .. ".logtime_settings.json")
+	return cfg.settings_file or (data_dir() .. sep .. ".logtime_settings.json")
 end
 
 -- Les réglages, par ordre de priorité croissante : valeurs par défaut du plugin, options de wezterm.lua, fichier de réglages.
@@ -158,7 +208,7 @@ function M.setup(opts)
 end
 
 local function data_path()
-	return cfg.data_file or (wezterm.home_dir .. sep .. ".logtime.json")
+	return cfg.data_file or (data_dir() .. sep .. ".logtime.json")
 end
 
 -- ------------------------------------------------------------
@@ -427,7 +477,7 @@ local idle_file = side_file({
 	prefix = "logtime_idle",
 	what = "du temps inactif",
 	path = function()
-		return cfg.idle_file or (wezterm.home_dir .. sep .. ".logtime_idle.json")
+		return cfg.idle_file or (data_dir() .. sep .. ".logtime_idle.json")
 	end,
 	decode = storage.decode,
 	encode = storage.encode,
@@ -445,7 +495,7 @@ local projects_file = side_file({
 	prefix = "logtime_projects",
 	what = "du temps par projet",
 	path = function()
-		return cfg.projects_file or (wezterm.home_dir .. sep .. ".logtime_projects.json")
+		return cfg.projects_file or (data_dir() .. sep .. ".logtime_projects.json")
 	end,
 	decode = projects_storage.decode,
 	encode = projects_storage.encode,

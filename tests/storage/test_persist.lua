@@ -108,7 +108,11 @@ end
 local writes = {}
 local real_open = io.open
 local blocked_reads = nil -- un motif : la relecture de ces fichiers échoue (fichier bloqué un instant sous Windows)
+local blocked_writes = nil -- un motif : l'écriture de ces fichiers est refusée
 io.open = function(path, mode)
+	if blocked_writes and mode == "wb" and path:find(blocked_writes) then
+		return nil, path .. ": Permission denied", 13
+	end
 	if blocked_reads and mode == "rb" and path:find(blocked_reads) then
 		return nil, path .. ": Permission denied", 13
 	end
@@ -173,10 +177,21 @@ local function new_env(opts)
 	local home = os.tmpname()
 	os.remove(home)
 	os.execute("mkdir -p '" .. home .. "'")
+	local data = home .. "/.local/share/logtime" -- le dossier des fichiers du plugin (storage/location.lua)
 	local logs = { error = {}, info = {} }
+	local mkdirs = {}
 	local fake = {
 		GLOBAL = hostile_global(opts.global),
 		home_dir = home,
+		-- crée un dossier comme le ferait WezTerm (mkdir -p) ; opts.mkdir_fails : la création échoue
+		run_child_process = function(args)
+			mkdirs[#mkdirs + 1] = table.concat(args, " ")
+			if opts.mkdir_fails then
+				return false, "", "refusé"
+			end
+			os.execute("mkdir -p '" .. args[#args] .. "'")
+			return true, "", ""
+		end,
 		log_error = function(m)
 			logs.error[#logs.error + 1] = m
 		end,
@@ -185,14 +200,26 @@ local function new_env(opts)
 		end,
 	}
 	if opts.file then
-		write(home .. "/" .. FILE, opts.file)
+		os.execute("mkdir -p '" .. data .. "'")
+		write(data .. "/" .. FILE, opts.file)
+	end
+	if opts.old_file then -- l'ancien emplacement (avant cette version) : directement dans le dossier personnel
+		write(home .. "/" .. FILE, opts.old_file)
 	end
 	package.loaded["wezterm"] = fake
 	local function load_module()
 		return assert(loadfile(root .. "/plugin/init.lua"))(root)
 	end
-	local env =
-		{ home = home, fake = fake, logs = logs, path = home .. "/" .. FILE, load = load_module, M = load_module() }
+	local env = {
+		home = home,
+		data = data,
+		fake = fake,
+		logs = logs,
+		mkdirs = mkdirs,
+		path = data .. "/" .. FILE,
+		load = load_module,
+		M = load_module(),
+	}
 	return env
 end
 local function run(env, t0, seconds)
@@ -235,7 +262,7 @@ local function scenarios()
 	e.M.tick(nil)
 	check("sans fichier : entre deux sauvegardes, le fichier ne bouge pas", read(e.path), '{"2026-10-12":11}')
 	check("sans fichier : aucune erreur", #e.logs.error, 0)
-	check("sans fichier : pas de fichier temporaire laissé", has_prefix(e.home, FILE .. ".tmp"), nil)
+	check("sans fichier : pas de fichier temporaire laissé", has_prefix(e.data, FILE .. ".tmp"), nil)
 	cleanup(e)
 
 	-- ============================================================
@@ -371,9 +398,9 @@ local function scenarios()
 	e = new_env({ file = broken })
 	clock.now = t0
 	e.M.tick(nil)
-	local kept = has_prefix(e.home, FILE .. ".corrupt-")
+	local kept = has_prefix(e.data, FILE .. ".corrupt-")
 	check("fichier abîmé : mis de côté sous un nouveau nom", kept ~= nil, true)
-	check("fichier abîmé : son contenu est conservé tel quel", kept and read(e.home .. "/" .. kept), broken)
+	check("fichier abîmé : son contenu est conservé tel quel", kept and read(e.data .. "/" .. kept), broken)
 	check("fichier abîmé : l'emplacement d'origine est libre", read(e.path), nil)
 	check("fichier abîmé : l'erreur est écrite dans les journaux", #e.logs.error, 1)
 	check("fichier abîmé : le message dit où il est", e.logs.error[1]:find(".corrupt-", 1, true) ~= nil, true)
@@ -418,7 +445,7 @@ local function scenarios()
 	text = run(e, t0 + 147, 70) -- la nouvelle tentative (toutes les 60 s) réussit, le fichier est mis de côté
 	check(
 		"fichier abîmé non déplaçable : une fois le problème réglé, le fichier est mis de côté",
-		has_prefix(e.home, FILE .. ".corrupt-") ~= nil,
+		has_prefix(e.data, FILE .. ".corrupt-") ~= nil,
 		true
 	)
 	check(
@@ -481,7 +508,7 @@ local function scenarios()
 		e.logs.error[1]:find("relecture impossible : .*Permission denied") ~= nil,
 		true
 	)
-	check("relecture bloquée : aucun fichier temporaire laissé", has_prefix(e.home, FILE .. ".tmp"), nil)
+	check("relecture bloquée : aucun fichier temporaire laissé", has_prefix(e.data, FILE .. ".tmp"), nil)
 	text = run(e, t0 + 13, 12)
 	check("relecture bloquée : la tentative suivante réussit, l'alerte disparaît", text, ICON .. " 00:00:25")
 	check("relecture bloquée : rien n'est perdu", read(e.path), '{"2026-10-12":21}')
@@ -511,7 +538,7 @@ local function scenarios()
 	clock.now = t0 + 6
 	text = e.M.tick(nil)
 	check("rechargement : le comptage continue", text, ICON .. " 00:00:06")
-	check("rechargement : le fichier n'est pas relu ni mis de côté", has_prefix(e.home, FILE .. ".corrupt-"), nil)
+	check("rechargement : le fichier n'est pas relu ni mis de côté", has_prefix(e.data, FILE .. ".corrupt-"), nil)
 	cleanup(e)
 
 	-- ============================================================
@@ -537,8 +564,125 @@ local function scenarios()
 	end
 	check("400 jours d'historique : tous conservés avec exactement les mêmes valeurs", identical, true)
 	check("400 jours d'historique : le jour du 12 est ajouté", after_days and after_days["2026-10-12"], 11)
-	check("chemin par défaut : <dossier personnel>/.logtime.json", read(e.home .. "/.logtime.json") ~= nil, true)
+	check(
+		"chemin par défaut : <dossier personnel>/.local/share/logtime/.logtime.json",
+		read(e.home .. "/.local/share/logtime/.logtime.json") ~= nil,
+		true
+	)
+	check("chemin par défaut : rien directement dans le dossier personnel", read(e.home .. "/.logtime.json"), nil)
 	cleanup(e)
+
+	-- ============================================================
+	-- 10 bis. Le dossier des fichiers (.local/share/logtime) et la copie depuis l'ancien emplacement
+	-- ============================================================
+	-- l'ancien fichier (dans le dossier personnel) est copié, jamais modifié ni supprimé
+	e = new_env({ old_file = HISTORY })
+	check("ancien emplacement : rien n'est préparé au simple chargement", #e.mkdirs, 0)
+	run(e, t0, 0) -- le premier passage : le dossier est préparé au premier besoin
+	check("ancien emplacement : le dossier est créé (une commande)", #e.mkdirs, 1)
+	check("ancien emplacement : par mkdir -p (Linux, macOS)", e.mkdirs[1], "mkdir -p " .. e.data)
+	check("ancien emplacement : le fichier est copié tel quel", read(e.path), HISTORY)
+	check("ancien emplacement : l'original est intact", read(e.home .. "/" .. FILE), HISTORY)
+	text = run(e, t0 + 1, 29)
+	check("ancien emplacement : le compteur repart de l'historique copié (de 0 à 30 s)", e.M.today_seconds(), 30)
+	check(
+		"ancien emplacement : l'historique est gardé dans le nouveau fichier",
+		days_mod.decode(read(e.path))["2026-10-10"],
+		15231
+	)
+	check("ancien emplacement : l'original n'est jamais réécrit", read(e.home .. "/" .. FILE), HISTORY)
+	check("ancien emplacement : aucune erreur", #e.logs.error, 0)
+	local said = false
+	for _, m in ipairs(e.logs.info) do
+		said = said or (m:find("copiés", 1, true) ~= nil and m:find("tu peux les supprimer", 1, true) ~= nil)
+	end
+	check("ancien emplacement : le journal dit ce qui a été copié et que l'original ne sert plus", said, true)
+	-- WezTerm réévalue la config : le dossier n'est pas préparé une seconde fois
+	e.M = e.load()
+	run(e, t0 + 31, 5)
+	check("rechargement : pas de nouvelle commande de création", #e.mkdirs, 1)
+	cleanup(e)
+
+	-- un fichier déjà dans le nouveau dossier n'est jamais remplacé par l'ancien
+	e = new_env({ file = '{"2026-10-11":1}', old_file = HISTORY })
+	run(e, t0, 0)
+	check("les deux emplacements : le dossier existe déjà, aucune commande", #e.mkdirs, 0)
+	check("les deux emplacements : le nouveau fichier n'est pas remplacé", read(e.path), '{"2026-10-11":1}')
+	check("les deux emplacements : l'ancien est intact", read(e.home .. "/" .. FILE), HISTORY)
+	cleanup(e)
+
+	-- le dossier ne peut pas être créé : tout reste dans le dossier personnel, comme avant
+	e = new_env({ old_file = HISTORY, mkdir_fails = true })
+	text = run(e, t0, 12)
+	check("création impossible : une erreur dans les journaux", #e.logs.error, 1)
+	check(
+		"création impossible : le message dit où restent les fichiers",
+		e.logs.error[1] and e.logs.error[1]:find("restent dans " .. e.home, 1, true) ~= nil,
+		true
+	)
+	check("création impossible : le comptage continue, sans alerte", text, ICON .. " 00:00:12")
+	check(
+		"création impossible : l'ancien fichier est utilisé (historique gardé, jour ajouté)",
+		read(e.home .. "/" .. FILE),
+		'{"2026-10-10":15231,"2026-10-11":1900,"2026-10-12":11}'
+	)
+	e.M = e.load()
+	run(e, t0 + 13, 3)
+	check("création impossible : pas de nouvel essai avant le prochain démarrage de WezTerm", #e.mkdirs, 1)
+	check("création impossible : toujours une seule erreur", #e.logs.error, 1)
+	cleanup(e)
+
+	-- la copie échoue : l'ancien emplacement est gardé (jamais d'heures comptées à part)
+	e = nil
+	e = new_env({ old_file = HISTORY })
+	blocked_writes = "/%.local/share/logtime/%.logtime%.json%.tmp$"
+	text = run(e, t0, 12)
+	blocked_writes = nil
+	check("copie impossible : une erreur pour le fichier, une pour l'emplacement gardé", #e.logs.error, 2)
+	check(
+		"copie impossible : le message dit que l'original est intact",
+		e.logs.error[1] and e.logs.error[1]:find("l'original est intact", 1, true) ~= nil,
+		true
+	)
+	check("copie impossible : rien dans le nouveau dossier", read(e.path), nil)
+	check(
+		"copie impossible : l'ancien fichier continue d'être utilisé",
+		read(e.home .. "/" .. FILE),
+		'{"2026-10-10":15231,"2026-10-11":1900,"2026-10-12":11}'
+	)
+	cleanup(e)
+
+	-- une WezTerm sans run_child_process : tout reste dans le dossier personnel, sans planter
+	e = new_env({ old_file = HISTORY })
+	cleanup(e)
+	e = nil
+	do
+		local home = os.tmpname()
+		os.remove(home)
+		os.execute("mkdir -p '" .. home .. "'")
+		local logs = { error = {}, info = {} }
+		package.loaded["wezterm"] = {
+			GLOBAL = hostile_global(),
+			home_dir = home,
+			log_error = function(m)
+				logs.error[#logs.error + 1] = m
+			end,
+			log_info = function() end,
+		}
+		local M = assert(loadfile(root .. "/plugin/init.lua"))(root)
+		clock.now = t0
+		for i = 0, 12 do
+			clock.now = t0 + i
+			M.tick(nil)
+		end
+		check("sans run_child_process : une erreur dans les journaux", #logs.error, 1)
+		check(
+			"sans run_child_process : le fichier est dans le dossier personnel",
+			read(home .. "/" .. FILE) ~= nil,
+			true
+		)
+		os.execute("rm -rf '" .. home .. "'")
+	end
 
 	-- ============================================================
 	-- 11. Ce que laisse une ancienne version, et un texte d'état illisible
@@ -598,14 +742,15 @@ local function scenarios()
 	end
 	check("wezterm.GLOBAL : seulement des clés logtime_*", table.concat(foreign, ","), "")
 	local names = {}
-	for _, n in ipairs(list(e.home)) do
+	for _, n in ipairs(list(e.data)) do
 		names[#names + 1] = n
 	end
 	check(
-		"dossier personnel : seulement le fichier d'heures, sa copie de sécurité et le temps par projet",
+		"dossier des fichiers : seulement le fichier d'heures, sa copie de sécurité et le temps par projet",
 		table.concat(names, ","),
 		FILE .. "," .. FILE .. ".bak,.logtime_projects.json"
 	)
+	check("dossier personnel : rien d'autre que .local", table.concat(list(e.home), ","), ".local")
 	cleanup(e)
 end
 

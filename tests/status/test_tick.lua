@@ -119,11 +119,15 @@ end
 
 local ICON = utf8.char(0xF017)
 local function fresh()
-	os.execute("rm -f '" .. home .. "'/.logtime.json*")
+	os.execute("rm -f '" .. home .. "'/.local/share/logtime/.logtime.json*")
 	local logs = { error = {}, info = {} }
 	local fake = {
 		GLOBAL = hostile_global(),
 		home_dir = home,
+		run_child_process = function(args) -- crée le dossier des fichiers, comme WezTerm (storage/location.lua)
+			os.execute("mkdir -p '" .. args[#args] .. "'")
+			return true, "", ""
+		end,
 		log_error = function(m)
 			logs.error[#logs.error + 1] = m
 		end,

@@ -161,9 +161,10 @@ local function new_env(opts)
 	local home = os.tmpname()
 	os.remove(home)
 	os.execute("mkdir -p '" .. home .. "'")
+	os.execute("mkdir -p '" .. home .. "/.local/share/logtime'") -- le dossier des fichiers du plugin
 	homes[#homes + 1] = home
 	if opts.file ~= false then
-		write(home .. "/.logtime.json", opts.file or HISTORY)
+		write(home .. "/.local/share/logtime/.logtime.json", opts.file or HISTORY)
 	end
 	local w = {
 		logs = { error = {}, info = {} },
@@ -173,6 +174,10 @@ local function new_env(opts)
 		spawned = {},
 		GLOBAL = hostile_global(),
 		home_dir = home,
+		run_child_process = function(args) -- crée le dossier des fichiers, comme WezTerm (storage/location.lua)
+			os.execute("mkdir -p '" .. args[#args] .. "'")
+			return true, "", ""
+		end,
 		target_triple = opts.triple or "x86_64-pc-windows-msvc",
 	}
 	current_w = w
@@ -368,7 +373,7 @@ local function scenarios()
 	)
 	check(
 		"F2 : lire les heures n'écrit rien (rien de nouveau à sauvegarder)",
-		read(e.home .. "/.logtime.json"),
+		read(e.home .. "/.local/share/logtime/.logtime.json"),
 		HISTORY
 	)
 	check("F2 : aucune erreur", #e.w.logs.error, 0)
@@ -1002,13 +1007,13 @@ local function scenarios()
 	-- la pause d'une heure, plus la seconde de la reprise (comptée avant de voir que l'écran a changé)
 	check(
 		"inactif : la pause est notée dans .logtime_idle.json",
-		read(e.home .. "/.logtime_idle.json"),
+		read(e.home .. "/.local/share/logtime/.logtime_idle.json"),
 		'{"2026-10-13":3601}'
 	)
 	-- (sauvegardé toutes les 10 s : les dernières secondes sont encore en mémoire)
 	check(
 		"inactif : .logtime.json garde son format (sans l'inactif)",
-		read(e.home .. "/.logtime.json"):match('^{"2026%-10%-13":%d+}$') ~= nil,
+		read(e.home .. "/.local/share/logtime/.logtime.json"):match('^{"2026%-10%-13":%d+}$') ~= nil,
 		true
 	)
 	check("inactif : aucune erreur", #e.w.logs.error, 0)
@@ -1066,24 +1071,30 @@ local function scenarios()
 	live(e, win, screen, 4301, 4700, false) -- 6 min 40 sans rien toucher
 	check(
 		"inactif, WezTerm rouvert : l'ancien inactif est gardé, le nouveau s'y ajoute",
-		read(home .. "/.logtime_idle.json"),
+		read(home .. "/.local/share/logtime/.logtime_idle.json"),
 		'{"2026-10-13":4001}'
 	)
 	cleanup(e)
 	-- un fichier d'inactif abîmé : mis de côté, jamais pris pour du vide en silence
 	clock.now = T0
 	e = new_env({ file = false })
-	write(e.home .. "/.logtime_idle.json", "pas du json")
+	write(e.home .. "/.local/share/logtime/.logtime_idle.json", "pas du json")
 	e.M.apply_to_config({})
 	screen = screen_pane(e)
 	live(e, win, screen, 0, 400, false)
 	check("inactif, fichier abîmé : signalé une seule fois dans les journaux", #e.w.logs.error, 1)
 	check(
 		"inactif, fichier abîmé : mis de côté",
-		io.popen("ls -a '" .. e.home .. "'"):read("*a"):find(".logtime_idle.json.corrupt-", 1, true) ~= nil,
+		io.popen("ls -a '" .. e.home .. "/.local/share/logtime'")
+			:read("*a")
+			:find(".logtime_idle.json.corrupt-", 1, true) ~= nil,
 		true
 	)
-	check("inactif, fichier abîmé : un nouveau fichier", read(e.home .. "/.logtime_idle.json"), '{"2026-10-13":400}')
+	check(
+		"inactif, fichier abîmé : un nouveau fichier",
+		read(e.home .. "/.local/share/logtime/.logtime_idle.json"),
+		'{"2026-10-13":400}'
+	)
 	cleanup(e)
 	-- ============================================================
 	-- le temps par projet
@@ -1123,7 +1134,7 @@ local function scenarios()
 		return "PING.EXE"
 	end
 	live(e, win, project_page, 4621, 4700, false)
-	local saved = assert(read(e.home .. "/.logtime_projects.json"))
+	local saved = assert(read(e.home .. "/.local/share/logtime/.logtime_projects.json"))
 	-- relu avec le lecteur du plugin (storage/projects.lua)
 	local modules = {}
 	local function module(name)
@@ -1147,7 +1158,8 @@ local function scenarios()
 		return "PING.EXE"
 	end
 	live(e, win, settings_pane, 4701, 4760, false)
-	local p_after = module("storage/projects").decode(read(e.home .. "/.logtime_projects.json"))["2026-10-13"]
+	local p_after =
+		module("storage/projects").decode(read(e.home .. "/.local/share/logtime/.logtime_projects.json"))["2026-10-13"]
 	check("projets : la page F4 compte aussi pour logtime (jamais pour PING)", p_after.PING, nil)
 	check("projets : la page F4, le temps va bien quelque part (logtime)", p_after.logtime >= 100, true)
 	check("projets : aucune erreur", #e.w.logs.error, 0)
@@ -1163,19 +1175,21 @@ local function scenarios()
 	-- un fichier de projets abîmé : mis de côté, comme les autres
 	clock.now = T0
 	e = new_env({ file = false })
-	write(e.home .. "/.logtime_projects.json", '{"2026-10-13":5}')
+	write(e.home .. "/.local/share/logtime/.logtime_projects.json", '{"2026-10-13":5}')
 	e.M.apply_to_config({})
 	screen = screen_pane(e, "file:///C:/Users/max/a/b/")
 	live(e, win, screen, 0, 30, true)
 	check("projets, fichier abîmé : signalé", #e.w.logs.error, 1)
 	check(
 		"projets, fichier abîmé : mis de côté",
-		io.popen("ls -a '" .. e.home .. "'"):read("*a"):find(".logtime_projects.json.corrupt-", 1, true) ~= nil,
+		io.popen("ls -a '" .. e.home .. "/.local/share/logtime'")
+			:read("*a")
+			:find(".logtime_projects.json.corrupt-", 1, true) ~= nil,
 		true
 	)
 	check(
 		"projets, fichier abîmé : un nouveau fichier",
-		read(e.home .. "/.logtime_projects.json"):find('"a/b"', 1, true) ~= nil,
+		read(e.home .. "/.local/share/logtime/.logtime_projects.json"):find('"a/b"', 1, true) ~= nil,
 		true
 	)
 	cleanup(e)
@@ -1183,7 +1197,10 @@ local function scenarios()
 	-- le fichier des projets ne se lit pas tout de suite : le temps attend en mémoire, puis s'ajoute au fichier
 	clock.now = T0
 	e = new_env({ file = false })
-	write(e.home .. "/.logtime_projects.json", '{"2026-10-12":{"vieux":7200},"2026-10-13":{"a/b":50,"c/d":9}}')
+	write(
+		e.home .. "/.local/share/logtime/.logtime_projects.json",
+		'{"2026-10-12":{"vieux":7200},"2026-10-13":{"a/b":50,"c/d":9}}'
+	)
 	e.M.apply_to_config({})
 	screen = screen_pane(e, "file:///C:/Users/max/a/b/")
 	open_fails[1] = "logtime_projects"
@@ -1192,7 +1209,7 @@ local function scenarios()
 	live(e, win, screen, 401, 421, true)
 	check(
 		"projets, lus en retard : la mémoire (421 s) l'emporte, les autres projets et jours sont gardés",
-		read(e.home .. "/.logtime_projects.json"),
+		read(e.home .. "/.local/share/logtime/.logtime_projects.json"),
 		'{"2026-10-12":{"vieux":7200},"2026-10-13":{"a/b":421,"c/d":9}}'
 	)
 	cleanup(e)
@@ -1223,7 +1240,7 @@ local function scenarios()
 	)
 	check(
 		"projets, sauvegarde bloquée : rien n'est perdu (dernière sauvegarde à la seconde 51, toutes les 10 s)",
-		read(e.home .. "/.logtime_projects.json"),
+		read(e.home .. "/.local/share/logtime/.logtime_projects.json"),
 		'{"2026-10-13":{"a/b":51}}'
 	)
 	cleanup(e)
@@ -1263,7 +1280,7 @@ local function scenarios()
 	-- le fichier ne se lit pas tout de suite : le temps inactif attend en mémoire, puis s'ajoute au fichier
 	clock.now = T0
 	e = new_env({ file = false })
-	write(e.home .. "/.logtime_idle.json", '{"2026-10-12":7200,"2026-10-13":50}')
+	write(e.home .. "/.local/share/logtime/.logtime_idle.json", '{"2026-10-12":7200,"2026-10-13":50}')
 	e.M.apply_to_config({})
 	screen = screen_pane(e)
 	open_fails[1] = "logtime_idle"
@@ -1272,14 +1289,14 @@ local function scenarios()
 	live(e, win, screen, 401, 421, false) -- sauvegardé à 401, 411 et 421
 	check(
 		"inactif, lu en retard : la mémoire (421 s) l'emporte sur le fichier (50 s), les autres jours sont gardés",
-		read(e.home .. "/.logtime_idle.json"),
+		read(e.home .. "/.local/share/logtime/.logtime_idle.json"),
 		'{"2026-10-12":7200,"2026-10-13":421}'
 	)
 	cleanup(e)
 	-- un fichier abîmé qu'on ne peut pas mettre de côté : jamais écrasé, signalé une seule fois
 	clock.now = T0
 	e = new_env({ file = false })
-	write(e.home .. "/.logtime_idle.json", "pas du json")
+	write(e.home .. "/.local/share/logtime/.logtime_idle.json", "pas du json")
 	e.M.apply_to_config({})
 	local real_rename = os.rename
 	os.rename = function(from, to)
@@ -1293,7 +1310,7 @@ local function scenarios()
 	os.rename = real_rename
 	check(
 		"inactif, impossible à mettre de côté : pas écrasé",
-		read(e.home .. "/.logtime_idle.json"),
+		read(e.home .. "/.local/share/logtime/.logtime_idle.json"),
 		"pas du json"
 	)
 	check("inactif, impossible à mettre de côté : une seule erreur", #e.w.logs.error, 1)

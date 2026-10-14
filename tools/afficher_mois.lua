@@ -4,9 +4,9 @@
 -- Utilisation :
 --   lua5.4 tools/afficher_mois.lua [FICHIER] [ANNEE MOIS] [--en] [--dimanche] [--objectif=HEURES]
 -- Exemples :
---   lua5.4 tools/afficher_mois.lua /mnt/c/Users/TON_NOM/.logtime.json
---   lua5.4 tools/afficher_mois.lua /mnt/c/Users/TON_NOM/.logtime.json 2026 9 --dimanche --objectif=3
--- Sans FICHIER : ~/.logtime.json (sous WSL, c'est le dossier personnel de Linux, pas celui de Windows).
+--   lua5.4 tools/afficher_mois.lua /mnt/c/Users/TON_NOM/.local/share/logtime/.logtime.json
+--   lua5.4 tools/afficher_mois.lua /mnt/c/Users/TON_NOM/.local/share/logtime/.logtime.json 2026 9 --dimanche --objectif=3
+-- Sans FICHIER : ~/.local/share/logtime/.logtime.json (sous WSL, c'est le dossier personnel de Linux, pas celui de Windows).
 local root = (arg and arg[0] or ""):match("^(.*)[/\\]tools[/\\]afficher_mois%.lua$") or "."
 
 local cache = {}
@@ -42,7 +42,7 @@ for _, a in ipairs(arg) do
 	end
 end
 
-local path = positional[1] or ((os.getenv("HOME") or ".") .. "/.logtime.json")
+local path = positional[1] or ((os.getenv("HOME") or ".") .. "/.local/share/logtime/.logtime.json")
 local today = os.date("*t")
 local year, month = today.year, today.month
 if positional[2] or positional[3] then
