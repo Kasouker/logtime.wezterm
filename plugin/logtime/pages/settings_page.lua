@@ -32,7 +32,7 @@ M.TAB = { COLORS = 1, CALENDAR = 2 }
 M.TAB_COUNT = 2
 
 -- Les réglages de l'onglet Calendrier, dans l'ordre d'affichage (leurs limites viennent de settings/schema.lua).
-M.CALENDAR_SETTINGS = { "max_months" }
+M.CALENDAR_SETTINGS = { "max_months", "months_anchor", "week_starts_on", "center" }
 
 -- Les messages affichés en bas de la page (gardés dans wezterm.GLOBAL sous forme de nombres).
 M.MESSAGE = { NONE = 0, SAVED = 1, FAILED = 2, CONSENT = 3, SETTING_SAVED = 4 }
@@ -76,17 +76,48 @@ local function title_line(tab, labels)
 	return "  " .. labels.title .. " : " .. labels.settings_title .. "  " .. table.concat(parts, " ")
 end
 
--- La valeur d'un réglage, avec des flèches qui montrent dans quel sens elle peut encore changer : « ◀ 12 » au maximum,
--- « ◀ 6 ▶ » au milieu, «   1 ▶ » au minimum.
-function M.format_value(definition, value)
+-- La valeur d'un réglage, avec des flèches qui montrent dans quel sens elle peut encore changer.
+--   Un nombre entier : « ◀ 12 » au maximum, « ◀ 6 ▶ » au milieu, «   1 ▶ » au minimum.
+--   Un choix ou un oui/non : les valeurs défilent en boucle, donc toujours les deux flèches : « ◀ lundi ▶ ».
+-- shown : le texte à afficher (la valeur traduite) ; par défaut, la valeur elle-même.
+function M.format_value(definition, value, shown)
+	shown = shown or tostring(value)
+	if definition.kind ~= "integer" then
+		return "◀ " .. shown .. " ▶"
+	end
 	local left = (value > definition.min) and "◀ " or "  "
 	local right = (value < definition.max) and " ▶" or ""
-	return left .. tostring(value) .. right
+	return left .. shown .. right
 end
 
--- La valeur suivante d'un réglage entier quand on appuie sur ← (delta = -1) ou → (delta = 1), sans sortir de ses limites.
+-- La valeur suivante quand on appuie sur ← (delta = -1) ou → (delta = 1).
+--   Un nombre entier : un de plus ou de moins, sans sortir de ses limites.
+--   Un choix : la valeur suivante (ou précédente) de la liste, en boucle.
+--   Un oui/non : l'inverse.
 function M.step(definition, value, delta)
+	if definition.kind == "boolean" then
+		return not value
+	elseif definition.kind == "enum" then
+		local values = definition.values
+		local position = 1
+		for i, allowed in ipairs(values) do
+			if allowed == value then
+				position = i
+			end
+		end
+		return values[(position - 1 + delta) % #values + 1]
+	end
 	return math.max(definition.min, math.min(definition.max, value + delta))
+end
+
+-- Le texte affiché pour une valeur : sa traduction (settings_values dans i18n), sinon la valeur elle-même.
+-- Les oui/non sont rangés sous les clés « yes » et « no ».
+local function value_text(key, value, labels)
+	local texts = labels.settings_values or {}
+	if type(value) == "boolean" then
+		return (texts.boolean or {})[value and "yes" or "no"] or tostring(value)
+	end
+	return (texts[key] or {})[value] or tostring(value)
 end
 
 local function message_line(message, labels)
@@ -117,10 +148,13 @@ local function render_calendar(state, labels)
 	}
 	for i, key in ipairs(M.CALENDAR_SETTINGS) do
 		local definition = schema.get(key)
-		local value = state.values[key] or definition.default
+		local value = state.values[key]
+		if value == nil then -- pas « or » : avec un oui/non, false or true donnerait true
+			value = definition.default
+		end
 		local name = names[key] or key
 		local padding = string.rep(" ", math.max(1, NAME_WIDTH - (utf8.len(name) or #name)))
-		lines[#lines + 1] = (i == state.row and "▸ " or "  ") .. name .. padding .. M.format_value(definition, value)
+		lines[#lines + 1] = (i == state.row and "▸ " or "  ") .. name .. padding .. M.format_value(definition, value, value_text(key, value, labels))
 	end
 	lines[#lines + 1] = ""
 	local selected = M.CALENDAR_SETTINGS[state.row]

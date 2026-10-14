@@ -21,6 +21,7 @@ local gradient = load_module("color/gradient")
 local convert = load_module("color/convert")
 local layout = load_module("calendar/layout")
 local store = load_module("settings/store")
+local schema = load_module("settings/schema")
 local platform = load_module("system/platform")
 local fr = load_module("i18n/fr")
 local en = load_module("i18n/en")
@@ -549,7 +550,7 @@ check("anglais : message", table.concat(shown_lines(e.pane), "\n"):find("✓ Sav
 -- ============================================================
 -- l'onglet Calendrier
 -- ============================================================
-local max_def = { key = "max_months", min = 1, max = 12 }
+local max_def = { key = "max_months", kind = "integer", min = 1, max = 12 }
 check("valeur au maximum : seulement la flèche de gauche", settings_page.format_value(max_def, 12), "◀ 12")
 check("valeur au milieu : les deux flèches", settings_page.format_value(max_def, 6), "◀ 6 ▶")
 check("valeur au minimum : seulement la flèche de droite", settings_page.format_value(max_def, 1), "  1 ▶")
@@ -569,7 +570,7 @@ check("onglet Calendrier : ligne 2, l'aide", cal_plain[2], "  " .. fr.settings_c
 check("onglet Calendrier : ligne 3, l'aide", cal_plain[3], "  " .. fr.settings_calendar_help2)
 check("onglet Calendrier : ligne 5, l'intitulé", cal_plain[5], "  Réglages du calendrier")
 check("onglet Calendrier : ligne 7, le réglage choisi et sa valeur alignée", cal_plain[7], "▸ Mois affichés au maximum      ◀ 12")
-check("onglet Calendrier : ligne 9, l'explication du réglage choisi", cal_plain[9], "  " .. fr.settings_hints.max_months)
+check("onglet Calendrier : ligne 12, l'explication du réglage choisi", cal_plain[12], "  " .. fr.settings_hints.max_months)
 check("onglet Calendrier : ligne 23 vide (aucun message)", cal_plain[23], "")
 check("onglet Calendrier : le message « enregistré »", strip(render({ tab = 2, row = 1, values = { max_months = 6 }, message = settings_page.MESSAGE.SETTING_SAVED })[23]), "  " .. fr.settings_setting_saved)
 check("onglet Calendrier : le message d'échec", strip(render({ tab = 2, row = 1, values = { max_months = 6 }, message = settings_page.MESSAGE.FAILED })[23]), "  " .. fr.settings_failed)
@@ -640,11 +641,11 @@ for _ = 1, 15 do
 end
 check("← quinze fois : bloqué au minimum (1)", read(e.path), '{\n  "max_months": 1\n}\n')
 check("au minimum : seulement la flèche de droite", months_line(e):match("  1 ▶$") ~= nil, true)
--- ↑ ↓ avec un seul réglage : le choix ne bouge pas, rien n'est écrit en plus
+-- ↓ puis ↑ : retour au 1er réglage, rien n'est écrit en plus
 local writes = #e.applied
 press(e, "j", e.pane)
 press(e, "k", e.pane)
-check("↑ ↓ : le réglage reste choisi", months_line(e):find("▸ Mois", 1, true) ~= nil, true)
+check("↓ ↑ : le 1er réglage est de nouveau choisi", months_line(e):find("▸ Mois", 1, true) ~= nil, true)
 check("↑ ↓ : rien n'est écrit", #e.applied, writes)
 -- Entrée ne fait rien dans cet onglet (chaque changement y est déjà enregistré)
 press(e, "Enter", e.pane)
@@ -683,6 +684,105 @@ press(e, "Tab", e.pane)
 check("Tab efface le message", shown_text(e):find("✓", 1, true), nil)
 press(e, "Tab", e.pane)
 check("Tab deux fois : la couleur choisie est gardée (4)", chosen(e.pane), 4)
+
+-- ---- les choix et les oui/non (début de la semaine, place du mois, centrage)
+local week_def = { kind = "enum", values = { "monday", "sunday" } }
+local three_def = { kind = "enum", values = { "a", "b", "c" } }
+local bool_def = { kind = "boolean" }
+check("step choix : → passe à la valeur suivante", settings_page.step(week_def, "monday", 1), "sunday")
+check("step choix : → après la dernière, retour à la première", settings_page.step(week_def, "sunday", 1), "monday")
+check("step choix : ← avant la première, la dernière", settings_page.step(three_def, "a", -1), "c")
+check("step choix : ← dans une liste de trois", settings_page.step(three_def, "c", -1), "b")
+check("step choix : valeur inconnue, on part de la première", settings_page.step(three_def, "zzz", 1), "b")
+check("step oui/non : → inverse", settings_page.step(bool_def, true, 1), false)
+check("step oui/non : ← inverse aussi", settings_page.step(bool_def, false, -1), true)
+check("format choix : toujours les deux flèches", settings_page.format_value(week_def, "monday", "lundi"), "◀ lundi ▶")
+check("format oui/non : toujours les deux flèches", settings_page.format_value(bool_def, false, "non"), "◀ non ▶")
+
+local four = render({ tab = 2, row = 3, values = { max_months = 6, months_anchor = "first", week_starts_on = "sunday", center = false }, message = 0 })
+local four_plain = {}
+for i, line in ipairs(four) do
+	four_plain[i] = strip(line)
+end
+check("quatre réglages : toujours 23 lignes", #four, 23)
+check("ligne 7 : le nombre de mois", four_plain[7], "  Mois affichés au maximum      ◀ 6 ▶")
+check("ligne 8 : la place du mois choisi (traduite)", four_plain[8], "  Place du mois choisi          ◀ au début ▶")
+check("ligne 9 : le début de la semaine, choisi (▸)", four_plain[9], "▸ Début de la semaine           ◀ dimanche ▶")
+check("ligne 10 : centré « non » reste « non » (false n'est pas remplacé par la valeur par défaut)", four_plain[10], "  Calendrier centré             ◀ non ▶")
+check("ligne 12 : l'explication du réglage choisi (le 3e)", four_plain[12], "  " .. fr.settings_hints.week_starts_on)
+local defaults_plain = strip(render({ tab = 2, row = 1, values = {}, message = 0 })[10])
+check("valeurs absentes : centré « oui » par défaut", defaults_plain, "  Calendrier centré             ◀ oui ▶")
+local four_en = render({ tab = 2, row = 1, values = { months_anchor = "last", week_starts_on = "monday", center = true }, message = 0 }, en)
+check("anglais : le début de la semaine", strip(four_en[9]), "  Week starts on                ◀ Monday ▶")
+check("anglais : oui/non", strip(four_en[10]), "  Centered calendar             ◀ yes ▶")
+check("chaque réglage de l'onglet a un nom, une explication et (si choix) ses valeurs, en français et en anglais", (function()
+	for _, labels in ipairs({ fr, en }) do
+		for _, key in ipairs(settings_page.CALENDAR_SETTINGS) do
+			if not labels.settings_names[key] or not labels.settings_hints[key] then
+				return key
+			end
+			if utf8.len(labels.settings_hints[key]) > 55 then
+				return key .. " (explication trop longue)"
+			end
+			local definition = schema.get(key)
+			if definition.kind == "enum" then
+				for _, v in ipairs(definition.values) do
+					if not (labels.settings_values[key] or {})[v] then
+						return key .. "." .. v
+					end
+				end
+			end
+		end
+	end
+	return true
+end)(), true)
+
+-- dans la page : choisir un réglage avec ↓, le changer avec →
+local function setting_line(env, name)
+	for _, line in ipairs(shown_lines(env.pane)) do
+		if line:find(name, 1, true) then
+			return line
+		end
+	end
+end
+e = open({})
+press(e, "Tab", e.pane)
+press(e, "j", e.pane)
+check("↓ : le 2e réglage est choisi", setting_line(e, "Place du mois choisi"):find("▸", 1, true) ~= nil, true)
+check("↓ : le 1er ne l'est plus", setting_line(e, "Mois affichés"):find("▸", 1, true), nil)
+check("↓ : son explication est affichée", shown_text(e):find(fr.settings_hints.months_anchor, 1, true) ~= nil, true)
+check("↓ : rien n'est écrit", read(e.path), nil)
+press(e, "DownArrow", e.pane)
+press(e, "l", e.pane)
+check("→ sur le début de la semaine : dimanche est enregistré", read(e.path), '{\n  "week_starts_on": "sunday"\n}\n')
+check("→ : appliqué tout de suite", e.applied[#e.applied].week_starts_on, "sunday")
+check("→ : le calendrier est redessiné", e.refreshed, 1)
+check("→ : la page montre dimanche", setting_line(e, "Début de la semaine"):find("◀ dimanche ▶", 1, true) ~= nil, true)
+press(e, "l", e.pane)
+check("→ encore : retour à lundi (en boucle)", read(e.path), '{\n  "week_starts_on": "monday"\n}\n')
+press(e, "j", e.pane)
+press(e, "h", e.pane)
+check("← sur le centrage : « non » est enregistré", read(e.path), '{\n  "week_starts_on": "monday",\n  "center": false\n}\n')
+check("← sur le centrage : la page montre « non »", setting_line(e, "Calendrier centré"):find("◀ non ▶", 1, true) ~= nil, true)
+press(e, "d", e.pane)
+check("d sur le centrage : « oui » (la valeur par défaut) est enregistré", read(e.path), '{\n  "week_starts_on": "monday",\n  "center": true\n}\n')
+press(e, "j", e.pane)
+check("↓ au dernier réglage : il reste choisi", setting_line(e, "Calendrier centré"):find("▸", 1, true) ~= nil, true)
+press(e, "k", e.pane)
+press(e, "k", e.pane)
+press(e, "k", e.pane)
+press(e, "k", e.pane)
+check("↑ quatre fois : bloqué au 1er réglage", setting_line(e, "Mois affichés"):find("▸", 1, true) ~= nil, true)
+-- centré « non » dans wezterm.lua : la page le montre (false n'est pas pris pour « absent »)
+e = open({})
+e.cfg.center = false
+e.cfg.week_starts_on = "sunday"
+press(e, "Tab", e.pane)
+check("center = false dans wezterm.lua : la page montre « non »", setting_line(e, "Calendrier centré"):find("◀ non ▶", 1, true) ~= nil, true)
+check("week_starts_on = sunday dans wezterm.lua : la page montre dimanche", setting_line(e, "Début de la semaine"):find("◀ dimanche ▶", 1, true) ~= nil, true)
+e.cfg.week_starts_on = "mardi"
+e.page.on_resize(e.window, e.pane)
+check("week_starts_on incorrect : la page montre la valeur par défaut (lundi)", setting_line(e, "Début de la semaine"):find("◀ lundi ▶", 1, true) ~= nil, true)
 
 -- rouvrir la page : on revient à l'onglet Couleurs
 e = open({})
