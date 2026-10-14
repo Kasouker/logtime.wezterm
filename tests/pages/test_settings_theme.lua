@@ -226,10 +226,10 @@ local keys = {}
 for i, binding in ipairs(e.table) do
 keys[i] = binding.key
 end
-check("avec la question : quatorze touches, y et n à la fin", #keys == 14 and keys[13] == "y" and keys[14] == "n", true)
-check("les événements de y et n ont des noms fixes", e.table[13].action.name == "logtime-settings-y" and e.table[14].action.name == "logtime-settings-n", true)
+check("avec la question : quinze touches (Tab compris), y et n à la fin", #keys == 15 and keys[14] == "y" and keys[15] == "n", true)
+check("les événements de y et n ont des noms fixes", e.table[14].action.name == "logtime-settings-y" and e.table[15].action.name == "logtime-settings-n", true)
 e = new_env({ no_consent = true })
-check("sans la question : douze touches, comme avant", #e.table, 12)
+check("sans la question : treize touches (Tab compris)", #e.table, 13)
 
 -- ============================================================
 -- la ligne de question (ligne 4)

@@ -1,6 +1,9 @@
--- plugin/logtime/pages/settings_page.lua : la page de personnalisation (touche F4), pour l'instant le choix de la couleur
--- du dégradé : un tableau de seize couleurs numérotées, un aperçu, et Entrée enregistre le choix dans le fichier de
--- réglages et l'applique tout de suite au calendrier (sans recharger WezTerm).
+-- plugin/logtime/pages/settings_page.lua : la page de personnalisation (touche F4), en onglets (Tab pour changer) :
+--   Couleurs   : le choix de la couleur du dégradé : un tableau de seize couleurs numérotées, un aperçu, et Entrée
+--                enregistre le choix dans le fichier de réglages et l'applique tout de suite au calendrier (sans recharger
+--                WezTerm) ;
+--   Calendrier : un réglage par ligne (pour l'instant le nombre de mois maximum) ; ← → change la valeur, enregistrée et
+--                appliquée tout de suite.
 -- Les seize couleurs sont celles du thème de WezTerm de l'utilisateur s'il a répondu « oui » à la question (touche y), sinon
 -- la palette classique (touche n). Il peut changer d'avis à tout moment avec ces deux touches.
 local load = ...
@@ -11,6 +14,7 @@ local safe = load("ui/safe")
 local gradient = load("color/gradient")
 local palette = load("color/palette")
 local convert = load("color/convert")
+local schema = load("settings/schema")
 
 local M = {}
 
@@ -20,9 +24,18 @@ M.EVENT_PREFIX = "logtime-settings"
 local COLUMNS = 4
 local ROWS = 4
 local CELL = 11 -- largeur d'une couleur, sans ses crochets
+local LINES = 23 -- hauteur de la page, la même dans tous les onglets (la page ne saute pas quand on change d'onglet)
+local NAME_WIDTH = 30 -- largeur du nom d'un réglage dans l'onglet Calendrier (les valeurs sont alignées après)
+
+-- Les onglets de la page (gardés dans wezterm.GLOBAL sous forme de nombres).
+M.TAB = { COLORS = 1, CALENDAR = 2 }
+M.TAB_COUNT = 2
+
+-- Les réglages de l'onglet Calendrier, dans l'ordre d'affichage (leurs limites viennent de settings/schema.lua).
+M.CALENDAR_SETTINGS = { "max_months" }
 
 -- Les messages affichés en bas de la page (gardés dans wezterm.GLOBAL sous forme de nombres).
-M.MESSAGE = { NONE = 0, SAVED = 1, FAILED = 2, CONSENT = 3 }
+M.MESSAGE = { NONE = 0, SAVED = 1, FAILED = 2, CONSENT = 3, SETTING_SAVED = 4 }
 
 -- Largeur du tableau de couleurs, avec la marge de gauche : 2 + 4 x (11 + 2 crochets) + 3 espaces.
 M.GRID_WIDTH = 2 + COLUMNS * (CELL + 2) + (COLUMNS - 1)
@@ -52,18 +65,89 @@ local function cell(index, selected, colors, names)
 	return left .. style .. center(tostring(index), CELL) .. convert.RESET .. right, left .. style .. center(name, CELL) .. convert.RESET .. right
 end
 
+-- La ligne 1 : le titre, puis les onglets ; l'onglet affiché est entre crochets.
+local function title_line(tab, labels)
+	local names = labels.settings_tabs or {}
+	local parts = {}
+	for i = 1, M.TAB_COUNT do
+		local name = names[i] or tostring(i)
+		parts[i] = (i == tab) and ("[" .. name .. "]") or (" " .. name .. " ")
+	end
+	return "  " .. labels.title .. " : " .. labels.settings_title .. "  " .. table.concat(parts, " ")
+end
+
+-- La valeur d'un réglage, avec des flèches qui montrent dans quel sens elle peut encore changer : « ◀ 12 » au maximum,
+-- « ◀ 6 ▶ » au milieu, «   1 ▶ » au minimum.
+function M.format_value(definition, value)
+	local left = (value > definition.min) and "◀ " or "  "
+	local right = (value < definition.max) and " ▶" or ""
+	return left .. tostring(value) .. right
+end
+
+-- La valeur suivante d'un réglage entier quand on appuie sur ← (delta = -1) ou → (delta = 1), sans sortir de ses limites.
+function M.step(definition, value, delta)
+	return math.max(definition.min, math.min(definition.max, value + delta))
+end
+
+local function message_line(message, labels)
+	if message == M.MESSAGE.SAVED then
+		return "  " .. labels.settings_saved
+	elseif message == M.MESSAGE.FAILED then
+		return "  " .. labels.settings_failed
+	elseif message == M.MESSAGE.CONSENT then
+		return "  " .. labels.settings_consent_saved
+	elseif message == M.MESSAGE.SETTING_SAVED then
+		return "  " .. labels.settings_setting_saved
+	end
+	return ""
+end
+
+-- L'onglet Calendrier : un réglage par ligne, le réglage choisi marqué par « ▸ », son explication en dessous de la liste.
+--   state = { row = le numéro du réglage choisi, values = { max_months = 12, ... }, message = M.MESSAGE.* }
+local function render_calendar(state, labels)
+	local names = labels.settings_names or {}
+	local hints = labels.settings_hints or {}
+	local lines = {
+		title_line(M.TAB.CALENDAR, labels),
+		"  " .. labels.settings_calendar_help1,
+		"  " .. labels.settings_calendar_help2,
+		"",
+		"  " .. labels.settings_calendar,
+		"",
+	}
+	for i, key in ipairs(M.CALENDAR_SETTINGS) do
+		local definition = schema.get(key)
+		local value = state.values[key] or definition.default
+		local name = names[key] or key
+		local padding = string.rep(" ", math.max(1, NAME_WIDTH - (utf8.len(name) or #name)))
+		lines[#lines + 1] = (i == state.row and "▸ " or "  ") .. name .. padding .. M.format_value(definition, value)
+	end
+	lines[#lines + 1] = ""
+	local selected = M.CALENDAR_SETTINGS[state.row]
+	lines[#lines + 1] = (selected and hints[selected]) and ("  " .. hints[selected]) or ""
+	while #lines < LINES - 1 do
+		lines[#lines + 1] = ""
+	end
+	lines[#lines + 1] = message_line(state.message, labels)
+	return lines, M.GRID_WIDTH
+end
+
 -- Le texte de la page, sous forme de lignes. Toujours le même nombre de lignes (les lignes facultatives restent vides),
 -- pour que la page ne saute pas quand un message apparaît.
+--   state.tab = l'onglet affiché (M.TAB.COLORS par défaut) ; pour l'onglet Calendrier, voir render_calendar.
 --   state = { index = 1 à 16 (la couleur choisie), current = "#RRGGBB" ou nil (la couleur enregistrée),
 --             gradient_off = true si le dégradé est désactivé, message = M.MESSAGE.*,
 --             colors = les 16 couleurs (la palette classique par défaut), names = leurs 16 noms (ceux de la palette classique
 --             par défaut), consent_line = le texte de la question sur les couleurs du thème (ligne 4), ou nil }
 -- Renvoie les lignes et la largeur du tableau de couleurs (la largeur qu'on centre).
 function M.render(state, labels)
+if state.tab == M.TAB.CALENDAR then
+	return render_calendar(state, labels)
+end
 local colors = state.colors or palette.COLORS
 local names = state.names or labels.palette or {}
 local lines = {}
-lines[#lines + 1] = "  " .. labels.title .. " : " .. labels.settings_title
+lines[#lines + 1] = title_line(M.TAB.COLORS, labels)
 lines[#lines + 1] = "  " .. labels.settings_help1
 lines[#lines + 1] = "  " .. labels.settings_help2
 lines[#lines + 1] = state.consent_line and ("  " .. state.consent_line) or ""
@@ -98,15 +182,7 @@ else
 lines[#lines + 1] = ""
 end
 lines[#lines + 1] = state.gradient_off and ("  " .. labels.settings_gradient_off) or ""
-if state.message == M.MESSAGE.SAVED then
-lines[#lines + 1] = "  " .. labels.settings_saved
-elseif state.message == M.MESSAGE.FAILED then
-lines[#lines + 1] = "  " .. labels.settings_failed
-elseif state.message == M.MESSAGE.CONSENT then
-lines[#lines + 1] = "  " .. labels.settings_consent_saved
-else
-lines[#lines + 1] = ""
-end
+lines[#lines + 1] = message_line(state.message, labels)
 return lines, M.GRID_WIDTH
 end
 
@@ -171,6 +247,33 @@ local DEFAULT_COLOR = palette.COLORS[palette.DEFAULT_INDEX]
 		return math.floor(index)
 	end
 
+	-- L'onglet affiché (logtime_settings_tab) et, dans l'onglet Calendrier, le réglage choisi (logtime_settings_row).
+	local function current_tab()
+		local tab = num(G.logtime_settings_tab)
+		if tab == M.TAB.CALENDAR then
+			return M.TAB.CALENDAR
+		end
+		return M.TAB.COLORS
+	end
+
+	local function current_row()
+		local row = num(G.logtime_settings_row)
+		if not row or row < 1 or row > #M.CALENDAR_SETTINGS then
+			return 1
+		end
+		return math.floor(row)
+	end
+
+	-- La valeur en cours d'un réglage : celle du plugin, sinon sa valeur par défaut.
+	local function setting_value(key)
+		local value = ctx.cfg()[key]
+		local ok, normalized = schema.validate(key, value)
+		if ok then
+			return normalized
+		end
+		return schema.get(key).default
+	end
+
 	local function dims_of(pane)
 		local ok, dims = pcall(function()
 			return pane:get_dimensions()
@@ -197,7 +300,14 @@ else
 consent_line = labels.consent_no
 end
 end
+local values = {}
+for _, key in ipairs(M.CALENDAR_SETTINGS) do
+	values[key] = setting_value(key)
+end
 local lines, width = M.render({
+tab = current_tab(),
+row = current_row(),
+values = values,
 index = selected_index(),
 current = current_color(),
 gradient_off = ctx.cfg().gradient == false,
@@ -261,6 +371,8 @@ end)
 G.logtime_settings_pane = page_pane:pane_id()
 G.logtime_settings_index = initial_index()
 G.logtime_settings_message = M.MESSAGE.NONE
+G.logtime_settings_tab = M.TAB.COLORS
+G.logtime_settings_row = 1
 safe.trace(wezterm, "logtime : page de personnalisation ouverte dans le panneau " .. tostring(page_pane:pane_id()))
 
 redraw(page_pane, true)
@@ -268,8 +380,49 @@ redraw_later(page_pane:pane_id(), { 0.4, 1.2 })
 keytable.activate(wezterm, window, page_pane, M.TABLE_NAME)
 end
 
+-- Enregistre un réglage dans le fichier de réglages (en gardant les autres réglages qui y sont) et l'applique tout de
+-- suite. Renvoie true si c'est fait ; sinon l'erreur est écrite dans les journaux et le message d'échec est préparé.
+local function store_setting(key, value)
+	local path = ctx.settings_path()
+	local current = ctx.store.load(path)
+	current[key] = value
+	local ok, err = ctx.store.save(path, current)
+	if not ok then
+		wezterm.log_error("logtime : enregistrement des réglages impossible : " .. tostring(err))
+		G.logtime_settings_message = M.MESSAGE.FAILED
+		return false
+	end
+	ctx.apply({ [key] = value })
+	return true
+end
+
+-- Onglet Calendrier : enregistre la nouvelle valeur du réglage et redessine le calendrier s'il est ouvert.
+local function change_setting(window, pane, key, value)
+	if value == setting_value(key) then
+		redraw(pane, false) -- déjà à cette valeur (au bord, ou déjà la valeur par défaut) : rien à écrire
+		return
+	end
+	if store_setting(key, value) then
+		G.logtime_settings_message = M.MESSAGE.SETTING_SAVED
+		safe.trace(wezterm, "logtime : réglage enregistré : " .. key .. " = " .. tostring(value))
+		pcall(ctx.refresh_calendar, window, pane)
+	end
+	redraw(pane, false)
+end
+
 local function move(delta_row, delta_col)
 return function(window, pane)
+if current_tab() == M.TAB.CALENDAR then
+	if delta_row ~= 0 then
+		G.logtime_settings_row = math.max(1, math.min(#M.CALENDAR_SETTINGS, current_row() + delta_row))
+		G.logtime_settings_message = M.MESSAGE.NONE
+		redraw(pane, false)
+	else
+		local key = M.CALENDAR_SETTINGS[current_row()]
+		change_setting(window, pane, key, M.step(schema.get(key), setting_value(key), delta_col))
+	end
+	return
+end
 local index = selected_index() - 1
 local row = math.max(0, math.min(ROWS - 1, index // COLUMNS + delta_row))
 local col = math.max(0, math.min(COLUMNS - 1, index % COLUMNS + delta_col))
@@ -282,48 +435,52 @@ end
 -- Enregistre la couleur dans le fichier de réglages (en gardant les autres réglages qui y sont), l'applique tout de
 	-- suite et redessine le calendrier s'il est ouvert.
 local function save(window, pane, color)
-local path = ctx.settings_path()
-local current = ctx.store.load(path)
-current.gradient_color = color
-local ok, err = ctx.store.save(path, current)
-if ok then
-ctx.apply({ gradient_color = color })
+if store_setting("gradient_color", color) then
 G.logtime_settings_message = M.MESSAGE.SAVED
 safe.trace(wezterm, "logtime : couleur enregistrée : " .. color)
 pcall(ctx.refresh_calendar, window, pane)
-else
-wezterm.log_error("logtime : enregistrement des réglages impossible : " .. tostring(err))
-G.logtime_settings_message = M.MESSAGE.FAILED
 end
 redraw(pane, false)
 end
 
+-- Entrée : enregistre la couleur choisie (l'onglet Calendrier n'en a pas besoin : chaque changement y est enregistré).
 local function choose(window, pane)
+if current_tab() ~= M.TAB.COLORS then
+	return
+end
 save(window, pane, active_palette().colors[selected_index()])
 end
 
 -- d : la couleur par défaut du plugin (l'or), et dans la palette proposée la case qui lui ressemble le plus.
+	-- Dans l'onglet Calendrier : la valeur par défaut du réglage choisi.
 	local function default(window, pane)
+		if current_tab() == M.TAB.CALENDAR then
+			local key = M.CALENDAR_SETTINGS[current_row()]
+			change_setting(window, pane, key, schema.get(key).default)
+			return
+		end
 		G.logtime_settings_index = position_in(DEFAULT_COLOR, active_palette().colors) or 1
 		save(window, pane, DEFAULT_COLOR)
+	end
+
+	-- Tab : l'onglet suivant (après le dernier, retour au premier).
+	local function next_tab(window, pane)
+		G.logtime_settings_tab = current_tab() % M.TAB_COUNT + 1
+		G.logtime_settings_message = M.MESSAGE.NONE
+		redraw(pane, false)
 	end
 
 	-- y / n : la réponse à la question sur les couleurs du thème, enregistrée dans le fichier de réglages et appliquée
 	-- tout de suite. La palette proposée change ; le choix se replace sur la couleur enregistrée (ou la plus proche).
 	local function answer(value)
 		return function(window, pane)
-			local path = ctx.settings_path()
-			local current = ctx.store.load(path)
-			current.theme_colors = value
-			local ok, err = ctx.store.save(path, current)
-			if ok then
-				ctx.apply({ theme_colors = value })
+			if current_tab() ~= M.TAB.COLORS then
+				return -- la question n'est affichée que dans l'onglet Couleurs
+			end
+			if store_setting("theme_colors", value) then
 				G.logtime_settings_index = initial_index()
 				G.logtime_settings_message = M.MESSAGE.CONSENT
 				safe.trace(wezterm, "logtime : couleurs du thème : " .. (value and "oui" or "non"))
-			else
-				wezterm.log_error("logtime : enregistrement des réglages impossible : " .. tostring(err))
-				G.logtime_settings_message = M.MESSAGE.FAILED
 			end
 			redraw(pane, false)
 		end
@@ -361,6 +518,7 @@ end
 			{ key = "DownArrow", run = move(1, 0) },
 			{ key = "Enter", run = choose },
 			{ key = "d", run = default },
+			{ key = "Tab", run = next_tab },
 			{ key = "q", run = close },
 			{ key = "Escape", run = close },
 		}

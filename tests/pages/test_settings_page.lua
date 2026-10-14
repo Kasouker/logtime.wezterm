@@ -87,7 +87,7 @@ local plain = {}
 for i, line in ipairs(lines) do
 	plain[i] = strip(line)
 end
-check("ligne 1 : le titre", plain[1], "  Logtime : Personnalisation")
+check("ligne 1 : le titre et les onglets (Couleurs affiché)", plain[1], "  Logtime : Personnalisation  [Couleurs]  Calendrier ")
 check("ligne 2 : l'aide, première partie", plain[2], "  " .. fr.settings_help1)
 check("ligne 3 : l'aide, seconde partie", plain[3], "  " .. fr.settings_help2)
 check("ligne 4 : vide", plain[4], "")
@@ -183,7 +183,7 @@ for _, state in ipairs({ { index = 1, message = 0 }, { index = 16, current = "#C
 end
 check("le nombre de lignes ne change jamais (la page ne saute pas)", stable, true)
 local english = render({ index = 3, current = "#C9AB6B", message = 1 }, en)
-check("anglais : le titre", strip(english[1]), "  Logtime : Settings")
+check("anglais : le titre et les onglets", strip(english[1]), "  Logtime : Settings  [Colors]  Calendar ")
 check("anglais : le nom de la couleur", strip(english[20]), "  Choice: 3 Gold (#C9AB6B)")
 check("anglais : le message", strip(english[23]), "  " .. en.settings_saved)
 check("anglais : les noms dans le tableau", strip(english[8]):find("Gold", 1, true) ~= nil, true)
@@ -546,13 +546,158 @@ check("anglais : titre", table.concat(shown_lines(e.pane), "\n"):find("Settings"
 press(e, "Enter", e.pane)
 check("anglais : message", table.concat(shown_lines(e.pane), "\n"):find("✓ Saved", 1, true) ~= nil, true)
 
+-- ============================================================
+-- l'onglet Calendrier
+-- ============================================================
+local max_def = { key = "max_months", min = 1, max = 12 }
+check("valeur au maximum : seulement la flèche de gauche", settings_page.format_value(max_def, 12), "◀ 12")
+check("valeur au milieu : les deux flèches", settings_page.format_value(max_def, 6), "◀ 6 ▶")
+check("valeur au minimum : seulement la flèche de droite", settings_page.format_value(max_def, 1), "  1 ▶")
+check("step : +1 au maximum reste au maximum", settings_page.step(max_def, 12, 1), 12)
+check("step : -1 au minimum reste au minimum", settings_page.step(max_def, 1, -1), 1)
+check("step : +1 au milieu", settings_page.step(max_def, 6, 1), 7)
+
+-- le dessin (fonction pure)
+local cal = render({ tab = settings_page.TAB.CALENDAR, row = 1, values = { max_months = 12 }, message = 0 })
+local cal_plain = {}
+for i, line in ipairs(cal) do
+	cal_plain[i] = strip(line)
+end
+check("onglet Calendrier : 23 lignes, comme l'onglet Couleurs", #cal, 23)
+check("onglet Calendrier : ligne 1, l'onglet affiché est entre crochets", cal_plain[1], "  Logtime : Personnalisation   Couleurs  [Calendrier]")
+check("onglet Calendrier : ligne 2, l'aide", cal_plain[2], "  " .. fr.settings_calendar_help1)
+check("onglet Calendrier : ligne 3, l'aide", cal_plain[3], "  " .. fr.settings_calendar_help2)
+check("onglet Calendrier : ligne 5, l'intitulé", cal_plain[5], "  Réglages du calendrier")
+check("onglet Calendrier : ligne 7, le réglage choisi et sa valeur alignée", cal_plain[7], "▸ Mois affichés au maximum      ◀ 12")
+check("onglet Calendrier : ligne 9, l'explication du réglage choisi", cal_plain[9], "  " .. fr.settings_hints.max_months)
+check("onglet Calendrier : ligne 23 vide (aucun message)", cal_plain[23], "")
+check("onglet Calendrier : le message « enregistré »", strip(render({ tab = 2, row = 1, values = { max_months = 6 }, message = settings_page.MESSAGE.SETTING_SAVED })[23]), "  " .. fr.settings_setting_saved)
+check("onglet Calendrier : le message d'échec", strip(render({ tab = 2, row = 1, values = { max_months = 6 }, message = settings_page.MESSAGE.FAILED })[23]), "  " .. fr.settings_failed)
+check("onglet Calendrier : valeur absente, la valeur par défaut (12)", strip(render({ tab = 2, row = 1, values = {}, message = 0 })[7]):match("◀ 12$") ~= nil, true)
+check("onglet Calendrier : aucune ligne ne dépasse 57 colonnes (français et anglais)", (function()
+	for _, labels in ipairs({ fr, en }) do
+		for _, line in ipairs(render({ tab = 2, row = 1, values = { max_months = 6 }, message = 4 }, labels)) do
+			if utf8.len(strip(line)) > 57 then
+				return false
+			end
+		end
+	end
+	return true
+end)(), true)
+check("anglais : la barre d'onglets", strip(render({ tab = 2, row = 1, values = {}, message = 0 }, en)[1]), "  Logtime : Settings   Colors  [Calendar]")
+
+-- la page, avec la fausse API
+local function shown_text(env)
+	return table.concat(shown_lines(env.pane), "\n")
+end
+local function months_line(env)
+	for _, line in ipairs(shown_lines(env.pane)) do
+		if line:find("Mois affichés au maximum", 1, true) then
+			return line
+		end
+	end
+end
+
+e = open({})
+press(e, "Tab", e.pane)
+check("Tab : l'onglet Calendrier est affiché", shown_text(e):find("[Calendrier]", 1, true) ~= nil, true)
+check("Tab : le réglage est affiché avec sa valeur (12 par défaut)", months_line(e):match("◀ 12$") ~= nil, true)
+check("Tab : la page tient toujours dans 57 x 23", select(3, e.page.build_lines({ cols = 57, rows = 23 })), true)
+check("Tab : rien n'est écrit en changeant d'onglet", read(e.path), nil)
+press(e, "Tab", e.pane)
+check("Tab deux fois : retour à l'onglet Couleurs", shown_text(e):find("[Couleurs]", 1, true) ~= nil, true)
+
+-- ← : la valeur baisse, est enregistrée, appliquée, et le calendrier redessiné
+e = open({})
+press(e, "Tab", e.pane)
+press(e, "h", e.pane)
+check("← : le fichier contient la nouvelle valeur", read(e.path), '{\n  "max_months": 11\n}\n')
+check("← : appliquée tout de suite", #e.applied == 1 and e.applied[1].max_months == 11, true)
+check("← : le calendrier est redessiné", e.refreshed, 1)
+check("← : la page montre la nouvelle valeur", months_line(e):match("◀ 11 ▶$") ~= nil, true)
+check("← : le message « enregistré »", shown_text(e):find(fr.settings_setting_saved, 1, true) ~= nil, true)
+press(e, "LeftArrow", e.pane)
+check("flèche gauche : une fois de plus (10)", read(e.path), '{\n  "max_months": 10\n}\n')
+press(e, "l", e.pane)
+check("→ : remonte à 11", read(e.path), '{\n  "max_months": 11\n}\n')
+check("← ← → : la couleur n'a pas été touchée", e.cfg.gradient_color, nil)
+press(e, "d", e.pane)
+check("d : la valeur par défaut (12) est enregistrée", read(e.path), '{\n  "max_months": 12\n}\n')
+local applied_before = #e.applied
+press(e, "d", e.pane)
+check("d déjà à la valeur par défaut : rien de plus n'est appliqué", #e.applied, applied_before)
+
+-- → au maximum : rien n'est écrit
+e = open({})
+press(e, "Tab", e.pane)
+press(e, "l", e.pane)
+check("→ à 12 (le maximum) : rien n'est écrit", read(e.path), nil)
+check("→ à 12 : rien n'est appliqué", #e.applied, 0)
+check("→ à 12 : le calendrier n'est pas redessiné", e.refreshed, 0)
+-- ← jusqu'au minimum, puis encore : reste à 1
+for _ = 1, 15 do
+	press(e, "h", e.pane)
+end
+check("← quinze fois : bloqué au minimum (1)", read(e.path), '{\n  "max_months": 1\n}\n')
+check("au minimum : seulement la flèche de droite", months_line(e):match("  1 ▶$") ~= nil, true)
+-- ↑ ↓ avec un seul réglage : le choix ne bouge pas, rien n'est écrit en plus
+local writes = #e.applied
+press(e, "j", e.pane)
+press(e, "k", e.pane)
+check("↑ ↓ : le réglage reste choisi", months_line(e):find("▸ Mois", 1, true) ~= nil, true)
+check("↑ ↓ : rien n'est écrit", #e.applied, writes)
+-- Entrée ne fait rien dans cet onglet (chaque changement y est déjà enregistré)
+press(e, "Enter", e.pane)
+check("Entrée dans l'onglet Calendrier : rien d'autre n'est enregistré", #e.applied, writes)
+
+-- les autres réglages du fichier sont gardés
+e = open({})
+write(e.path, '{"gradient_color": "#6989C9", "lang": "en"}')
+press(e, "Tab", e.pane)
+press(e, "h", e.pane)
+check("← garde les autres réglages du fichier", read(e.path), '{\n  "lang": "en",\n  "max_months": 11,\n  "gradient_color": "#6989C9"\n}\n')
+
+-- une valeur incorrecte dans wezterm.lua : la page montre la valeur par défaut, sans planter
+e = open({})
+e.cfg.max_months = 100
+press(e, "Tab", e.pane)
+check("max_months = 100 dans wezterm.lua : la page montre 12", months_line(e):match("◀ 12$") ~= nil, true)
+check("max_months = 100 : aucune erreur", #e.w.logs.error, 0)
+e.cfg.max_months = 4
+e.page.on_resize(e.window, e.pane)
+check("max_months = 4 dans wezterm.lua : la page montre 4", months_line(e):match("◀ 4 ▶$") ~= nil, true)
+
+-- échec d'enregistrement
+e = open({ path = "/tmp/dossier_qui_nexiste_pas_logtime/sous/.logtime_settings.json" })
+press(e, "Tab", e.pane)
+press(e, "h", e.pane)
+check("échec (onglet Calendrier) : le message d'échec", shown_text(e):find("✗ Enregistrement impossible", 1, true) ~= nil, true)
+check("échec (onglet Calendrier) : rien n'est appliqué", #e.applied, 0)
+check("échec (onglet Calendrier) : la valeur affichée ne change pas", months_line(e):match("◀ 12$") ~= nil, true)
+
+-- changer d'onglet garde la couleur choisie et efface le message
+e = open({})
+press(e, "l", e.pane)
+press(e, "Enter", e.pane)
+press(e, "Tab", e.pane)
+check("Tab efface le message", shown_text(e):find("✓", 1, true), nil)
+press(e, "Tab", e.pane)
+check("Tab deux fois : la couleur choisie est gardée (4)", chosen(e.pane), 4)
+
+-- rouvrir la page : on revient à l'onglet Couleurs
+e = open({})
+press(e, "Tab", e.pane)
+e.w.GLOBAL.logtime_settings_pane = nil
+e.page.open(e.window, e.w.new_pane())
+check("rouvrir la page : l'onglet Couleurs est affiché", e.w.GLOBAL.logtime_settings_tab, settings_page.TAB.COLORS)
+
 -- ---- les touches de la page
-local expected_keys = { "h", "LeftArrow", "l", "RightArrow", "k", "UpArrow", "j", "DownArrow", "Enter", "d", "q", "Escape" }
+local expected_keys = { "h", "LeftArrow", "l", "RightArrow", "k", "UpArrow", "j", "DownArrow", "Enter", "d", "Tab", "q", "Escape" }
 local actual = {}
 for i, binding in ipairs(open({}).table) do
 actual[i] = binding.key
 end
-check("douze touches, dans cet ordre", table.concat(actual, ","), table.concat(expected_keys, ","))
+check("treize touches, dans cet ordre", table.concat(actual, ","), table.concat(expected_keys, ","))
 check("les événements ont des noms fixes", open({}).table[9].action.name, "logtime-settings-Enter")
 check("préfixe des événements", settings_page.EVENT_PREFIX, "logtime-settings")
 check("nom de la table de touches", settings_page.TABLE_NAME, "logtime_settings")

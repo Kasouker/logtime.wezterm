@@ -216,7 +216,7 @@ end
 -- ============================================================
 local e = new_env()
 local config = e.M.apply_to_config(theme_config())
-check("la table de touches a quatorze touches (y et n en plus)", #config.key_tables.logtime_settings, 14)
+check("la table de touches a quinze touches (Tab, y et n compris)", #config.key_tables.logtime_settings, 15)
 open_key(e, config, "F4")
 local settings = e.w.spawned[1]
 check("la question est affichée", plain(settings):find("Couleurs de ton thème ?   y : oui   n : non", 1, true) ~= nil, true)
