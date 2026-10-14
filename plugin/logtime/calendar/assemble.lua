@@ -31,10 +31,49 @@ function M.width(cfg)
 	return M.WIDTH + (borders_on(cfg) and 1 or 0)
 end
 
--- La hauteur d'un mois en bloc : 21, ou 22 avec les encadrés (le trait horizontal prend la place de la ligne vide entre
--- deux semaines ; il faut seulement une ligne de plus pour le trait du haut).
+-- La hauteur d'un mois en bloc : 21, ou 24 avec les encadrés : le trait horizontal prend la place de la ligne vide entre
+-- deux semaines ; il faut en plus le haut et le bas du cadre du mois, et la jonction entre l'en-tête et les cases.
 function M.height(cfg)
-	return M.HEIGHT + (borders_on(cfg) and 1 or 0)
+	return M.HEIGHT + (borders_on(cfg) and 3 or 0)
+end
+
+-- La largeur entre les deux traits verticaux du cadre d'un mois : 66 - 2 (la marge) - 2 (les traits).
+local INNER = 62
+
+local function visible_len(s)
+	local plain = s:gsub("\27%[[%d;]*m", "")
+	return utf8.len(plain) or #plain
+end
+
+-- Les traits et leur couleur, ou nil sans encadrés.
+local function border_of(cfg)
+	if not borders_on(cfg) then
+		return nil
+	end
+	return M.BORDER_STYLES[cfg.border_style] or M.BORDER_STYLES.rounded, convert.fg(M.BORDER_COLOR)
+end
+
+-- Le haut ou le bas du cadre d'un mois.
+local function frame_edge(left, right, b, color)
+	return "  " .. color .. left .. string.rep(b.h, INNER) .. right .. convert.RESET
+end
+
+-- Une ligne de texte dans le cadre d'un mois : « │ texte … │ ». text commence par la marge de deux espaces (retirée ici),
+-- éventuellement après des codes de style (le titre en gras du mois choisi commence par « \27[1m »).
+local function framed(text, b, color)
+	-- en Lua, « * » ne s'applique pas à un groupe entre parenthèses : on passe les codes de style un par un
+	local codes, rest = "", text
+	while true do
+		local code = rest:match("^\27%[[%d;]*m")
+		if not code then
+			break
+		end
+		codes, rest = codes .. code, rest:sub(#code + 1)
+	end
+	local content = codes .. rest:gsub("^  ", "", 1)
+	local pad = math.max(0, INNER - 1 - visible_len(content))
+	local v = color .. b.v .. convert.RESET
+	return "  " .. v .. " " .. content .. string.rep(" ", pad) .. v
 end
 
 -- Hauteur d'un mois en bloc (month_block) : titre, en-tête, 6 semaines de 3 lignes, totaux. Les mois de 4 ou 5 semaines
@@ -123,9 +162,19 @@ local function header_line(cfg, labels)
 		table.insert(names, 1, names[7])
 		names[8] = nil
 	end
+	local b, color = border_of(cfg)
+	if b then
+		-- dans le cadre du mois : chaque nom au-dessus de l'intérieur de sa case
+		local cells = {}
+		for i = 1, 7 do
+			cells[i] = center(names[i], 8)
+		end
+		local v = color .. b.v .. convert.RESET
+		return "  " .. v .. table.concat(cells, " ") .. v
+	end
 	local header = { "  " }
 	for i = 1, 7 do
-		header[#header + 1] = center(names[i], 9) -- avec les encadrés aussi : un nom de 3 lettres reste centré dans la case
+		header[#header + 1] = center(names[i], 9)
 	end
 	return table.concat(header)
 end
@@ -206,23 +255,24 @@ local function validated_text(days, year, month, cfg, s, labels)
 end
 
 -- Une ligne de traits de la grille : left .. (8 traits .. join) x 6 .. 8 traits .. right, dans la couleur des traits.
-local function rule(left, join, right, b)
+local function rule(left, join, right, b, color)
 	local h8 = string.rep(b.h, 8)
-	return "  " .. convert.fg(M.BORDER_COLOR) .. left .. string.rep(h8 .. join, 6) .. h8 .. right .. convert.RESET
+	return "  " .. color .. left .. string.rep(h8 .. join, 6) .. h8 .. right .. convert.RESET
 end
 
 -- Les semaines : trois lignes par semaine (les numéros, les durées, une ligne vide).
--- Avec les encadrés : un trait en haut, puis par semaine les numéros, les durées et un trait (celui du bas après la
--- dernière semaine) ; les cases sont séparées par un trait vertical au lieu d'un espace.
+-- Avec les encadrés : la grille des cases, dans le cadre du mois : une jonction « ├┬┤ » sous l'en-tête, puis par semaine
+-- les numéros, les durées et un trait ; après la dernière semaine, la jonction « ├┴┤ » avec le bas du cadre. Les cases
+-- sont séparées par un trait vertical au lieu d'un espace.
 local function week_lines(days, year, month, today_key, cfg)
 	local out = {}
 	local goal_secs = stats.has_goal(cfg.goal_hours) and cfg.goal_hours * 3600 or nil
 	local count_days = dates.days_in_month(year, month)
 	local day = 1 - dates.offset(year, month, cfg.week_starts_on)
-	local b = borders_on(cfg) and (M.BORDER_STYLES[cfg.border_style] or M.BORDER_STYLES.rounded) or nil
-	local v = b and (convert.fg(M.BORDER_COLOR) .. b.v .. convert.RESET) or nil
+	local b, color = border_of(cfg)
+	local v = b and (color .. b.v .. convert.RESET) or nil
 	if b then
-		out[#out + 1] = rule(b.tl, b.t, b.tr, b)
+		out[#out + 1] = rule(b.l, b.t, b.r, b, color)
 	end
 	while day <= count_days do
 		local l1, l2 = {}, {}
@@ -243,7 +293,7 @@ local function week_lines(days, year, month, today_key, cfg)
 		if b then
 			out[#out + 1] = "  " .. v .. table.concat(l1, v) .. v
 			out[#out + 1] = "  " .. v .. table.concat(l2, v) .. v
-			out[#out + 1] = (day > count_days) and rule(b.bl, b.b, b.br, b) or rule(b.l, b.x, b.r, b)
+			out[#out + 1] = (day > count_days) and rule(b.l, b.b, b.r, b, color) or rule(b.l, b.x, b.r, b, color)
 		else
 			out[#out + 1] = "  " .. table.concat(l1, " ") .. " "
 			out[#out + 1] = "  " .. table.concat(l2, " ") .. " "
@@ -293,25 +343,39 @@ function M.render_month(days, year, month, today_key, cfg, labels)
 	end
 
 	local s = stats.month_stats(days, year, month, cfg.goal_hours)
+	local b, color = border_of(cfg)
+	-- Avec les encadrés, le mois et ses statistiques sont dans un cadre ; la légende des couleurs reste dehors. Le titre perd
+	-- alors « Logtime : » (il dépasserait du cadre ; la ligne d'aide au-dessus le dit déjà).
+	local function text(s_)
+		add(b and framed(s_, b, color) or s_)
+	end
 	add("")
-	add(string.format("  %s : %s %d   %s", labels.title, labels.months[month], year, totals_text(s, labels)))
-	add("")
+	if b then
+		add(frame_edge(b.tl, b.tr, b, color))
+		text(string.format("  %s %d   %s", labels.months[month], year, totals_text(s, labels)))
+	else
+		add(string.format("  %s : %s %d   %s", labels.title, labels.months[month], year, totals_text(s, labels)))
+		add("")
+	end
 	add(header_line(cfg, labels))
 	for _, line in ipairs(week_lines(days, year, month, today_key, cfg)) do
 		add(line)
 	end
 
 	-- Statistiques (le total et les jours actifs sont en haut, à côté du titre)
-	add(string.format("  %s : %s", labels.average, stats.hm(s.average)))
+	text(string.format("  %s : %s", labels.average, stats.hm(s.average)))
 	local line = {}
 	if s.best_day then
 		line[#line + 1] = string.format("%s : %d (%s)", labels.best, s.best_day, stats.hm(s.best_secs))
 	end
 	line[#line + 1] = string.format("%s : %d %s", labels.streak, stats.streak(days, today_key), labels.streak_unit)
-	add("  " .. table.concat(line, "   "))
+	text("  " .. table.concat(line, "   "))
 	local validated = validated_text(days, year, month, cfg, s, labels)
 	if validated then
-		add("  " .. validated)
+		text("  " .. validated)
+	end
+	if b then
+		add(frame_edge(b.bl, b.br, b, color))
 	end
 
 	add(legend_line(cfg, labels))
@@ -329,6 +393,22 @@ if selected then
 title = "\27[1m" .. title .. convert.RESET
 end
 title = title .. "   " .. totals_text(s, labels)
+local validated = validated_text(days, year, month, cfg, s, labels)
+local b, color = border_of(cfg)
+if b then
+	-- Le mois dans son cadre : le haut, le titre, l'en-tête, la grille des cases, des lignes vides (dans le cadre) pour que
+	-- tous les mois aient la même hauteur, la ligne des validés, le bas.
+	local lines = { frame_edge(b.tl, b.tr, b, color), framed(title, b, color), header_line(cfg, labels) }
+	for _, line in ipairs(week_lines(days, year, month, today_key, cfg)) do
+		lines[#lines + 1] = line
+	end
+	while #lines < M.height(cfg) - 2 do
+		lines[#lines + 1] = framed("", b, color)
+	end
+	lines[#lines + 1] = framed(validated and ("  " .. validated) or "", b, color)
+	lines[#lines + 1] = frame_edge(b.bl, b.br, b, color)
+	return { lines = lines, width = M.width(cfg) }
+end
 local lines = { title, header_line(cfg, labels) }
 for _, line in ipairs(week_lines(days, year, month, today_key, cfg)) do
 lines[#lines + 1] = line
@@ -336,7 +416,6 @@ end
 while #lines < M.height(cfg) - 1 do
 lines[#lines + 1] = ""
 end
-local validated = validated_text(days, year, month, cfg, s, labels)
 lines[#lines + 1] = validated and ("  " .. validated) or ""
 return { lines = lines, width = M.width(cfg) }
 end
