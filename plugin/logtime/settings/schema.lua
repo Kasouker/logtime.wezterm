@@ -5,10 +5,14 @@ local M = {}
 
 -- kind : "enum" (une valeur parmi une liste), "boolean", "color" (#RRGGBB), "number", "integer" (nombre entier).
 -- default = nil : pas de valeur par défaut (le réglage est simplement absent, comme goal_hours).
+-- none : une valeur acceptée en plus des limites, qui veut dire « aucun » (goal_hours = 0 : pas d'objectif). Elle peut
+-- être écrite dans le fichier de réglages, et l'emporte alors sur la valeur de wezterm.lua.
+-- step : de combien la valeur change à chaque appui sur ← ou → dans la page de personnalisation (1 par défaut).
 M.DEFINITIONS = {
 	{ key = "lang", kind = "enum", values = { "fr", "en" }, default = "fr" },
 	{ key = "week_starts_on", kind = "enum", values = { "monday", "sunday" }, default = "monday" },
-	{ key = "goal_hours", kind = "number", min = 0.5, max = 24, default = nil },
+	{ key = "goal_hours", kind = "number", min = 0.5, max = 24, default = nil, none = 0, step = 0.5 },
+	{ key = "goal_days", kind = "integer", min = 1, max = 7, default = 5 },
 	{ key = "max_months", kind = "integer", min = 1, max = 12, default = 12 },
 	{ key = "months_anchor", kind = "enum", values = { "last", "first" }, default = "last" },
 	{ key = "center", kind = "boolean", default = true },
@@ -92,6 +96,9 @@ end
 -- number ou integer
 if type(value) ~= "number" or value ~= value or value == math.huge or value == -math.huge then
 return false, "doit être un nombre"
+end
+if definition.none ~= nil and value == definition.none then
+return true, math.tointeger(value) or value
 end
 if kind == "integer" and value ~= math.floor(value) then
 return false, "doit être un nombre entier"

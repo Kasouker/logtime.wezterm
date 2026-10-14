@@ -184,7 +184,7 @@ function M.render_month(days, year, month, today_key, cfg, labels)
 		line[#line + 1] = string.format("%s : %d (%s)", labels.best, s.best_day, stats.hm(s.best_secs))
 	end
 	line[#line + 1] = string.format("%s : %d %s", labels.streak, stats.streak(days, today_key), labels.streak_unit)
-	if cfg.goal_hours then
+	if stats.has_goal(cfg.goal_hours) then
 		line[#line + 1] = string.format("%s : %d %s", labels.goal, s.goal_days, labels.goal_unit)
 	end
 	add("  " .. table.concat(line, "   "))

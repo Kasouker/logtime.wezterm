@@ -30,10 +30,15 @@ function M.streak(days, today_key)
 	return count
 end
 
+-- Un objectif d'heures est actif s'il est donné et plus grand que 0 (0 veut dire « aucun objectif »).
+function M.has_goal(goal_hours)
+	return type(goal_hours) == "number" and goal_hours > 0
+end
+
 -- Les statistiques d'un mois. goal_hours (facultatif) : nombre d'heures qui comptent pour « objectif atteint ».
 -- Renvoie { total, active, average, best_day, best_secs, goal_days } (best_day vaut nil s'il n'y a rien ce mois-ci).
 function M.month_stats(days, year, month, goal_hours)
-	local goal_secs = goal_hours and goal_hours * 3600 or nil
+	local goal_secs = M.has_goal(goal_hours) and goal_hours * 3600 or nil
 	local total, active, goal_days = 0, 0, 0
 	local best_day, best_secs = nil, 0
 	for day = 1, dates.days_in_month(year, month) do

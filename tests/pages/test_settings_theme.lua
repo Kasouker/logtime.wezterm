@@ -242,7 +242,7 @@ local function row4(opts)
 local env = open(opts)
 local ls = lines_of(shown(env.pane))
 for i, line in ipairs(ls) do
-if line:find("Logtime : ", 1, true) or line:find("Settings", 1, true) then
+if line:find("Personnalisation", 1, true) or line:find("Settings", 1, true) then
 return ls[i + 3]
 end
 end

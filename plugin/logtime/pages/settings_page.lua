@@ -25,15 +25,23 @@ local COLUMNS = 4
 local ROWS = 4
 local CELL = 11 -- largeur d'une couleur, sans ses crochets
 local LINES = 23 -- hauteur de la page, la même dans tous les onglets (la page ne saute pas quand on change d'onglet)
-local NAME_WIDTH = 30 -- largeur du nom d'un réglage dans l'onglet Calendrier (les valeurs sont alignées après)
+local NAME_WIDTH = 30 -- largeur du nom d'un réglage dans un onglet de réglages (les valeurs sont alignées après)
 
 -- Les onglets de la page (gardés dans wezterm.GLOBAL sous forme de nombres).
-M.TAB = { COLORS = 1, CALENDAR = 2 }
-M.TAB_COUNT = 2
+M.TAB = { COLORS = 1, CALENDAR = 2, GENERAL = 3 }
+M.TAB_COUNT = 3
 
 -- Les réglages de l'onglet Calendrier, dans l'ordre d'affichage (leurs limites viennent de settings/schema.lua).
 -- Pas de réglage du centrage : le calendrier est toujours centré (center = false reste possible dans wezterm.lua).
 M.CALENDAR_SETTINGS = { "max_months", "months_anchor", "week_starts_on" }
+-- Les réglages de l'onglet Général.
+M.GENERAL_SETTINGS = { "lang", "goal_hours", "goal_days" }
+
+-- Les onglets de réglages : leur liste de réglages et la clé (i18n) de leur intitulé. L'onglet Couleurs n'en fait pas partie.
+M.LISTS = {
+	[M.TAB.CALENDAR] = { settings = M.CALENDAR_SETTINGS, heading = "settings_calendar" },
+	[M.TAB.GENERAL] = { settings = M.GENERAL_SETTINGS, heading = "settings_general" },
+}
 
 -- Les messages affichés en bas de la page (gardés dans wezterm.GLOBAL sous forme de nombres).
 M.MESSAGE = { NONE = 0, SAVED = 1, FAILED = 2, CONSENT = 3, SETTING_SAVED = 4 }
@@ -74,25 +82,36 @@ local function title_line(tab, labels)
 		local name = names[i] or tostring(i)
 		parts[i] = (i == tab) and ("[" .. name .. "]") or (" " .. name .. " ")
 	end
-	return "  " .. labels.title .. " : " .. labels.settings_title .. "  " .. table.concat(parts, " ")
+	return "  " .. labels.settings_title .. "  " .. table.concat(parts, " ")
+end
+
+-- La valeur d'un réglage quand rien n'est choisi : sa valeur par défaut, sinon sa valeur « aucun » (none).
+function M.fallback(definition)
+	if definition.default ~= nil then
+		return definition.default
+	end
+	return definition.none
 end
 
 -- La valeur d'un réglage, avec des flèches qui montrent dans quel sens elle peut encore changer.
---   Un nombre entier : « ◀ 12 » au maximum, « ◀ 6 ▶ » au milieu, «   1 ▶ » au minimum.
+--   Un nombre : « ◀ 12 » au maximum, « ◀ 6 ▶ » au milieu, «   1 ▶ » au minimum. S'il a une valeur « aucun » (none),
+--   c'est elle qui est tout en bas : «   aucun ▶ », puis « ◀ 0h30 ▶ ».
 --   Un choix ou un oui/non : les valeurs défilent en boucle, donc toujours les deux flèches : « ◀ lundi ▶ ».
 -- shown : le texte à afficher (la valeur traduite) ; par défaut, la valeur elle-même.
 function M.format_value(definition, value, shown)
 	shown = shown or tostring(value)
-	if definition.kind ~= "integer" then
+	if definition.kind == "enum" or definition.kind == "boolean" then
 		return "◀ " .. shown .. " ▶"
 	end
-	local left = (value > definition.min) and "◀ " or "  "
+	local lowest = (definition.none ~= nil) and definition.none or definition.min
+	local left = (value > lowest) and "◀ " or "  "
 	local right = (value < definition.max) and " ▶" or ""
 	return left .. shown .. right
 end
 
 -- La valeur suivante quand on appuie sur ← (delta = -1) ou → (delta = 1).
---   Un nombre entier : un de plus ou de moins, sans sortir de ses limites.
+--   Un nombre : step de plus ou de moins (1 par défaut), sans sortir de ses limites ; sous le minimum, la valeur
+--   « aucun » s'il y en a une (et de « aucun », → donne le minimum).
 --   Un choix : la valeur suivante (ou précédente) de la liste, en boucle.
 --   Un oui/non : l'inverse.
 function M.step(definition, value, delta)
@@ -108,15 +127,40 @@ function M.step(definition, value, delta)
 		end
 		return values[(position - 1 + delta) % #values + 1]
 	end
-	return math.max(definition.min, math.min(definition.max, value + delta))
+	if definition.none ~= nil then
+		if value == definition.none then
+			return (delta > 0) and definition.min or definition.none
+		end
+		if delta < 0 and value <= definition.min then
+			return definition.none
+		end
+	end
+	local next_value = math.max(definition.min, math.min(definition.max, value + delta * (definition.step or 1)))
+	return math.tointeger(next_value) or next_value
+end
+
+-- Une durée en heures, comme dans le calendrier : 7.5 -> « 7h30 », 8 -> « 8h00 ».
+local function hours_text(hours)
+	local minutes = math.floor(hours * 60 + 0.5)
+	return string.format("%dh%02d", minutes // 60, minutes % 60)
 end
 
 -- Le texte affiché pour une valeur : sa traduction (settings_values dans i18n), sinon la valeur elle-même.
--- Les oui/non sont rangés sous les clés « yes » et « no ».
+-- Les oui/non sont rangés sous les clés « yes » et « no », la valeur « aucun » sous « none ».
 local function value_text(key, value, labels)
 	local texts = labels.settings_values or {}
+	local definition = schema.get(key) or {}
 	if type(value) == "boolean" then
 		return (texts.boolean or {})[value and "yes" or "no"] or tostring(value)
+	end
+	if definition.none ~= nil and value == definition.none then
+		return texts.none or tostring(value)
+	end
+	if key == "goal_hours" then
+		return hours_text(value)
+	end
+	if key == "goal_days" then
+		return string.format(texts.goal_days or "%d / 7", value)
 	end
 	return (texts[key] or {})[value] or tostring(value)
 end
@@ -134,31 +178,33 @@ local function message_line(message, labels)
 	return ""
 end
 
--- L'onglet Calendrier : un réglage par ligne, le réglage choisi marqué par « ▸ », son explication en dessous de la liste.
---   state = { row = le numéro du réglage choisi, values = { max_months = 12, ... }, message = M.MESSAGE.* }
-local function render_calendar(state, labels)
+-- Un onglet de réglages (Calendrier, Général) : un réglage par ligne, le réglage choisi marqué par « ▸ », son explication
+-- en dessous de la liste.
+--   state = { tab = l'onglet, row = le numéro du réglage choisi, values = { max_months = 12, ... }, message = M.MESSAGE.* }
+local function render_list(state, labels)
+	local list = M.LISTS[state.tab]
 	local names = labels.settings_names or {}
 	local hints = labels.settings_hints or {}
 	local lines = {
-		title_line(M.TAB.CALENDAR, labels),
+		title_line(state.tab, labels),
 		"  " .. labels.settings_calendar_help1,
 		"  " .. labels.settings_calendar_help2,
 		"",
-		"  " .. labels.settings_calendar,
+		"  " .. (labels[list.heading] or ""),
 		"",
 	}
-	for i, key in ipairs(M.CALENDAR_SETTINGS) do
+	for i, key in ipairs(list.settings) do
 		local definition = schema.get(key)
 		local value = state.values[key]
 		if value == nil then -- pas « or » : avec un oui/non, false or true donnerait true
-			value = definition.default
+			value = M.fallback(definition)
 		end
 		local name = names[key] or key
 		local padding = string.rep(" ", math.max(1, NAME_WIDTH - (utf8.len(name) or #name)))
 		lines[#lines + 1] = (i == state.row and "▸ " or "  ") .. name .. padding .. M.format_value(definition, value, value_text(key, value, labels))
 	end
 	lines[#lines + 1] = ""
-	local selected = M.CALENDAR_SETTINGS[state.row]
+	local selected = list.settings[state.row]
 	lines[#lines + 1] = (selected and hints[selected]) and ("  " .. hints[selected]) or ""
 	while #lines < LINES - 1 do
 		lines[#lines + 1] = ""
@@ -176,8 +222,8 @@ end
 --             par défaut), consent_line = le texte de la question sur les couleurs du thème (ligne 4), ou nil }
 -- Renvoie les lignes et la largeur du tableau de couleurs (la largeur qu'on centre).
 function M.render(state, labels)
-if state.tab == M.TAB.CALENDAR then
-	return render_calendar(state, labels)
+if M.LISTS[state.tab] then
+	return render_list(state, labels)
 end
 local colors = state.colors or palette.COLORS
 local names = state.names or labels.palette or {}
@@ -282,31 +328,38 @@ local DEFAULT_COLOR = palette.COLORS[palette.DEFAULT_INDEX]
 		return math.floor(index)
 	end
 
-	-- L'onglet affiché (logtime_settings_tab) et, dans l'onglet Calendrier, le réglage choisi (logtime_settings_row).
+	-- L'onglet affiché (logtime_settings_tab) et, dans un onglet de réglages, le réglage choisi (logtime_settings_row).
 	local function current_tab()
 		local tab = num(G.logtime_settings_tab)
-		if tab == M.TAB.CALENDAR then
-			return M.TAB.CALENDAR
+		if M.LISTS[tab] then
+			return tab
 		end
 		return M.TAB.COLORS
 	end
 
+	-- La liste des réglages de l'onglet affiché (nil dans l'onglet Couleurs).
+	local function current_list()
+		local list = M.LISTS[current_tab()]
+		return list and list.settings or nil
+	end
+
 	local function current_row()
 		local row = num(G.logtime_settings_row)
-		if not row or row < 1 or row > #M.CALENDAR_SETTINGS then
+		local list = current_list() or {}
+		if not row or row < 1 or row > #list then
 			return 1
 		end
 		return math.floor(row)
 	end
 
-	-- La valeur en cours d'un réglage : celle du plugin, sinon sa valeur par défaut.
+	-- La valeur en cours d'un réglage : celle du plugin, sinon sa valeur par défaut (ou « aucun »).
 	local function setting_value(key)
 		local value = ctx.cfg()[key]
 		local ok, normalized = schema.validate(key, value)
 		if ok then
 			return normalized
 		end
-		return schema.get(key).default
+		return M.fallback(schema.get(key))
 	end
 
 	local function dims_of(pane)
@@ -336,8 +389,10 @@ consent_line = labels.consent_no
 end
 end
 local values = {}
-for _, key in ipairs(M.CALENDAR_SETTINGS) do
-	values[key] = setting_value(key)
+for _, list in pairs(M.LISTS) do
+	for _, key in ipairs(list.settings) do
+		values[key] = setting_value(key)
+	end
 end
 local lines, width = M.render({
 tab = current_tab(),
@@ -447,13 +502,14 @@ end
 
 local function move(delta_row, delta_col)
 return function(window, pane)
-if current_tab() == M.TAB.CALENDAR then
+local list = current_list()
+if list then
 	if delta_row ~= 0 then
-		G.logtime_settings_row = math.max(1, math.min(#M.CALENDAR_SETTINGS, current_row() + delta_row))
+		G.logtime_settings_row = math.max(1, math.min(#list, current_row() + delta_row))
 		G.logtime_settings_message = M.MESSAGE.NONE
 		redraw(pane, false)
 	else
-		local key = M.CALENDAR_SETTINGS[current_row()]
+		local key = list[current_row()]
 		change_setting(window, pane, key, M.step(schema.get(key), setting_value(key), delta_col))
 	end
 	return
@@ -478,7 +534,7 @@ end
 redraw(pane, false)
 end
 
--- Entrée : enregistre la couleur choisie (l'onglet Calendrier n'en a pas besoin : chaque changement y est enregistré).
+-- Entrée : enregistre la couleur choisie (les onglets de réglages n'en ont pas besoin : chaque changement y est enregistré).
 local function choose(window, pane)
 if current_tab() ~= M.TAB.COLORS then
 	return
@@ -487,11 +543,12 @@ save(window, pane, active_palette().colors[selected_index()])
 end
 
 -- d : la couleur par défaut du plugin (l'or), et dans la palette proposée la case qui lui ressemble le plus.
-	-- Dans l'onglet Calendrier : la valeur par défaut du réglage choisi.
+	-- Dans un onglet de réglages : la valeur par défaut du réglage choisi (ou « aucun » s'il n'en a pas).
 	local function default(window, pane)
-		if current_tab() == M.TAB.CALENDAR then
-			local key = M.CALENDAR_SETTINGS[current_row()]
-			change_setting(window, pane, key, schema.get(key).default)
+		local list = current_list()
+		if list then
+			local key = list[current_row()]
+			change_setting(window, pane, key, M.fallback(schema.get(key)))
 			return
 		end
 		G.logtime_settings_index = position_in(DEFAULT_COLOR, active_palette().colors) or 1
@@ -501,6 +558,7 @@ end
 	-- Tab : l'onglet suivant (après le dernier, retour au premier).
 	local function next_tab(window, pane)
 		G.logtime_settings_tab = current_tab() % M.TAB_COUNT + 1
+		G.logtime_settings_row = 1
 		G.logtime_settings_message = M.MESSAGE.NONE
 		redraw(pane, false)
 	end

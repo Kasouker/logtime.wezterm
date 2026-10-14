@@ -88,7 +88,7 @@ local plain = {}
 for i, line in ipairs(lines) do
 	plain[i] = strip(line)
 end
-check("ligne 1 : le titre et les onglets (Couleurs affiché)", plain[1], "  Logtime : Personnalisation  [Couleurs]  Calendrier ")
+check("ligne 1 : le titre et les onglets (Couleurs affiché)", plain[1], "  Personnalisation  [Couleurs]  Calendrier   Général ")
 check("ligne 2 : l'aide, première partie", plain[2], "  " .. fr.settings_help1)
 check("ligne 3 : l'aide, seconde partie", plain[3], "  " .. fr.settings_help2)
 check("ligne 4 : vide", plain[4], "")
@@ -184,7 +184,7 @@ for _, state in ipairs({ { index = 1, message = 0 }, { index = 16, current = "#C
 end
 check("le nombre de lignes ne change jamais (la page ne saute pas)", stable, true)
 local english = render({ index = 3, current = "#C9AB6B", message = 1 }, en)
-check("anglais : le titre et les onglets", strip(english[1]), "  Logtime : Settings  [Colors]  Calendar ")
+check("anglais : le titre et les onglets", strip(english[1]), "  Settings  [Colors]  Calendar   General ")
 check("anglais : le nom de la couleur", strip(english[20]), "  Choice: 3 Gold (#C9AB6B)")
 check("anglais : le message", strip(english[23]), "  " .. en.settings_saved)
 check("anglais : les noms dans le tableau", strip(english[8]):find("Gold", 1, true) ~= nil, true)
@@ -253,7 +253,12 @@ wezterm = w,
 G = w.GLOBAL,
 num = function(v) return v end,
 cfg = function() return env.cfg end,
-		labels = function() return opts.labels or fr end,
+		labels = function()
+			if opts.labels_from_cfg then
+				return (env.cfg.lang == "en") and en or fr
+			end
+			return opts.labels or fr
+		end,
 		blocker_args = function() return platform.blocker_args("windows") end,
 		store = store,
 		settings_path = function() return env.path end,
@@ -565,7 +570,7 @@ for i, line in ipairs(cal) do
 	cal_plain[i] = strip(line)
 end
 check("onglet Calendrier : 23 lignes, comme l'onglet Couleurs", #cal, 23)
-check("onglet Calendrier : ligne 1, l'onglet affiché est entre crochets", cal_plain[1], "  Logtime : Personnalisation   Couleurs  [Calendrier]")
+check("onglet Calendrier : ligne 1, l'onglet affiché est entre crochets", cal_plain[1], "  Personnalisation   Couleurs  [Calendrier]  Général ")
 check("onglet Calendrier : ligne 2, l'aide", cal_plain[2], "  " .. fr.settings_calendar_help1)
 check("onglet Calendrier : ligne 3, l'aide", cal_plain[3], "  " .. fr.settings_calendar_help2)
 check("onglet Calendrier : ligne 5, l'intitulé", cal_plain[5], "  Réglages du calendrier")
@@ -585,7 +590,7 @@ check("onglet Calendrier : aucune ligne ne dépasse 57 colonnes (français et an
 	end
 	return true
 end)(), true)
-check("anglais : la barre d'onglets", strip(render({ tab = 2, row = 1, values = {}, message = 0 }, en)[1]), "  Logtime : Settings   Colors  [Calendar]")
+check("anglais : la barre d'onglets", strip(render({ tab = 2, row = 1, values = {}, message = 0 }, en)[1]), "  Settings   Colors  [Calendar]  General ")
 
 -- la page, avec la fausse API
 local function shown_text(env)
@@ -606,7 +611,9 @@ check("Tab : le réglage est affiché avec sa valeur (12 par défaut)", months_l
 check("Tab : la page tient toujours dans 57 x 23", select(3, e.page.build_lines({ cols = 57, rows = 23 })), true)
 check("Tab : rien n'est écrit en changeant d'onglet", read(e.path), nil)
 press(e, "Tab", e.pane)
-check("Tab deux fois : retour à l'onglet Couleurs", shown_text(e):find("[Couleurs]", 1, true) ~= nil, true)
+check("Tab deux fois : l'onglet Général", shown_text(e):find("[Général]", 1, true) ~= nil, true)
+press(e, "Tab", e.pane)
+check("Tab trois fois : retour à l'onglet Couleurs", shown_text(e):find("[Couleurs]", 1, true) ~= nil, true)
 
 -- ← : la valeur baisse, est enregistrée, appliquée, et le calendrier redessiné
 e = open({})
@@ -683,7 +690,8 @@ press(e, "Enter", e.pane)
 press(e, "Tab", e.pane)
 check("Tab efface le message", shown_text(e):find("✓", 1, true), nil)
 press(e, "Tab", e.pane)
-check("Tab deux fois : la couleur choisie est gardée (4)", chosen(e.pane), 4)
+press(e, "Tab", e.pane)
+check("Tab trois fois : la couleur choisie est gardée (4)", chosen(e.pane), 4)
 
 -- ---- les choix et les oui/non (début de la semaine, place du mois, centrage)
 local week_def = { kind = "enum", values = { "monday", "sunday" } }
@@ -774,6 +782,111 @@ check("week_starts_on = sunday dans wezterm.lua : la page montre dimanche", sett
 e.cfg.week_starts_on = "mardi"
 e.page.on_resize(e.window, e.pane)
 check("week_starts_on incorrect : la page montre la valeur par défaut (lundi)", setting_line(e, "Début de la semaine"):find("◀ lundi ▶", 1, true) ~= nil, true)
+
+-- ============================================================
+-- l'onglet Général : langue, objectif par jour, jours par semaine
+-- ============================================================
+local goal_def = { kind = "number", min = 0.5, max = 24, none = 0, step = 0.5 }
+check("objectif : de « aucun », → donne le minimum (0h30)", settings_page.step(goal_def, 0, 1), 0.5)
+check("objectif : de « aucun », ← reste « aucun »", settings_page.step(goal_def, 0, -1), 0)
+check("objectif : du minimum, ← donne « aucun »", settings_page.step(goal_def, 0.5, -1), 0)
+check("objectif : → ajoute 30 min", settings_page.step(goal_def, 7.5, 1), 8)
+check("objectif : un nombre entier reste entier (8 et non 8.0)", math.type(settings_page.step(goal_def, 7.5, 1)), "integer")
+check("objectif : bloqué à 24", settings_page.step(goal_def, 24, 1), 24)
+check("objectif : « aucun » n'a que la flèche de droite", settings_page.format_value(goal_def, 0, "aucun"), "  aucun ▶")
+check("objectif : au minimum, la flèche de gauche (vers « aucun »)", settings_page.format_value(goal_def, 0.5, "0h30"), "◀ 0h30 ▶")
+check("fallback : la valeur par défaut", settings_page.fallback({ default = 5 }), 5)
+check("fallback : sans valeur par défaut, « aucun »", settings_page.fallback({ none = 0 }), 0)
+check("fallback : false n'est pas remplacé par « aucun »", settings_page.fallback({ default = false, none = 0 }), false)
+
+local gen = render({ tab = settings_page.TAB.GENERAL, row = 2, values = { lang = "fr", goal_hours = 7.5, goal_days = 4 }, message = 0 })
+local gen_plain = {}
+for i, line in ipairs(gen) do
+	gen_plain[i] = strip(line)
+end
+check("onglet Général : 23 lignes", #gen, 23)
+check("onglet Général : ligne 1, la barre d'onglets", gen_plain[1], "  Personnalisation   Couleurs   Calendrier  [Général]")
+check("onglet Général : ligne 5, l'intitulé", gen_plain[5], "  Réglages généraux")
+check("onglet Général : la langue, dans sa propre langue", gen_plain[7], "  Langue                        ◀ français ▶")
+check("onglet Général : l'objectif en heures et minutes, choisi", gen_plain[8], "▸ Objectif par jour             ◀ 7h30 ▶")
+check("onglet Général : les jours par semaine", gen_plain[9], "  Jours d'objectif par semaine  ◀ 4 sur 7 ▶")
+check("onglet Général : l'explication de l'objectif", gen_plain[11], "  " .. fr.settings_hints.goal_hours)
+local gen_none = render({ tab = 3, row = 1, values = { goal_hours = 0 }, message = 0 })
+check("onglet Général : objectif 0 affiché « aucun »", strip(gen_none[8]), "  Objectif par jour               aucun ▶")
+check("onglet Général : sans valeurs, objectif « aucun » et 5 jours par défaut", strip(render({ tab = 3, row = 1, values = {}, message = 0 })[8]) .. "|" .. strip(render({ tab = 3, row = 1, values = {}, message = 0 })[9]), "  Objectif par jour               aucun ▶|  Jours d'objectif par semaine  ◀ 5 sur 7 ▶")
+check("onglet Général en anglais : English reste English, aucun devient none", strip(render({ tab = 3, row = 1, values = { lang = "en" }, message = 0 }, en)[7]) .. "|" .. strip(render({ tab = 3, row = 1, values = {}, message = 0 }, en)[8]), "▸ Language                      ◀ English ▶|  Daily goal                      none ▶")
+check("chaque réglage de l'onglet Général a un nom et une explication de 55 caractères au plus (français et anglais)", (function()
+	for _, labels in ipairs({ fr, en }) do
+		for _, key in ipairs(settings_page.GENERAL_SETTINGS) do
+			local hint = labels.settings_hints[key]
+			if not labels.settings_names[key] or not hint or utf8.len(hint) > 55 then
+				return key
+			end
+		end
+	end
+	return true
+end)(), true)
+check("aucune ligne de l'onglet Général ne dépasse 57 colonnes", (function()
+	for _, labels in ipairs({ fr, en }) do
+		for row = 1, 3 do
+			for _, line in ipairs(render({ tab = 3, row = row, values = { goal_hours = 23.5, goal_days = 7 }, message = 4 }, labels)) do
+				if utf8.len(strip(line)) > 57 then
+					return strip(line)
+				end
+			end
+		end
+	end
+	return true
+end)(), true)
+
+-- dans la page
+local function to_general(env)
+	press(env, "Tab", env.pane)
+	press(env, "Tab", env.pane)
+end
+e = open({})
+press(e, "Tab", e.pane)
+press(e, "j", e.pane)
+press(e, "j", e.pane)
+check("(avant : le 3e réglage de l'onglet Calendrier est choisi)", setting_line(e, "Début de la semaine"):find("▸", 1, true) ~= nil, true)
+press(e, "Tab", e.pane)
+check("Général : l'onglet est affiché", shown_text(e):find("[Général]", 1, true) ~= nil, true)
+check("Général : le 1er réglage (la langue) est choisi, même si on était sur un autre réglage avant", setting_line(e, "Langue"):find("▸", 1, true) ~= nil, true)
+press(e, "j", e.pane)
+press(e, "l", e.pane)
+check("objectif → : 0h30 est enregistré", read(e.path), '{\n  "goal_hours": 0.5\n}\n')
+check("objectif → : appliqué tout de suite", e.cfg.goal_hours, 0.5)
+check("objectif → : la page montre 0h30", setting_line(e, "Objectif par jour"):find("◀ 0h30 ▶", 1, true) ~= nil, true)
+for _ = 1, 15 do
+	press(e, "l", e.pane)
+end
+check("objectif → seize fois : 8h00", read(e.path), '{\n  "goal_hours": 8\n}\n')
+check("objectif : la page montre 8h00", setting_line(e, "Objectif par jour"):find("◀ 8h00 ▶", 1, true) ~= nil, true)
+press(e, "d", e.pane)
+check("objectif d : « aucun » est écrit (0), pas retiré : il l'emporte sur wezterm.lua", read(e.path), '{\n  "goal_hours": 0\n}\n')
+check("objectif d : appliqué (0)", e.cfg.goal_hours, 0)
+check("objectif d : la page montre « aucun »", setting_line(e, "Objectif par jour"):find("aucun ▶", 1, true) ~= nil, true)
+press(e, "j", e.pane)
+press(e, "h", e.pane)
+check("jours ← : 4 est enregistré", read(e.path), '{\n  "goal_hours": 0,\n  "goal_days": 4\n}\n')
+-- l'objectif écrit dans wezterm.lua est montré
+e = open({})
+e.cfg.goal_hours = 7
+to_general(e)
+check("goal_hours = 7 dans wezterm.lua : la page montre 7h00", setting_line(e, "Objectif par jour"):find("◀ 7h00 ▶", 1, true) ~= nil, true)
+press(e, "j", e.pane)
+press(e, "h", e.pane)
+check("de 7h00, ← : 6h30", read(e.path), '{\n  "goal_hours": 6.5\n}\n')
+-- la langue : la page change de langue tout de suite
+e = open({ labels_from_cfg = true })
+to_general(e)
+press(e, "l", e.pane)
+check("langue → : English est enregistré", read(e.path), '{\n  "lang": "en"\n}\n')
+check("langue → : appliqué tout de suite", e.cfg.lang, "en")
+check("langue → : la page est redessinée en anglais", shown_text(e):find("[General]", 1, true) ~= nil, true)
+check("langue → : la langue garde son nom (English)", shown_text(e):find("◀ English ▶", 1, true) ~= nil, true)
+press(e, "d", e.pane)
+check("langue d : retour au français", shown_text(e):find("◀ français ▶", 1, true) ~= nil, true)
 
 -- rouvrir la page : on revient à l'onglet Couleurs
 e = open({})

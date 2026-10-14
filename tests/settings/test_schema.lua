@@ -46,7 +46,7 @@ local function rejects(name, key, value)
 end
 
 -- ---- la liste
-check("treize réglages", #schema.keys(), 13)
+check("quatorze réglages", #schema.keys(), 14)
 check("le premier est lang", schema.keys()[1], "lang")
 check("gradient_color est connu", schema.is_known("gradient_color"), true)
 check("un nom inconnu n'est pas connu", schema.is_known("gradiant"), false)
@@ -159,13 +159,27 @@ for key, value in pairs(defaults) do
 end
 check("toutes les valeurs par défaut sont acceptées par le schéma", all_valid, true)
 check("goal_hours n'a pas de valeur par défaut", defaults.goal_hours, nil)
-check("onze valeurs par défaut", (function()
+check("douze valeurs par défaut", (function()
 	local n = 0
 	for _ in pairs(defaults) do
 		n = n + 1
 	end
 	return n
-end)(), 11)
+end)(), 12)
+
+-- ---- « aucun » (none) et goal_days
+accepts("goal_hours 0 : aucun objectif (la valeur none)", "goal_hours", 0, 0)
+rejects("goal_hours 0,25 : ni aucun, ni dans les limites", "goal_hours", 0.25)
+rejects("goal_hours -1", "goal_hours", -1)
+check("goal_hours : la valeur none est 0", schema.get("goal_hours").none, 0)
+check("goal_hours : change de 0,5 en 0,5 dans la page", schema.get("goal_hours").step, 0.5)
+accepts("goal_days 1 (le minimum)", "goal_days", 1, 1)
+accepts("goal_days 7 (le maximum)", "goal_days", 7, 7)
+rejects("goal_days 0", "goal_days", 0)
+rejects("goal_days 8", "goal_days", 8)
+rejects("goal_days 4,5", "goal_days", 4.5)
+check("goal_days : 5 par défaut", defaults.goal_days, 5)
+rejects("max_months 0 (pas de valeur none pour lui)", "max_months", 0)
 defaults.lang = "xx"
 check("defaults() renvoie une copie", schema.defaults().lang, "fr")
 
