@@ -22,7 +22,24 @@ local json = load_module("settings/json")
 local homes, outside = {}, {}
 local real_open = io.open
 local corrupt_tmp_reads = false -- simule un disque qui rend un autre contenu que celui écrit dans le fichier temporaire
+local blocked_tmp_reads = false -- simule un fichier temporaire bloqué un instant (antivirus, indexation sous Windows)
+local failing_tmp_close = false -- simule un disque plein : l'écriture n'échoue qu'à la fermeture
 io.open = function(path, mode)
+	if failing_tmp_close and path:sub(-4) == ".tmp" and mode == "wb" then
+		local real = real_open(path, mode)
+		return {
+			write = function(self)
+				return self
+			end,
+			close = function()
+				real:close()
+				return nil, "No space left on device"
+			end,
+		}
+	end
+	if blocked_tmp_reads and path:sub(-4) == ".tmp" and mode == "rb" then
+		return nil, path .. ": Permission denied", 13
+	end
 	if corrupt_tmp_reads and path:sub(-4) == ".tmp" and not (mode and (mode:find("w") or mode:find("a"))) then
 		return {
 			read = function()
@@ -306,6 +323,37 @@ check(
 )
 check("save : écriture corrompue : le fichier d'origine est intact", read(path), intact)
 check("save : écriture corrompue : le fichier temporaire est retiré", read(path .. ".tmp"), nil)
+check(
+	"save : écriture corrompue : la raison dit combien d'octets ont été relus",
+	save_err:find("16 octets relus au lieu de", 1, true) ~= nil,
+	true
+)
+
+-- le fichier temporaire ne peut pas être relu : rien ne remplace le bon fichier, et la raison du système est donnée
+blocked_tmp_reads = true
+saved, save_err = store.save(path, { max_months = 2 })
+blocked_tmp_reads = false
+check("save : relecture bloquée : échec", saved, false)
+check(
+	"save : relecture bloquée : la raison du système est donnée",
+	save_err,
+	"la vérification après écriture a échoué : relecture impossible : " .. path .. ".tmp: Permission denied"
+)
+check("save : relecture bloquée : le fichier d'origine est intact", read(path), intact)
+check("save : relecture bloquée : le fichier temporaire est retiré", read(path .. ".tmp"), nil)
+
+-- l'écriture n'échoue qu'à la fermeture : rien ne remplace le bon fichier, et la raison du système est donnée
+failing_tmp_close = true
+saved, save_err = store.save(path, { max_months = 2 })
+failing_tmp_close = false
+check("save : fermeture en échec : échec", saved, false)
+check(
+	"save : fermeture en échec : la raison du système est donnée",
+	save_err,
+	"écriture impossible : écriture incomplète : No space left on device"
+)
+check("save : fermeture en échec : le fichier d'origine est intact", read(path), intact)
+check("save : fermeture en échec : le fichier temporaire est retiré", read(path .. ".tmp"), nil)
 
 -- un réglage invalide ou inconnu
 local before = read(path)

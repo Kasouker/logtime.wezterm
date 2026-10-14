@@ -103,21 +103,30 @@ function M.save(path, days, encode)
 	if not f then
 		return false, "écriture impossible : " .. tostring(err)
 	end
-	local written = f:write(text)
-	f:close()
-	if not written then
+	local written, write_err = f:write(text)
+	local closed, close_err = f:close() -- l'écriture sur le disque peut n'échouer qu'ici
+	if not written or not closed then
 		os.remove(tmp)
-		return false, "écriture incomplète"
+		return false, "écriture incomplète : " .. tostring(write_err or close_err)
 	end
 
-	local check = io.open(tmp, "rb")
-	local back = check and check:read("*a")
-	if check then
-		check:close()
+	-- La raison exacte est dans le message : sous Windows, un antivirus ou l'indexation peut bloquer un instant un
+	-- fichier tout juste écrit (la sauvegarde suivante, quelques secondes plus tard, réussit alors).
+	local check, open_err = io.open(tmp, "rb")
+	if not check then
+		os.remove(tmp)
+		return false, "la vérification après écriture a échoué : relecture impossible : " .. tostring(open_err)
 	end
+	local back = check:read("*a")
+	check:close()
 	if back ~= text then
 		os.remove(tmp)
-		return false, "la vérification après écriture a échoué"
+		return false,
+			string.format(
+				"la vérification après écriture a échoué : %d octets relus au lieu de %d",
+				back and #back or 0,
+				#text
+			)
 	end
 
 	if os.rename(tmp, path) then

@@ -107,7 +107,11 @@ end
 
 local writes = {}
 local real_open = io.open
+local blocked_reads = nil -- un motif : la relecture de ces fichiers échoue (fichier bloqué un instant sous Windows)
 io.open = function(path, mode)
+	if blocked_reads and mode == "rb" and path:find(blocked_reads) then
+		return nil, path .. ": Permission denied", 13
+	end
 	if mode and (mode:find("w") or mode:find("a") or mode:find("%+")) then
 		writes[#writes + 1] = path
 	end
@@ -451,6 +455,37 @@ local function scenarios()
 		read(e.home .. "/pas_encore/.logtime.json"),
 		'{"2026-10-12":21}'
 	)
+	local function recovered(logs)
+		local n = 0
+		for _, m in ipairs(logs.info) do
+			if m:find("sauvegarde réussie de nouveau", 1, true) then
+				n = n + 1
+			end
+		end
+		return n
+	end
+	check("échec de sauvegarde : le retour à la normale est écrit dans les journaux, une fois", recovered(e.logs), 1)
+	text = run(e, t0 + 26, 30)
+	check("échec de sauvegarde : les sauvegardes réussies suivantes n'écrivent plus rien", recovered(e.logs), 1)
+	cleanup(e)
+
+	-- le fichier tout juste écrit ne peut pas être relu (ce qui est arrivé sous Windows : antivirus, indexation)
+	e = new_env()
+	blocked_reads = "%.logtime%.json%.tmp$"
+	text = run(e, t0, 12)
+	blocked_reads = nil
+	check("relecture bloquée : la barre affiche un point d'alerte", text, ICON .. " 00:00:12 ⚠")
+	check("relecture bloquée : une seule erreur dans les journaux", #e.logs.error, 1)
+	check(
+		"relecture bloquée : le message dit pourquoi",
+		e.logs.error[1]:find("relecture impossible : .*Permission denied") ~= nil,
+		true
+	)
+	check("relecture bloquée : aucun fichier temporaire laissé", has_prefix(e.home, FILE .. ".tmp"), nil)
+	text = run(e, t0 + 13, 12)
+	check("relecture bloquée : la tentative suivante réussit, l'alerte disparaît", text, ICON .. " 00:00:25")
+	check("relecture bloquée : rien n'est perdu", read(e.path), '{"2026-10-12":21}')
+	check("relecture bloquée : le retour à la normale est écrit dans les journaux", recovered(e.logs), 1)
 	cleanup(e)
 
 	-- ============================================================

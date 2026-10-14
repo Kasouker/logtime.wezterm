@@ -120,10 +120,10 @@ local function write_file(path, text)
 	if not f then
 		return false, tostring(err)
 	end
-	local written = f:write(text)
-	f:close()
-	if not written then
-		return false, "écriture incomplète"
+	local written, write_err = f:write(text)
+	local closed, close_err = f:close() -- l'écriture sur le disque peut n'échouer qu'ici
+	if not written or not closed then
+		return false, "écriture incomplète : " .. tostring(write_err or close_err)
 	end
 	return true
 end
@@ -190,9 +190,22 @@ local function write_atomic(path, text)
 		os.remove(tmp)
 		return false, "écriture impossible : " .. tostring(err)
 	end
-	if read_file(tmp) ~= text then
+	-- La raison exacte est dans le message (voir storage/days.lua : un fichier tout juste écrit peut être bloqué un instant).
+	local check, open_err = io.open(tmp, "rb")
+	if not check then
 		os.remove(tmp)
-		return false, "la vérification après écriture a échoué"
+		return false, "la vérification après écriture a échoué : relecture impossible : " .. tostring(open_err)
+	end
+	local back = check:read("*a")
+	check:close()
+	if back ~= text then
+		os.remove(tmp)
+		return false,
+			string.format(
+				"la vérification après écriture a échoué : %d octets relus au lieu de %d",
+				back and #back or 0,
+				#text
+			)
 	end
 	if os.rename(tmp, path) then
 		return true

@@ -1159,6 +1159,37 @@ local function scenarios()
 	)
 	cleanup(e)
 
+	-- la sauvegarde des projets échoue un moment (fichier bloqué) : une erreur, puis le retour à la normale est noté
+	clock.now = T0
+	e = new_env({ file = false })
+	e.M.apply_to_config({})
+	screen = screen_pane(e, "file:///C:/Users/max/a/b/")
+	open_fails[1] = ".logtime_projects.json.tmp"
+	live(e, win, screen, 0, 30, true)
+	open_fails[1] = nil
+	local function logged(list, text)
+		local n = 0
+		for _, m in ipairs(list) do
+			if m:find(text, 1, true) then
+				n = n + 1
+			end
+		end
+		return n
+	end
+	check("projets, sauvegarde bloquée : une seule erreur", logged(e.w.logs.error, "sauvegarde du fichier"), 1)
+	live(e, win, screen, 31, 60, true)
+	check(
+		"projets, sauvegarde bloquée : le retour à la normale est noté, une fois",
+		logged(e.w.logs.info, "réussie de nouveau"),
+		1
+	)
+	check(
+		"projets, sauvegarde bloquée : rien n'est perdu (dernière sauvegarde à la seconde 51, toutes les 10 s)",
+		read(e.home .. "/.logtime_projects.json"),
+		'{"2026-10-13":{"a/b":51}}'
+	)
+	cleanup(e)
+
 	-- le fichier ne se lit pas tout de suite : le temps inactif attend en mémoire, puis s'ajoute au fichier
 	clock.now = T0
 	e = new_env({ file = false })

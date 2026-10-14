@@ -204,7 +204,7 @@ io.open = function(p, m)
 				return true
 			end,
 			close = function()
-				real:close()
+				return real:close() -- le disque ne signale rien
 			end,
 		}
 	end
@@ -213,8 +213,60 @@ end
 ok, why = days_mod.save(file, { ["2026-10-10"] = 999999, ["2026-10-11"] = 5 })
 io.open = real_open2
 check("save : écriture tronquée détectée, échec", ok, false)
+check(
+	"save : écriture tronquée, la raison dit combien d'octets ont été relus",
+	why,
+	"la vérification après écriture a échoué : 18 octets relus au lieu de 36"
+)
 check("save : écriture tronquée, l'ancien fichier est intact", read(file), '{"2026-10-10":1}')
 check("save : écriture tronquée, fichier temporaire supprimé", read(file .. ".tmp"), nil)
+
+-- l'écriture n'échoue qu'à la fermeture (disque plein : les données restent en mémoire jusque-là)
+io.open = function(p, m)
+	if p:match("%.tmp$") and m == "wb" then
+		local real = real_open2(p, m)
+		return {
+			write = function(self)
+				return self
+			end,
+			close = function()
+				real:close()
+				return nil, "No space left on device"
+			end,
+		}
+	end
+	return real_open2(p, m)
+end
+ok, why = days_mod.save(file, { ["2026-10-10"] = 5 })
+io.open = real_open2
+check("save : fermeture en échec, échec", ok, false)
+check(
+	"save : fermeture en échec, la raison du système est donnée",
+	why,
+	"écriture incomplète : No space left on device"
+)
+check("save : fermeture en échec, l'ancien fichier est intact", read(file), '{"2026-10-10":1}')
+check("save : fermeture en échec, fichier temporaire supprimé", read(file .. ".tmp"), nil)
+
+-- le fichier tout juste écrit ne peut pas être relu (Windows : antivirus ou indexation qui le bloque un instant)
+io.open = function(p, m)
+	if p:match("%.tmp$") and m == "rb" then
+		return nil, p .. ": Permission denied", 13
+	end
+	return real_open2(p, m)
+end
+ok, why = days_mod.save(file, { ["2026-10-10"] = 5 })
+io.open = real_open2
+check("save : relecture bloquée, échec", ok, false)
+check(
+	"save : relecture bloquée, la raison du système est donnée",
+	why,
+	"la vérification après écriture a échoué : relecture impossible : " .. file .. ".tmp: Permission denied"
+)
+check("save : relecture bloquée, l'ancien fichier est intact", read(file), '{"2026-10-10":1}')
+check("save : relecture bloquée, fichier temporaire supprimé", read(file .. ".tmp"), nil)
+ok = days_mod.save(file, { ["2026-10-10"] = 5 })
+check("save : relecture bloquée, la sauvegarde suivante réussit", read(file), '{"2026-10-10":5}')
 
 -- dossier inexistant : échec propre, rien n'est créé
 ok, why = days_mod.save(dir .. "/inexistant/sous/.logtime.json", { ["2026-10-10"] = 1 })

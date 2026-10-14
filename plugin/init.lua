@@ -295,6 +295,9 @@ local function maybe_save(now, days)
 	local ok, saved, err = pcall(storage.save, path, days)
 	G.logtime_saved = now
 	if ok and saved then
+		if G.logtime_save_failed then
+			wezterm.log_info("logtime : sauvegarde réussie de nouveau (le problème précédent était passager)")
+		end
 		G.logtime_dirty = false
 		G.logtime_save_failed = false
 	else
@@ -397,6 +400,13 @@ local function side_file(o)
 		local ok, saved, err = pcall(storage.save, o.path(), file.get(), o.encode)
 		G[key("saved")] = now
 		if ok and saved then
+			if G[key("save_failed")] then
+				wezterm.log_info(
+					"logtime : sauvegarde du fichier "
+						.. o.what
+						.. " réussie de nouveau (le problème précédent était passager)"
+				)
+			end
 			G[key("dirty")] = false
 			G[key("save_failed")] = false
 		elseif not G[key("save_failed")] then
