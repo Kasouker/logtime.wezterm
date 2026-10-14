@@ -802,6 +802,98 @@ local function scenarios()
 		true
 	)
 	cleanup(e)
+
+	-- ============================================================
+	-- 🎉 la notification : une seule fois par jour, au moment où l'objectif est atteint
+	-- ============================================================
+	local function run(env, windows, from, to)
+		for s = from, to do
+			clock.now = T0 + s
+			for _, w_ in ipairs(windows) do
+				update(env, w_)
+			end
+		end
+	end
+	local function toasts(windows)
+		local all = {}
+		for _, w_ in ipairs(windows) do
+			for _, m in ipairs(w_.toasts) do
+				all[#all + 1] = m
+			end
+		end
+		return all
+	end
+	-- 6h59m58s, objectif 7 h : atteint 2 s plus tard
+	e = new_env({ file = almost })
+	e.M.apply_to_config({}, { goal_hours = 7 })
+	win = e.window()
+	run(e, { win }, 0, 1)
+	check("🎉 pas encore atteint : pas de notification", #win.toasts, 0)
+	run(e, { win }, 2, 2)
+	check("🎉 atteint : une notification", #win.toasts, 1)
+	check(
+		"🎉 le message, avec ses 🎉 au début et à la fin",
+		win.toasts[1],
+		"🎉 Objectif du jour atteint : 7h ! 🎉"
+	)
+	check(
+		"🎉 aussi dans les journaux",
+		e.w.logs.info[#e.w.logs.info],
+		"logtime : 🎉 Objectif du jour atteint : 7h ! 🎉"
+	)
+	run(e, { win }, 3, 30)
+	check("🎉 une seule fois (rien de plus ensuite)", #win.toasts, 1)
+	cleanup(e)
+	-- WezTerm démarre alors que l'objectif est déjà atteint : pas de seconde notification
+	e = new_env({ file = '{"2026-10-13":30000}' })
+	e.M.apply_to_config({}, { goal_hours = 7 })
+	win = e.window()
+	run(e, { win }, 0, 10)
+	check("🎉 WezTerm rouvert après l'objectif : pas de notification", #win.toasts, 0)
+	cleanup(e)
+	-- sans objectif : jamais
+	e = new_env({ file = almost })
+	e.M.apply_to_config({})
+	win = e.window()
+	run(e, { win }, 0, 10)
+	check("🎉 sans objectif : jamais de notification", #win.toasts, 0)
+	cleanup(e)
+	-- deux fenêtres : une seule notification en tout
+	e = new_env({ file = almost })
+	e.M.apply_to_config({}, { goal_hours = 7 })
+	local win1, win2 = e.window(), e.window()
+	run(e, { win1, win2 }, 0, 5)
+	check("🎉 deux fenêtres ouvertes : une seule notification en tout", #toasts({ win1, win2 }), 1)
+	cleanup(e)
+	-- le compteur caché (status = false) : la notification part quand même
+	e = new_env({ file = almost })
+	e.M.apply_to_config({}, { goal_hours = 7, status = false })
+	win = e.window()
+	run(e, { win }, 0, 5)
+	check("🎉 compteur caché : la notification part quand même", #win.toasts, 1)
+	cleanup(e)
+	-- en anglais, objectif 7 h 30
+	e = new_env({ file = '{"2026-10-13":26998}' })
+	e.M.apply_to_config({}, { goal_hours = 7.5, lang = "en" })
+	win = e.window()
+	run(e, { win }, 0, 5)
+	check("🎉 en anglais, 7h30", win.toasts[1], "🎉 Daily goal reached: 7h30! 🎉")
+	cleanup(e)
+	-- Windows refuse la notification : rien ne casse
+	e = new_env({ file = almost })
+	e.M.apply_to_config({}, { goal_hours = 7 })
+	win = e.window()
+	function win:toast_notification()
+		error("notifications désactivées")
+	end
+	run(e, { win }, 0, 5)
+	check("🎉 notification refusée : aucune erreur", #e.w.logs.error, 0)
+	check(
+		"🎉 notification refusée : le compteur s'affiche quand même, avec son ✓",
+		win.right:find("✓", 1, true) ~= nil,
+		true
+	)
+	cleanup(e)
 end
 
 current_mode = "plain"

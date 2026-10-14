@@ -37,4 +37,16 @@ function M.text(secs, goal_hours)
 	return clock .. M.hms(secs) .. " / " .. M.goal_short(goal_hours)
 end
 
+-- Faut-il annoncer que l'objectif du jour est atteint ? Une seule fois par jour, au moment où le compteur PASSE de « pas
+-- atteint » à « atteint » sous nos yeux : au premier passage (WezTerm vient de démarrer), on note l'état sans rien
+-- annoncer (sinon, en rouvrant WezTerm après l'objectif, on l'annoncerait une seconde fois).
+--   seen    : ce qui a été noté au passage précédent ("2026-10-13=0" ou "2026-10-13=1"), ou nil au premier passage ;
+--   day_key : le jour ("2026-10-13") ; reached : l'objectif est-il atteint maintenant ?
+-- Renvoie ce qu'il faut noter maintenant, et true s'il faut annoncer.
+function M.goal_event(seen, day_key, reached)
+	local now_seen = day_key .. "=" .. (reached and "1" or "0")
+	local announce = reached and seen == (day_key .. "=0")
+	return now_seen, announce
+end
+
 return M

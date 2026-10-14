@@ -342,6 +342,15 @@ function M.today_seconds()
 	return days[day.key(os.time(), cfg.day_offset)] or 0
 end
 
+-- Les textes dans la langue choisie (le français si la langue demandée n'existe pas).
+local function labels()
+	local ok, found = pcall(load_module, "i18n/" .. tostring(cfg.lang))
+	if ok then
+		return found
+	end
+	return load_module("i18n/fr")
+end
+
 -- Fait avancer le compteur et renvoie le texte à afficher. Plusieurs appels dans la même seconde ne comptent le
 -- temps qu'une fois (counter.advance ne compte rien si l'instant n'a pas changé).
 -- Une erreur ne doit jamais casser la barre : elle est écrite dans les journaux de WezTerm, une seule fois tant que
@@ -405,9 +414,26 @@ end
 
 -- À chaque mise à jour de WezTerm (update-status) : compter, puis afficher le compteur là où il faut (status/auto.lua).
 -- Ne renvoie jamais false : ça empêcherait les autres (tabline.wez…) de dessiner leur barre.
+-- 🎉 L'objectif du jour vient d'être atteint : une notification, une seule fois par jour (voir status.goal_event).
+-- Une notification qui échoue (Windows peut les masquer) ne gêne rien : le « ✓ » du compteur le montre aussi.
+-- Sans objectif, reached est toujours faux : rien n'est jamais annoncé.
+local function maybe_announce(window, reached)
+	local today = day.key(os.time(), cfg.day_offset)
+	local seen, announce = status.goal_event(G.logtime_goal_seen, today, reached)
+	G.logtime_goal_seen = seen
+	if announce then
+		local message = string.format(labels().goal_toast, status.goal_short(cfg.goal_hours))
+		pcall(function()
+			window:toast_notification("logtime", message, nil, 10000)
+		end)
+		wezterm.log_info("logtime : " .. message)
+	end
+end
+
 local function on_update_status(window, pane, tabline_url)
 	local text, reached = status_text()
 	update_tabline_style(reached)
+	maybe_announce(window, reached)
 	local now = os.time()
 	if not num(G.logtime_status_started) then
 		G.logtime_status_started = now -- le premier passage depuis le démarrage de WezTerm (survit aux rechargements)
@@ -459,15 +485,6 @@ function M.days_snapshot()
 		copy[key] = secs
 	end
 	return copy
-end
-
--- Les textes dans la langue choisie (le français si la langue demandée n'existe pas).
-local function labels()
-	local ok, found = pcall(load_module, "i18n/" .. tostring(cfg.lang))
-	if ok then
-		return found
-	end
-	return load_module("i18n/fr")
 end
 
 -- À appeler dans wezterm.lua, APRÈS les autres réglages de touches (keys.lua remplace config.keys) :

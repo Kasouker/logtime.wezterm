@@ -23,6 +23,7 @@ return {
 	streak = "Current streak",
 	streak_unit = "d",
 	today = "* = today",
+	goal_toast = "🎉 Daily goal reached: %s! 🎉",
 	validated_weeks = "Validated weeks",
 	validated_days = "Validated days",
 	page_help = "← → or h l: month   t: today   r: refresh   q: close",

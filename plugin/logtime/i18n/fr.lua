@@ -23,6 +23,7 @@ return {
 	streak = "Série en cours",
 	streak_unit = "j",
 	today = "* = aujourd'hui",
+	goal_toast = "🎉 Objectif du jour atteint : %s ! 🎉",
 	validated_weeks = "Semaines validées",
 	validated_days = "Jours validés",
 	page_help = "← → ou h l : mois   t : aujourd'hui   r : rafraîchir   q : fermer",

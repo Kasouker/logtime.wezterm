@@ -51,5 +51,27 @@ check("reached : pas encore", status.reached(25199, 7), false)
 check("reached : sans objectif", status.reached(99999, nil), false)
 check("reached : objectif 0", status.reached(99999, 0), false)
 
+-- ---- goal_event : annoncer l'objectif une seule fois par jour, au moment où il est atteint
+local function ev(seen, key, reached)
+	local now_seen, announce = status.goal_event(seen, key, reached)
+	return now_seen .. " " .. tostring(announce)
+end
+local D = "2026-10-13"
+check("premier passage, objectif pas atteint : on note, rien à annoncer", ev(nil, D, false), D .. "=0 false")
+check(
+	"premier passage, objectif déjà atteint (WezTerm rouvert) : on note, rien à annoncer",
+	ev(nil, D, true),
+	D .. "=1 false"
+)
+check("l'objectif vient d'être atteint : on annonce", ev(D .. "=0", D, true), D .. "=1 true")
+check("déjà atteint et annoncé : rien de plus", ev(D .. "=1", D, true), D .. "=1 false")
+check("toujours pas atteint : rien", ev(D .. "=0", D, false), D .. "=0 false")
+check("nouveau jour, première fois vu : on note, rien à annoncer", ev("2026-10-12=0", D, true), D .. "=1 false")
+check(
+	"objectif relevé en cours de journée (plus atteint), puis atteint de nouveau : on annonce",
+	ev(D .. "=0", D, true),
+	D .. "=1 true"
+)
+
 print(string.format("\n%d vérifications réussies, %d échecs", passed, failed))
 os.exit(failed == 0 and 0 or 1)
