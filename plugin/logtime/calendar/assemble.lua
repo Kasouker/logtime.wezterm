@@ -100,9 +100,38 @@ local function header_line(cfg, labels)
 	return table.concat(header)
 end
 
+M.GOAL_MARK = "✓"
+local STRIKE, NO_STRIKE = "\27[9m", "\27[29m"
+
+-- La durée d'un jour (ligne 2 de sa case), centrée sur 8 caractères. Avec un objectif :
+--   atteint                       : « ✓ 8h02 » ;
+--   pas atteint, jour déjà passé  : la durée est rayée (seulement le texte, pas les espaces autour) ;
+--   pas atteint, aujourd'hui ou plus tard : rien de spécial (la journée n'est pas finie).
+-- Un jour sans rien garde son « · ». Les dates "AAAA-MM-JJ" se comparent comme du texte : l'ordre est le bon.
+local function duration_text(secs, key, today_key, goal_secs)
+	if secs <= 0 then
+		return center("·", 8)
+	end
+	local text = stats.hm(secs)
+	if not goal_secs then
+		return center(text, 8)
+	end
+	if secs >= goal_secs then
+		return center(M.GOAL_MARK .. " " .. text, 8)
+	end
+	if today_key and key < today_key then
+		local padded = center(text, 8)
+		local left = padded:match("^( *)")
+		local right = string.rep(" ", 8 - #left - (utf8.len(text) or #text))
+		return left .. STRIKE .. text .. NO_STRIKE .. right
+	end
+	return center(text, 8)
+end
+
 -- Les semaines : trois lignes par semaine (les numéros, les durées, une ligne vide)
 local function week_lines(days, year, month, today_key, cfg)
 	local out = {}
+	local goal_secs = stats.has_goal(cfg.goal_hours) and cfg.goal_hours * 3600 or nil
 	local count_days = dates.days_in_month(year, month)
 	local day = 1 - dates.offset(year, month, cfg.week_starts_on)
 	while day <= count_days do
@@ -116,9 +145,8 @@ local function week_lines(days, year, month, today_key, cfg)
 				local secs = math.floor(math.max(0, days[key] or 0))
 				local st = style(secs, cfg)
 				local mark = (key == today_key) and "*" or " "
-				local text = secs > 0 and stats.hm(secs) or "·"
 				l1[#l1 + 1] = st .. mark .. string.format("%2d", day) .. string.rep(" ", 5) .. convert.RESET .. " "
-				l2[#l2 + 1] = st .. center(text, 8) .. convert.RESET .. " "
+				l2[#l2 + 1] = st .. duration_text(secs, key, today_key, goal_secs) .. convert.RESET .. " "
 			end
 			day = day + 1
 		end

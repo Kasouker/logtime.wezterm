@@ -281,6 +281,41 @@ check("has_goal : 0 n'est pas un objectif", stats.has_goal(0), false)
 check("has_goal : nil n'est pas un objectif", stats.has_goal(nil), false)
 check("has_goal : 0,5 est un objectif", stats.has_goal(0.5), true)
 check("objectif 0 : aucun jour compté comme atteint", stats.month_stats(days, 2026, 10, 0).goal_days, 0)
+
+-- ---- l'objectif dans les cases : ✓ si atteint, durée rayée si pas atteint (jours passés seulement)
+-- le 10 : 4h13, le 11 : 0h31, le 12 (aujourd'hui) : 1h00 ; objectif 3 h
+local function durations_line(text, day_line_pattern)
+	local ls = lines_of(text)
+	for i, line in ipairs(ls) do
+		if strip(line):find(day_line_pattern) then
+			return ls[i + 1]
+		end
+	end
+end
+local goal_raw = render(days, 2026, 10, "2026-10-12", { goal_hours = 3 })
+local raw_line = durations_line(goal_raw, " 10 ")
+local plain_line = strip(raw_line)
+check("objectif atteint (le 10, 4h13 ≥ 3h) : « ✓ 4h13 »", plain_line:find("✓ 4h13", 1, true) ~= nil, true)
+check("objectif pas atteint, jour passé (le 11, 0h31) : la durée est rayée", raw_line:find("\27[9m0h31\27[29m", 1, true) ~= nil, true)
+check("rayé : seulement le texte, les espaces autour ne le sont pas", raw_line:find("\27[9m 0h31", 1, true) == nil and raw_line:find("0h31 \27[29m", 1, true) == nil, true)
+check("aujourd'hui (le 12, 1h00 < 3h) : pas rayé, la journée n'est pas finie", raw_line:find("\27[9m1h00", 1, true), nil)
+check("aujourd'hui : pas de ✓ non plus", plain_line:find("✓ 1h00", 1, true), nil)
+check("un seul jour rayé dans le mois", select(2, goal_raw:gsub("\27%[9m", "")), 1)
+check("un seul ✓ dans le mois", select(2, goal_raw:gsub("✓", "")), 1)
+check("la ligne garde sa largeur (65) avec ✓ et rayé", utf8.len(strip(raw_line)) <= 65 and utf8.len(plain_line) == utf8.len(strip(durations_line(render(days, 2026, 10, "2026-10-12", {}), " 10 "))), true)
+check("objectif atteint pile (3h00 = 3h) : ✓", strip(render({ ["2026-10-05"] = 10800 }, 2026, 10, "2026-10-12", { goal_hours = 3 })):find("✓ 3h00", 1, true) ~= nil, true)
+check("objectif 2h59 pour 3h : rayé", render({ ["2026-10-05"] = 10799 }, 2026, 10, "2026-10-12", { goal_hours = 3 }):find("\27[9m2h59", 1, true) ~= nil, true)
+check("une longue durée avec ✓ tient dans la case (« ✓ 12h30 »)", strip(render({ ["2026-10-05"] = 45000 }, 2026, 10, "2026-10-12", { goal_hours = 3 })):find("✓ 12h30", 1, true) ~= nil, true)
+local no_goal = render(days, 2026, 10, "2026-10-12", {})
+check("sans objectif : ni ✓ ni rayé", no_goal:find("✓", 1, true) == nil and no_goal:find("\27[9m", 1, true) == nil, true)
+local zero_goal = render(days, 2026, 10, "2026-10-12", { goal_hours = 0 })
+check("objectif « aucun » (0) : ni ✓ ni rayé", zero_goal:find("✓", 1, true) == nil and zero_goal:find("\27[9m", 1, true) == nil, true)
+check("jour sans rien : garde son « · », jamais rayé", render({}, 2026, 10, "2026-10-12", { goal_hours = 3 }):find("\27[9m", 1, true), nil)
+check("mois passé entier : tous les jours pas atteints sont rayés", select(2, render({ ["2026-09-01"] = 60, ["2026-09-30"] = 60 }, 2026, 9, "2026-10-12", { goal_hours = 3 }):gsub("\27%[9m", "")), 2)
+check("mois à venir : rien n'est rayé", render({ ["2026-11-01"] = 60 }, 2026, 11, "2026-10-12", { goal_hours = 3 }):find("\27[9m", 1, true), nil)
+local block = assemble.month_block(days, 2026, 10, "2026-10-12", { goal_hours = 3 }, fr, false)
+local block_text = table.concat(block.lines, "\n")
+check("plusieurs mois (month_block) : ✓ et rayé aussi", block_text:find("✓ 4h13", 1, true) ~= nil and block_text:find("\27[9m0h31", 1, true) ~= nil, true)
 local empty = lines_of(strip(render({}, 2026, 10, "2026-10-12")))
 check("mois vide : totaux à zéro", empty[#empty - 2], "  Total du mois : 0h00   Jours actifs : 0   Moyenne par jour actif : 0h00")
 check("mois vide : pas de meilleur jour, série à zéro", empty[#empty - 1], "  Série en cours : 0 j")
