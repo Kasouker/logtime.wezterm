@@ -9,6 +9,13 @@ local M = {}
 
 -- Largeur visible d'une ligne de semaine : 2 espaces + 7 colonnes de 9 caractères
 M.WIDTH = 65
+-- Avec un objectif, une colonne de plus à droite : le résultat de la semaine (« ✓ 4/5 »).
+M.WEEK_COLUMN = 8
+
+-- La largeur d'un mois avec ces réglages : 65, ou 73 avec un objectif (la colonne de la semaine).
+function M.width(cfg)
+	return M.WIDTH + (stats.has_goal((cfg or {}).goal_hours) and M.WEEK_COLUMN or 0)
+end
 
 -- Hauteur d'un mois en bloc (month_block) : titre, en-tête, 6 semaines de 3 lignes, totaux. Les mois de 4 ou 5 semaines
 -- sont complétés par des lignes vides, pour que les totaux soient toujours alignés d'un mois à l'autre.
@@ -19,6 +26,7 @@ M.HEIGHT = 21
 M.DEFAULTS = {
 week_starts_on = "monday",
 goal_hours = nil,
+goal_days = 5, -- jours où l'objectif est atteint qui font une semaine réussie
 heat = { "#2E3644", "#5A5240", "#8C7A4A", "#C9AB6B" },
 thresholds = { 1, 3, 6 },
 cell_color = nil,
@@ -97,6 +105,9 @@ local function header_line(cfg, labels)
 	for i = 1, 7 do
 		header[#header + 1] = center(names[i], 9)
 	end
+	if stats.has_goal(cfg.goal_hours) then
+		header[#header + 1] = center(labels.week_column or "", M.WEEK_COLUMN)
+	end
 	return table.concat(header)
 end
 
@@ -128,13 +139,47 @@ local function duration_text(secs, key, today_key, goal_secs)
 	return center(text, 8)
 end
 
--- Les semaines : trois lignes par semaine (les numéros, les durées, une ligne vide)
+-- Le résultat d'une semaine (colonne de droite), centré sur M.WEEK_COLUMN : le nombre de jours où l'objectif est
+-- atteint sur les 7 jours de la semaine (ceux des mois voisins compris), sur goal_days.
+--   assez de jours        : « ✓ 4/5 » (même si la semaine n'est pas finie) ;
+--   pas assez, semaine finie (son dernier jour est passé), avec du travail : « 2/5 » rayé ;
+--   semaine sans aucun travail (vacances, avant l'installation du plugin) : « 0/5 », jamais rayé (comme un jour vide) ;
+--   pas assez, semaine en cours ou à venir : « 1/5 » (elle peut encore réussir).
+local function week_result(days, year, month, first_day, today_key, goal_secs, goal_days)
+	local reached, worked = 0, false
+	local last_key
+	for d = first_day, first_day + 6 do
+		last_key = dates.key_any(year, month, d)
+		local secs = math.floor(math.max(0, days[last_key] or 0))
+		if secs > 0 then
+			worked = true
+		end
+		if secs >= goal_secs then
+			reached = reached + 1
+		end
+	end
+	local text = string.format("%d/%d", reached, goal_days)
+	if reached >= goal_days then
+		return center(M.GOAL_MARK .. " " .. text, M.WEEK_COLUMN)
+	end
+	if worked and today_key and last_key < today_key then
+		local padded = center(text, M.WEEK_COLUMN)
+		local left = padded:match("^( *)")
+		return left .. STRIKE .. text .. NO_STRIKE .. string.rep(" ", M.WEEK_COLUMN - #left - #text)
+	end
+	return center(text, M.WEEK_COLUMN)
+end
+
+-- Les semaines : trois lignes par semaine (les numéros, les durées, une ligne vide). Avec un objectif, le résultat de
+-- la semaine est au bout de la ligne des durées.
 local function week_lines(days, year, month, today_key, cfg)
 	local out = {}
 	local goal_secs = stats.has_goal(cfg.goal_hours) and cfg.goal_hours * 3600 or nil
+	local goal_days = math.floor(tonumber(cfg.goal_days) or M.DEFAULTS.goal_days)
 	local count_days = dates.days_in_month(year, month)
 	local day = 1 - dates.offset(year, month, cfg.week_starts_on)
 	while day <= count_days do
+		local first_day = day
 		local l1, l2 = { "  " }, { "  " }
 		for _ = 1, 7 do
 			if day < 1 or day > count_days then
@@ -149,6 +194,10 @@ local function week_lines(days, year, month, today_key, cfg)
 				l2[#l2 + 1] = st .. duration_text(secs, key, today_key, goal_secs) .. convert.RESET .. " "
 			end
 			day = day + 1
+		end
+		if goal_secs then
+			l1[#l1 + 1] = string.rep(" ", M.WEEK_COLUMN)
+			l2[#l2 + 1] = week_result(days, year, month, first_day, today_key, goal_secs, goal_days)
 		end
 		out[#out + 1] = table.concat(l1)
 		out[#out + 1] = table.concat(l2)
@@ -222,7 +271,7 @@ function M.render_month(days, year, month, today_key, cfg, labels)
 end
 
 -- Un mois en bloc compact, pour en afficher plusieurs côte à côte : le titre, l'en-tête, les semaines et une ligne de totaux.
--- selected : le titre est alors en gras. Renvoie { lines = { ... }, width = M.WIDTH }.
+-- selected : le titre est alors en gras. Renvoie { lines = { ... }, width = M.width(cfg) }.
 function M.month_block(days, year, month, today_key, cfg, labels, selected)
 cfg = with_defaults(cfg)
 local title = string.format("  %s %d", labels.months[month], year)
@@ -238,7 +287,7 @@ lines[#lines + 1] = ""
 end
 local s = stats.month_stats(days, year, month, cfg.goal_hours)
 lines[#lines + 1] = string.format("  %s : %s   %s : %d", labels.total, stats.hm(s.total), labels.active, s.active)
-return { lines = lines, width = M.WIDTH }
+return { lines = lines, width = M.width(cfg) }
 end
 
 return M

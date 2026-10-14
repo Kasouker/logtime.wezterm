@@ -7,6 +7,12 @@ function M.key(year, month, day)
 	return string.format("%04d-%02d-%02d", year, month, day)
 end
 
+-- La clé d'un jour qui peut sortir du mois : (2026, 10, 0) -> "2026-09-30", (2026, 10, 32) -> "2026-11-01".
+-- À midi, pour ne jamais tomber sur un changement d'heure.
+function M.key_any(year, month, day)
+	return os.date("%Y-%m-%d", os.time({ year = year, month = month, day = day, hour = 12 }))
+end
+
 -- Nombre de jours du mois (28 à 31, février des années bissextiles compris)
 function M.days_in_month(year, month)
 	return os.date("*t", os.time({ year = year, month = month + 1, day = 0, hour = 12 })).day

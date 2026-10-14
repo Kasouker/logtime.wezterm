@@ -12,6 +12,7 @@ return {
 	goal = "Goal reached",
 	goal_unit = "d",
 	today = "* = today",
+	week_column = "Week",
 	page_help = "← → or h l: month   t: today   r: refresh   q: close",
 	settings_title = "Settings",
 	settings_help1 = "←↑↓→ or h j k l: choose   Enter: save",

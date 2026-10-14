@@ -12,6 +12,7 @@ return {
 	goal = "Objectif atteint",
 	goal_unit = "j",
 	today = "* = aujourd'hui",
+	week_column = "Semaine",
 	page_help = "← → ou h l : mois   t : aujourd'hui   r : rafraîchir   q : fermer",
 	settings_title = "Personnalisation",
 	settings_help1 = "←↑↓→ ou h j k l : choisir   Entrée : enregistrer",

@@ -86,21 +86,22 @@ curve = cfg.gradient_curve,
 		local labels, cfg = ctx.labels(), with_gradient(ctx.cfg())
 		local year, month = selected_month()
 		local help = "  " .. labels.title .. "   " .. labels.page_help
+		local block_width = assemble.width(cfg) -- plus large avec un objectif (la colonne de la semaine)
 		local plan = { count = 1 }
 		if dims then
-			plan = layout.plan(dims.cols, dims.rows, cfg.max_months)
+			plan = layout.plan(dims.cols, dims.rows, cfg.max_months, block_width)
 		end
 		if plan.count <= 1 then
 			local text = help .. "\n" .. assemble.render_month(ctx.days(), year, month, ctx.today_key(), cfg, labels)
 			if dims then
 				-- Même un seul mois ne tient pas en entier : un message à la place d'un calendrier coupé.
 				local needed = select(2, text:gsub("\n", "\n")) + 1
-				if (tonumber(dims.cols) or 0) < layout.BLOCK_WIDTH or (tonumber(dims.rows) or 0) < needed then
-					local title, hint = labels.too_small, string.format(labels.too_small_hint, layout.BLOCK_WIDTH, needed)
+				if (tonumber(dims.cols) or 0) < block_width or (tonumber(dims.rows) or 0) < needed then
+					local title, hint = labels.too_small, string.format(labels.too_small_hint, block_width, needed)
 					return title .. "\n" .. hint, 0, math.max(layout.visible_width(title), layout.visible_width(hint))
 				end
 			end
-			return text, 1, layout.BLOCK_WIDTH
+			return text, 1, block_width
 		end
 		local days, today = ctx.days(), ctx.today_key()
 		local blocks = {}
@@ -109,7 +110,7 @@ curve = cfg.gradient_curve,
 			blocks[#blocks + 1] = assemble.month_block(days, shown.year, shown.month, today, cfg, labels, selected)
 		end
 		local body = layout.arrange(blocks, plan.columns, layout.GAP)
-		local width = plan.columns * layout.BLOCK_WIDTH + (plan.columns - 1) * layout.GAP
+		local width = plan.columns * block_width + (plan.columns - 1) * layout.GAP
 		return help .. "\n\n" .. table.concat(body, "\n") .. "\n\n" .. assemble.legend(cfg, labels), plan.count, width
 	end
 
