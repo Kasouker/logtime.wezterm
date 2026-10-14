@@ -677,6 +677,24 @@ local function maybe_announce(window, reached)
 	end
 end
 
+-- tabline.wez s'il est installé ET utilisé par cette config (son setup() a été appelé : get_config() renvoie sa
+-- configuration). Installé ne suffit pas : WezTerm garde tous les plugins déjà téléchargés, même ceux qu'une config
+-- n'utilise plus, et le compteur s'ajouterait alors à une barre qui n'est jamais affichée.
+local function active_tabline(tabline_url)
+	if not tabline_url then
+		return nil
+	end
+	local ok, tabline = pcall(wezterm.plugin.require, tabline_url)
+	if not (ok and type(tabline) == "table" and type(tabline.get_config) == "function") then
+		return nil
+	end
+	local ok_config, opts = pcall(tabline.get_config)
+	if ok_config and type(opts) == "table" then
+		return tabline, opts
+	end
+	return nil
+end
+
 local function on_update_status(window, pane, tabline_url)
 	local text, reached = status_text() -- d'abord compter (avec la dernière activité connue), puis regarder l'activité
 	note_activity(window, pane)
@@ -686,12 +704,13 @@ local function on_update_status(window, pane, tabline_url)
 	if not num(G.logtime_status_started) then
 		G.logtime_status_started = now -- le premier passage depuis le démarrage de WezTerm (survit aux rechargements)
 	end
+	local tabline, tabline_opts = active_tabline(tabline_url)
 	local mode = auto.choose({
 		enabled = cfg.status ~= false,
 		now = now,
 		external_at = num(G.logtime_external_tick),
 		started_at = num(G.logtime_status_started),
-		has_tabline = tabline_url ~= nil,
+		has_tabline = tabline ~= nil,
 	})
 	if mode == "right" then
 		if reached then
@@ -701,11 +720,8 @@ local function on_update_status(window, pane, tabline_url)
 		end
 		window:set_right_status(text)
 	elseif mode == "tabline" then
-		local ok, tabline = pcall(wezterm.plugin.require, tabline_url)
-		if ok and type(tabline) == "table" and type(tabline.get_config) == "function" then
-			if auto.ensure_component(tabline.get_config(), tabline_items) then
-				wezterm.log_info("logtime : compteur ajouté à la barre de tabline.wez")
-			end
+		if auto.ensure_component(tabline_opts, tabline_items) then
+			wezterm.log_info("logtime : compteur ajouté à la barre de tabline.wez")
 		end
 	end
 end

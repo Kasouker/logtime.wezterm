@@ -692,6 +692,44 @@ local function scenarios()
 	check("tabline : aucune erreur", #e.w.logs.error, 0)
 	cleanup(e)
 
+	-- tabline.wez installé mais PAS utilisé par cette config (son setup() n'a pas été appelé : get_config() renvoie
+	-- nil) : WezTerm garde les plugins déjà téléchargés. Le compteur doit s'afficher à droite, sinon il est invisible.
+	clock.now = T0
+	tl = fake_tabline()
+	tl.module.get_config = function()
+		return nil
+	end
+	e = new_env({ file = false, plugins = { { url = TABLINE } }, tabline = tl })
+	e.M.apply_to_config({})
+	win = e.window()
+	update(e, win)
+	check("tabline installé mais pas utilisé : le compteur est à droite dès le départ", win.right ~= nil, true)
+	clock.now = T0 + 5
+	update(e, win)
+	check(
+		"tabline installé mais pas utilisé : toujours à droite",
+		win.right ~= nil and win.right:find(HMS) ~= nil,
+		true
+	)
+	check("tabline installé mais pas utilisé : rien d'ajouté à tabline", #tl.opts.sections.tabline_x, 0)
+	check("tabline installé mais pas utilisé : aucune erreur", #e.w.logs.error, 0)
+	cleanup(e)
+
+	-- tabline.wez installé, et sa fonction get_config plante : le compteur reste visible, à droite
+	clock.now = T0
+	tl = fake_tabline()
+	tl.module.get_config = function()
+		error("tabline cassé")
+	end
+	e = new_env({ file = false, plugins = { { url = TABLINE } }, tabline = tl })
+	e.M.apply_to_config({})
+	win = e.window()
+	clock.now = T0 + 5
+	update(e, win)
+	check("tabline qui plante : le compteur est à droite", win.right ~= nil, true)
+	check("tabline qui plante : aucune erreur du plugin", #e.w.logs.error, 0)
+	cleanup(e)
+
 	-- tabline.wez + tick() déjà branché dans tabline (ta configuration) : rien n'est ajouté
 	clock.now = T0
 	tl = fake_tabline()
