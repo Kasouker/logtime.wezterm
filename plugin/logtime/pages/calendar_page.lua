@@ -1,6 +1,7 @@
 -- plugin/logtime/pages/calendar_page.lua : la page du calendrier (un onglet où l'on change de mois avec les flèches).
 local load = ...
 local assemble = load("calendar/assemble")
+local year_view = load("calendar/year")
 local layout = load("calendar/layout")
 local screen = load("ui/screen")
 local keytable = load("ui/keytable")
@@ -10,6 +11,7 @@ local gradient = load("color/gradient")
 local M = {}
 
 M.TABLE_NAME = "logtime_page"
+M.VIEW = { MONTHS = 1, YEAR = 2 }
 
 -- ctx fournit ce que la page ne sait pas faire seule :
 --   wezterm       l'API de WezTerm
@@ -27,7 +29,8 @@ function M.create(ctx)
 	local page = {}
 
 	-- L'état de la page, gardé dans wezterm.GLOBAL sous forme de simples nombres :
-	--   logtime_page_pane (le panneau de la page), logtime_page_year, logtime_page_month (le mois affiché)
+	--   logtime_page_pane (le panneau de la page), logtime_page_year, logtime_page_month (le mois affiché),
+	--   logtime_page_view (M.VIEW.MONTHS ou M.VIEW.YEAR : la vue affichée, touche a)
 	local function page_id()
 		return num(G.logtime_page_pane)
 	end
@@ -59,12 +62,34 @@ function M.create(ctx)
 		return nil
 	end
 
-	-- Le texte de la page : une ligne d'aide, puis le ou les mois. Le nombre de mois dépend de la taille de la fenêtre
+	local function current_view()
+		return num(G.logtime_page_view) == M.VIEW.YEAR and M.VIEW.YEAR or M.VIEW.MONTHS
+	end
+
+	-- La vue de l'année : une ligne d'aide, l'année (calendar/year.lua), la légende des couleurs. Si elle ne tient pas
+	-- dans la fenêtre : le message « fenêtre trop petite », avec la taille nécessaire.
+	local function build_year_text(dims, labels, cfg, year)
+		local help = "  " .. labels.title .. "   " .. labels.year_help
+		local lines, width = year_view.render(ctx.days(), year, ctx.today_key(), cfg, labels)
+		local text = help .. "\n\n" .. table.concat(lines, "\n") .. "\n\n" .. assemble.legend(cfg, labels)
+		local needed = #lines + 4
+		width = math.max(width, layout.visible_width(help))
+		if dims and ((tonumber(dims.cols) or 0) < width or (tonumber(dims.rows) or 0) < needed) then
+			local title, hint = labels.too_small, string.format(labels.too_small_hint, width, needed)
+			return title .. "\n" .. hint, 0, math.max(layout.visible_width(title), layout.visible_width(hint))
+		end
+		return text, 12, width
+	end
+
+	-- Le texte de la page : une ligne d'aide, puis le ou les mois (ou l'année, touche a). Le nombre de mois dépend de la taille de la fenêtre
 	-- (dims = { cols, rows } ; sans taille, un seul mois). Renvoie le texte, le nombre de mois affichés et la largeur
 	-- du calendrier (la largeur qu'on centre).
 	function page.build_text(dims)
 		local labels, cfg = ctx.labels(), with_gradient(ctx.cfg())
 		local year, month = selected_month()
+		if current_view() == M.VIEW.YEAR then
+			return build_year_text(dims, labels, cfg, year)
+		end
 		local help = "  " .. labels.title .. "   " .. labels.page_help
 		local block_width, block_height = assemble.width(cfg), assemble.height(cfg) -- plus grand avec les encadrés
 		local plan = { count = 1 }
@@ -162,6 +187,7 @@ function M.create(ctx)
 
 		G.logtime_page_pane = page_pane:pane_id()
 		G.logtime_page_year, G.logtime_page_month = current_month()
+		G.logtime_page_view = M.VIEW.MONTHS
 		safe.trace(wezterm, "logtime : page ouverte dans le panneau " .. tostring(page_pane:pane_id()))
 
 		redraw(page_pane, true)
@@ -177,9 +203,14 @@ function M.create(ctx)
 		redraw(pane, false)
 	end
 
+	-- ← → : un mois de plus ou de moins (une année dans la vue de l'année).
 	local function shift_month(delta)
 		return function(window, pane)
 			local year, month = selected_month()
+			if current_view() == M.VIEW.YEAR then
+				show(year + delta, month, pane) -- l'année d'à côté, le même mois (delta n'est pas modifié : la touche le garde)
+				return
+			end
 			month = month + delta
 			if month < 1 then
 				month, year = 12, year - 1
@@ -193,6 +224,12 @@ function M.create(ctx)
 	local function go_today(window, pane)
 		local year, month = current_month()
 		show(year, month, pane)
+	end
+
+	-- a : la vue de l'année, ou de nouveau les mois.
+	local function toggle_view(window, pane)
+		G.logtime_page_view = (current_view() == M.VIEW.YEAR) and M.VIEW.MONTHS or M.VIEW.YEAR
+		redraw(pane, false)
 	end
 
 	local function refresh(window, pane)
@@ -213,6 +250,7 @@ function M.create(ctx)
 			{ key = "l", run = shift_month(1) },
 			{ key = "RightArrow", run = shift_month(1) },
 			{ key = "t", run = go_today },
+			{ key = "a", run = toggle_view },
 			{ key = "r", run = refresh },
 			{ key = "q", run = close },
 			{ key = "Escape", run = close },

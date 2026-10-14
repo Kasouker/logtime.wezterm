@@ -324,7 +324,11 @@ local function scenarios()
 		#config.keys == 3 and config.keys[1].key == "d" and config.keys[2].key == "F2" and config.keys[3].key == "F4",
 		true
 	)
-	check("apply : la table de touches de la page, avec 8 touches", #config.key_tables.logtime_page, 8)
+	check(
+		"apply : la table de touches de la page, avec 9 touches (dont a : l'année)",
+		#config.key_tables.logtime_page,
+		9
+	)
 	check(
 		"apply : un gestionnaire de redimensionnement par page (calendrier et personnalisation)",
 		e.w.events["window-resized"] ~= nil and #e.w.events["window-resized"],
@@ -349,7 +353,7 @@ local function scenarios()
 	check(
 		"F2 : la ligne d'aide est la première ligne affichée (le dessin est centré)",
 		(text:gsub("^\n+", "")):match("^%s*(.-)\n"),
-		"Logtime   ← → ou h l : mois   t : aujourd'hui   r : rafraîchir   q : fermer"
+		"Logtime   ← → : mois   a : année   t : aujourd'hui   r : rafraîchir   q : fermer"
 	)
 	check(
 		"F2 : lire les heures n'écrit rien (rien de nouveau à sauvegarder)",

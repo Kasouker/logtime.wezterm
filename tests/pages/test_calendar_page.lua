@@ -562,7 +562,7 @@ local function scenarios()
 		#config.keys == 2 and config.keys[1] == existing and config.keys[2].key == "F2",
 		true
 	)
-	check("keys : la table de touches de la page existe, avec 8 touches", #config.key_tables.logtime_page, 8)
+	check("keys : la table de touches de la page existe, avec 9 touches", #config.key_tables.logtime_page, 9)
 	check(
 		"keys : un gestionnaire de redimensionnement est installé",
 		w.events["window-resized"] ~= nil and #w.events["window-resized"],
@@ -628,6 +628,100 @@ local function scenarios()
 		"anglais : la page est en anglais",
 		strip(w.spawned[1].pane.injected[1]):find("Logtime : October 2026", 1, true) ~= nil
 			and strip(w.spawned[1].pane.injected[1]):find("q: close", 1, true) ~= nil,
+		true
+	)
+
+	-- ============================================================
+	-- la vue de l'année (touche a)
+	-- ============================================================
+	w = new_wezterm()
+	page = new_page(w)
+	win = new_window(w)
+	page.open(win, w.new_pane())
+	page_pane = w.spawned[1].pane
+	local function shown_now()
+		return strip(page_pane.injected[#page_pane.injected])
+	end
+	check("ouverture : la vue des mois", num(w.GLOBAL.logtime_page_view), calendar_page.VIEW.MONTHS)
+	press("a")
+	check("a : la vue de l'année", num(w.GLOBAL.logtime_page_view), calendar_page.VIEW.YEAR)
+	check(
+		"a : l'année 2026 est dessinée",
+		shown_now():find("2026   Total de l'année : 7h43 / Jours actifs : 4", 1, true) ~= nil,
+		true
+	)
+	check("a : l'aide de la vue année", shown_now():find(fr.year_help, 1, true) ~= nil, true)
+	check(
+		"a : les mois en tête",
+		shown_now():find("Jan", 1, true) ~= nil and shown_now():find("Déc", 1, true) ~= nil,
+		true
+	)
+	check("a : la légende des couleurs en bas", shown_now():find("aujourd'hui", 1, true) ~= nil, true)
+	press("l")
+	year, month = month_of(w)
+	check("vue année, l : l'année suivante (2027)", year .. "-" .. month, "2027-10")
+	check("vue année, l : 2027 est dessinée", shown_now():find("2027   Total de l'année", 1, true) ~= nil, true)
+	press("LeftArrow")
+	press("LeftArrow")
+	year = month_of(w)
+	check("vue année, ← ← : 2025", year, 2025)
+	press("t")
+	year = month_of(w)
+	check("vue année, t : l'année en cours", year, 2026)
+	check("vue année, t : on reste dans la vue de l'année", num(w.GLOBAL.logtime_page_view), calendar_page.VIEW.YEAR)
+	press("a")
+	check("a de nouveau : les mois", num(w.GLOBAL.logtime_page_view), calendar_page.VIEW.MONTHS)
+	check("a de nouveau : le mois est dessiné", shown_now():find("Logtime : Octobre 2026", 1, true) ~= nil, true)
+	press("h")
+	year, month = month_of(w)
+	check("vue des mois, h : un mois en arrière (pas une année)", year .. "-" .. month, "2026-9")
+	-- la touche ne garde pas le pas d'une année après être passée par la vue de l'année
+	press("a")
+	press("l")
+	press("a")
+	press("l")
+	year, month = month_of(w)
+	check("l dans l'année, puis l dans les mois : un an, puis UN mois (2027-10)", year .. "-" .. month, "2027-10")
+	press("a")
+	press("l")
+	year, month = month_of(w)
+	check("l dans l'année une seconde fois : encore un an (pas 12 ans)", year .. "-" .. month, "2028-10")
+	press("a")
+	-- rouvrir F2 : on revient aux mois
+	press("a")
+	w.GLOBAL.logtime_page_pane = nil
+	page.open(new_window(w), w.new_pane())
+	check("rouvrir F2 : la vue des mois", num(w.GLOBAL.logtime_page_view), calendar_page.VIEW.MONTHS)
+	-- la taille de la fenêtre
+	w = new_wezterm()
+	page = new_page(w)
+	w.GLOBAL.logtime_page_view = calendar_page.VIEW.YEAR
+	local year_text, _, year_width = page.build_text({ cols = 120, rows = 40 })
+	check(
+		"vue année, 120 x 40 (la fenêtre par défaut) : l'année tient",
+		strip(year_text):find("Total de l'année", 1, true) ~= nil,
+		true
+	)
+	check("vue année : la largeur à centrer (113 en 2026)", year_width, 113)
+	local small_text = page.build_text({ cols = 100, rows = 40 })
+	check(
+		"vue année, 100 colonnes : « fenêtre trop petite »",
+		strip(small_text):find("Fenêtre trop petite", 1, true) == 1,
+		true
+	)
+	check(
+		"vue année, 100 colonnes : la taille nécessaire",
+		strip(small_text):find("113 colonnes sur 16 lignes", 1, true) ~= nil,
+		true
+	)
+	check(
+		"vue année, 15 lignes : trop bas",
+		strip(page.build_text({ cols = 120, rows = 15 })):find("Fenêtre trop petite", 1, true) == 1,
+		true
+	)
+	check(
+		"vue année, 16 lignes : ça tient",
+		strip(page.build_text({ cols = 120, rows = 16 })):find("Total de l'année", 1, true) ~= nil,
 		true
 	)
 end

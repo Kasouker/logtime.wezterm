@@ -247,6 +247,12 @@ local function background(secs, cfg)
 	return cfg.heat[lv]
 end
 
+-- La couleur d'un jour ("#RRGGBB", ou nil : pas de couleur), la même que dans les cases du calendrier. La vue de
+-- l'année s'en sert aussi (calendar/year.lua).
+function M.day_color(secs, cfg)
+	return background(secs, with_defaults(cfg))
+end
+
 local function style(secs, cfg)
 	local bg = background(secs, cfg)
 	if not bg then
