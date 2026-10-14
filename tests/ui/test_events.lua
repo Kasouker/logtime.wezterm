@@ -290,7 +290,7 @@ check("noms fixes : F2 de l'ancienne config appelle bien le gestionnaire du nouv
 check("noms fixes : la page est ouverte par le nouvel état", #eval2.spawned, 1)
 local page_pane = eval2.spawned[1]
 eval2.GLOBAL.logtime_page_pane = page_pane.id
-local h_action = action_of(config1.key_tables.logtime_page, "h")
+local h_action = action_of(config1.key_tables.logtime_page, "PageUp")
 local n_before = #page_pane.injected
 check(
 	"noms fixes : « h » de l'ancienne config appelle le gestionnaire du nouvel état",

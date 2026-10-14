@@ -336,9 +336,9 @@ local function scenarios()
 		true
 	)
 	check(
-		"apply : la table de touches de la page, avec 9 touches (dont a : l'année)",
+		"apply : la table de touches de la page, avec 16 touches (dont a : l'année, Entrée : le détail)",
 		#config.key_tables.logtime_page,
-		9
+		16
 	)
 	check(
 		"apply : un gestionnaire de redimensionnement par page (calendrier et personnalisation)",
@@ -364,7 +364,7 @@ local function scenarios()
 	check(
 		"F2 : la ligne d'aide est la première ligne affichée (le dessin est centré)",
 		(text:gsub("^\n+", "")):match("^%s*(.-)\n"),
-		"Logtime   ← → : mois   a : année   t : aujourd'hui   r : rafraîchir   q : fermer"
+		"Logtime   ←→↑↓ jour   PgUp PgDn mois   Entrée détail   a année   t aujourd'hui"
 	)
 	check(
 		"F2 : lire les heures n'écrit rien (rien de nouveau à sauvegarder)",
@@ -410,7 +410,7 @@ local function scenarios()
 	text = last_text(e.w.spawned[1].pane)
 	check(
 		"réglages : en anglais",
-		text:find("Logtime : October 2026", 1, true) ~= nil and text:find("q: close", 1, true) ~= nil,
+		text:find("Logtime : October 2026", 1, true) ~= nil and text:find("Enter details", 1, true) ~= nil,
 		true
 	)
 	check("réglages : la semaine commence le dimanche", text:find("Sun%s+Mon") ~= nil, true)
@@ -1003,6 +1003,16 @@ local function scenarios()
 		last_text(idle_page):find("Aujourd'hui : 1h00 inactif", 1, true) ~= nil,
 		true
 	)
+	page_binding(config, "a")(win, idle_page)
+	page_binding(config, "Enter")(win, idle_page)
+	check(
+		"Entrée : le détail d'aujourd'hui, avec son temps inactif",
+		last_text(idle_page):find("Mardi 13 octobre 2026 · aujourd'hui", 1, true) ~= nil
+			and last_text(idle_page):find("Inactif    1h00", 1, true) ~= nil,
+		true
+	)
+	page_binding(config, "Escape")(win, idle_page)
+	check("Échap : retour au calendrier", last_text(idle_page):find("Octobre 2026", 1, true) ~= nil, true)
 	-- WezTerm rouvert : le fichier est relu, et la suite s'y ajoute
 	local home = e.home
 	homes[#homes + 1] = home

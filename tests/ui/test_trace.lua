@@ -300,7 +300,7 @@ check(
 local before = #w.logs.info
 local h = nil
 for _, b in ipairs(config.key_tables.logtime_page) do
-	if b.key == "h" then
+	if b.key == "PageUp" then
 		h = function(window, pane)
 			fire(b.action, window, pane)
 		end

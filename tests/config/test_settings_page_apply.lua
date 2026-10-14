@@ -250,7 +250,7 @@ check(
 	#config.key_tables.logtime_settings,
 	15
 )
-check("celle du calendrier est intacte (neuf touches)", #config.key_tables.logtime_page, 9)
+check("celle du calendrier est intacte (seize touches)", #config.key_tables.logtime_page, 16)
 check("un gestionnaire pour l'ouverture de la personnalisation", #e.w.events["logtime-settings-open"], 1)
 check("un gestionnaire pour la touche Entrée", #e.w.events["logtime-settings-Enter"], 1)
 check("deux gestionnaires de redimensionnement (calendrier et personnalisation)", #e.w.events["window-resized"], 2)

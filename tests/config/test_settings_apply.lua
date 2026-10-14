@@ -310,7 +310,7 @@ config = e.M.apply_to_config({})
 frame, months, lines = open_page(e, config)
 check(
 	"center = false dans le fichier : l'aide est tout en haut à gauche",
-	lines[1]:find("Logtime   ← →", 1, true) == 3,
+	lines[1]:find("Logtime   ←→↑↓", 1, true) == 3,
 	true
 )
 cleanup(e)
@@ -329,7 +329,7 @@ config = e.M.apply_to_config({}, { lang = "en" })
 frame, months, lines = open_page(e, config)
 check(
 	"réglages incorrects : le bon réglage est appliqué (center = false)",
-	lines[1]:find("Logtime   ← →", 1, true) == 3
+	lines[1]:find("Logtime   ←→↑↓", 1, true) == 3
 		or lines[1]:find("Logtime", 1, true) ~= nil and lines[1]:find("Logtime", 1, true) <= 3,
 	true
 )

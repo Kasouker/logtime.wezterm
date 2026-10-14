@@ -421,7 +421,7 @@ check(
 	true
 )
 w.GLOBAL.logtime_page_pane = pane.id
-binding(w, page, "h")(win, pane)
+binding(w, page, "PageUp")(win, pane)
 local shown = last_text(pane)
 check(
 	"h avec quatre mois : le mois choisi recule, Juin à Septembre",
@@ -440,8 +440,8 @@ check(
 	true
 )
 w.GLOBAL.logtime_page_year, w.GLOBAL.logtime_page_month = 2026, 2
-binding(w, page, "l")(win, pane)
-binding(w, page, "l")(win, pane)
+binding(w, page, "PageDown")(win, pane)
+binding(w, page, "PageDown")(win, pane)
 shown = last_text(pane)
 check(
 	"l : le mois choisi avance (Avril : Janvier à Avril)",
@@ -449,7 +449,7 @@ check(
 	true
 )
 w.GLOBAL.logtime_page_year, w.GLOBAL.logtime_page_month = 2026, 2
-binding(w, page, "h")(win, pane)
+binding(w, page, "PageUp")(win, pane)
 shown = last_text(pane)
 check(
 	"janvier choisi : les mois d'avant sont ceux de l'année précédente",

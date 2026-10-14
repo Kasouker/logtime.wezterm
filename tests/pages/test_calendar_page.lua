@@ -35,6 +35,7 @@ local function load_module(name)
 	return cache[name]
 end
 local calendar_page = load_module("pages/calendar_page")
+local assemble = load_module("calendar/assemble")
 local keys = load_module("config/keys")
 local platform = load_module("system/platform")
 local fr = load_module("i18n/fr")
@@ -423,27 +424,27 @@ local function scenarios()
 		binding(page, key)(w2, pane or page_pane)
 		return w2
 	end
-	press("h")
+	press("PageUp")
 	year, month = month_of(w)
-	check("h : mois précédent (septembre 2026)", year .. "-" .. month, "2026-9")
+	check("PgUp : mois précédent (septembre 2026)", year .. "-" .. month, "2026-9")
 	check(
-		"h : le dessin est mis à jour",
+		"PgUp : le dessin est mis à jour",
 		strip(page_pane.injected[#page_pane.injected]):find("Logtime : Septembre 2026", 1, true) ~= nil,
 		true
 	)
 	check(
-		"h : septembre affiche ses heures (0h30 le 30)",
+		"PgUp : septembre affiche ses heures (0h30 le 30)",
 		strip(page_pane.injected[#page_pane.injected]):find("0h30", 1, true) ~= nil,
 		true
 	)
-	press("LeftArrow")
+	press("PageUp")
 	year, month = month_of(w)
-	check("flèche gauche : août 2026", year .. "-" .. month, "2026-8")
-	press("l")
-	press("RightArrow")
-	press("RightArrow")
+	check("PgUp encore : août 2026", year .. "-" .. month, "2026-8")
+	press("PageDown")
+	press("PageDown")
+	press("PageDown")
 	year, month = month_of(w)
-	check("l et flèche droite : trois mois plus tard = novembre 2026", year .. "-" .. month, "2026-11")
+	check("PgDn trois fois : trois mois plus tard = novembre 2026", year .. "-" .. month, "2026-11")
 	check(
 		"novembre affiche ses heures (2h00 le 2)",
 		strip(page_pane.injected[#page_pane.injected]):find("2h00", 1, true) ~= nil,
@@ -453,16 +454,16 @@ local function scenarios()
 	year, month = month_of(w)
 	check("t : retour au mois en cours", year .. "-" .. month, "2026-10")
 	w.GLOBAL.logtime_page_year, w.GLOBAL.logtime_page_month = 2026, 1
-	press("h")
+	press("PageUp")
 	year, month = month_of(w)
-	check("janvier puis h : décembre de l'année d'avant", year .. "-" .. month, "2025-12")
-	press("l")
+	check("janvier puis PgUp : décembre de l'année d'avant", year .. "-" .. month, "2025-12")
+	press("PageDown")
 	year, month = month_of(w)
-	check("décembre puis l : janvier de l'année d'après", year .. "-" .. month, "2026-1")
+	check("décembre puis PgDn : janvier de l'année d'après", year .. "-" .. month, "2026-1")
 	w.GLOBAL.logtime_page_year, w.GLOBAL.logtime_page_month = 2026, 12
-	press("l")
+	press("PageDown")
 	year, month = month_of(w)
-	check("décembre 2026 puis l : janvier 2027", year .. "-" .. month, "2027-1")
+	check("décembre 2026 puis PgDn : janvier 2027", year .. "-" .. month, "2027-1")
 	count = #page_pane.injected
 	press("r")
 	year, month = month_of(w)
@@ -473,11 +474,11 @@ local function scenarios()
 	)
 	w.GLOBAL.logtime_page_year, w.GLOBAL.logtime_page_month = 2200, 12
 	count = #page_pane.injected
-	press("l")
+	press("PageDown")
 	year, month = month_of(w)
 	check("limite : pas au-delà de l'année 2200", #page_pane.injected == count and year == 2200, true)
 	w.GLOBAL.logtime_page_year, w.GLOBAL.logtime_page_month = 1970, 1
-	press("h")
+	press("PageUp")
 	year = month_of(w)
 	check("limite : pas avant 1970", year, 1970)
 
@@ -562,7 +563,7 @@ local function scenarios()
 		#config.keys == 2 and config.keys[1] == existing and config.keys[2].key == "F2",
 		true
 	)
-	check("keys : la table de touches de la page existe, avec 9 touches", #config.key_tables.logtime_page, 9)
+	check("keys : la table de touches de la page existe, avec 16 touches", #config.key_tables.logtime_page, 16)
 	check(
 		"keys : un gestionnaire de redimensionnement est installé",
 		w.events["window-resized"] ~= nil and #w.events["window-resized"],
@@ -627,7 +628,7 @@ local function scenarios()
 	check(
 		"anglais : la page est en anglais",
 		strip(w.spawned[1].pane.injected[1]):find("Logtime : October 2026", 1, true) ~= nil
-			and strip(w.spawned[1].pane.injected[1]):find("q: close", 1, true) ~= nil,
+			and strip(w.spawned[1].pane.injected[1]):find("Enter details", 1, true) ~= nil,
 		true
 	)
 
@@ -672,16 +673,16 @@ local function scenarios()
 	press("a")
 	check("a de nouveau : les mois", num(w.GLOBAL.logtime_page_view), calendar_page.VIEW.MONTHS)
 	check("a de nouveau : le mois est dessiné", shown_now():find("Logtime : Octobre 2026", 1, true) ~= nil, true)
-	press("h")
+	press("PageUp")
 	year, month = month_of(w)
-	check("vue des mois, h : un mois en arrière (pas une année)", year .. "-" .. month, "2026-9")
+	check("vue des mois, PgUp : un mois en arrière (pas une année)", year .. "-" .. month, "2026-9")
 	-- la touche ne garde pas le pas d'une année après être passée par la vue de l'année
 	press("a")
 	press("l")
 	press("a")
-	press("l")
+	press("PageDown")
 	year, month = month_of(w)
-	check("l dans l'année, puis l dans les mois : un an, puis UN mois (2027-10)", year .. "-" .. month, "2027-10")
+	check("l dans l'année, puis PgDn dans les mois : un an, puis UN mois (2027-10)", year .. "-" .. month, "2027-10")
 	press("a")
 	press("l")
 	year, month = month_of(w)
@@ -723,6 +724,153 @@ local function scenarios()
 		"vue année, 16 lignes : ça tient",
 		strip(page.build_text({ cols = 120, rows = 16 })):find("Total de l'année", 1, true) ~= nil,
 		true
+	)
+
+	-- ============================================================
+	-- choisir un jour (flèches) et voir son détail (Entrée)
+	-- ============================================================
+	w = new_wezterm()
+	local ctx
+	page, ctx = new_page(w, {
+		idle_days = function()
+			return { ["2026-10-12"] = 1800 }
+		end,
+	})
+	page.open(new_window(w), w.new_pane())
+	page_pane = w.spawned[1].pane
+	local SEL = assemble.SELECTED
+	local function day_of()
+		local year_, month_ = month_of(w)
+		return string.format("%d-%02d-%02d", year_, month_, num(w.GLOBAL.logtime_page_day))
+	end
+	local function drawn_raw()
+		return page_pane.injected[#page_pane.injected]
+	end
+	check("ouverture : aujourd'hui est choisi", day_of(), "2026-10-13")
+	check(
+		"ouverture : sa case est en couleurs inversées (avec son étoile)",
+		drawn_raw():find(SEL .. "*13", 1, true) ~= nil,
+		true
+	)
+	check("une seule case inversée par ligne de jours", select(2, drawn_raw():gsub(SEL:gsub("%p", "%%%0"), "")), 2)
+	press("RightArrow")
+	check("→ : le jour d'après", day_of(), "2026-10-14")
+	check("→ : la case du 14 est inversée", drawn_raw():find(SEL .. " 14", 1, true) ~= nil, true)
+	check("→ : celle du 13 ne l'est plus", drawn_raw():find(SEL .. "*13", 1, true), nil)
+	press("l")
+	check("l : pareil", day_of(), "2026-10-15")
+	press("LeftArrow")
+	press("h")
+	press("h")
+	check("← h h : trois jours en arrière", day_of(), "2026-10-12")
+	press("DownArrow")
+	check("↓ : la semaine d'après", day_of(), "2026-10-19")
+	press("j")
+	press("j")
+	check("j j : on passe en novembre tout seul", day_of(), "2026-11-02")
+	check("j j : novembre est dessiné", strip(drawn_raw()):find("Logtime : Novembre 2026", 1, true) ~= nil, true)
+	press("UpArrow")
+	check("↑ : la semaine d'avant, retour en octobre", day_of(), "2026-10-26")
+	press("k")
+	check("k : pareil", day_of(), "2026-10-19")
+	w.GLOBAL.logtime_page_year, w.GLOBAL.logtime_page_month, w.GLOBAL.logtime_page_day = 2026, 12, 31
+	press("RightArrow")
+	check("31 décembre puis → : 1er janvier de l'année d'après", day_of(), "2027-01-01")
+	press("LeftArrow")
+	check("puis ← : 31 décembre", day_of(), "2026-12-31")
+	w.GLOBAL.logtime_page_month, w.GLOBAL.logtime_page_day = 10, 31
+	press("PageDown")
+	check("31 octobre puis PgDn : 30 novembre (pas de 31)", day_of(), "2026-11-30")
+	press("PageUp")
+	check("puis PgUp : 30 octobre (le jour est gardé)", day_of(), "2026-10-30")
+	w.GLOBAL.logtime_page_year, w.GLOBAL.logtime_page_month, w.GLOBAL.logtime_page_day = 2026, 2, 31
+	check(
+		"un jour trop grand dans GLOBAL : ramené à la fin du mois",
+		page.build_text():find(SEL .. " 28", 1, true) ~= nil,
+		true
+	)
+	press("t")
+	check("t : de nouveau aujourd'hui", day_of(), "2026-10-13")
+	-- sans dégradé, les réglages ne sont pas recopiés par le dégradé : la page doit faire sa propre copie
+	local real_cfg = { week_starts_on = "monday", day_offset = 0, gradient = false }
+	ctx.cfg = function()
+		return real_cfg
+	end
+	page.build_text()
+	check("la case choisie ne va pas dans les vrais réglages", real_cfg.selected_key, nil)
+	-- pas de jour enregistré : aujourd'hui dans le mois en cours, le 1er dans un autre
+	w.GLOBAL.logtime_page_day = nil
+	check(
+		"pas de jour enregistré, mois en cours : aujourd'hui",
+		page.build_text():find(SEL .. "*13", 1, true) ~= nil,
+		true
+	)
+	w.GLOBAL.logtime_page_month = 9
+	check("pas de jour enregistré, autre mois : le 1er", page.build_text():find(SEL .. "  1", 1, true) ~= nil, true)
+	press("t")
+
+	-- Entrée : le détail du jour
+	press("LeftArrow")
+	press("Enter")
+	check("Entrée : la vue du jour", num(w.GLOBAL.logtime_page_view), calendar_page.VIEW.DAY)
+	check("Entrée : le détail du 12", strip(drawn_raw()):find("Lundi 12 octobre 2026", 1, true) ~= nil, true)
+	check("Entrée : l'aide du détail", strip(drawn_raw()):find(fr.day_help, 1, true) ~= nil, true)
+	check(
+		"Entrée : le temps inactif du jour (0h30 sur 1h00)",
+		strip(drawn_raw()):find("Inactif    0h30", 1, true) ~= nil,
+		true
+	)
+	press("RightArrow")
+	check(
+		"dans le détail, → : le jour d'après, toujours en détail",
+		num(w.GLOBAL.logtime_page_view),
+		calendar_page.VIEW.DAY
+	)
+	check(
+		"dans le détail, → : le 13, aujourd'hui",
+		strip(drawn_raw()):find("Mardi 13 octobre 2026 · aujourd'hui", 1, true) ~= nil,
+		true
+	)
+	press("UpArrow")
+	check(
+		"dans le détail, ↑ : une semaine avant",
+		strip(drawn_raw()):find("Mardi 6 octobre 2026", 1, true) ~= nil,
+		true
+	)
+	press("Enter")
+	check("Entrée de nouveau : le calendrier", num(w.GLOBAL.logtime_page_view), calendar_page.VIEW.MONTHS)
+	check("Entrée de nouveau : le 6 est choisi", drawn_raw():find(SEL .. "  6", 1, true) ~= nil, true)
+	press("Enter")
+	press("Escape")
+	check("Échap dans le détail : retour au calendrier", num(w.GLOBAL.logtime_page_view), calendar_page.VIEW.MONTHS)
+	check("Échap dans le détail : la page reste ouverte", num(w.GLOBAL.logtime_page_pane), page_pane.id)
+	press("a")
+	press("Enter")
+	check("Entrée dans la vue de l'année : rien", num(w.GLOBAL.logtime_page_view), calendar_page.VIEW.YEAR)
+	press("UpArrow")
+	check("↑ dans la vue de l'année : rien", day_of(), "2026-10-06")
+	press("a")
+	press("Escape")
+	check("Échap dans le calendrier : la page est fermée", w.GLOBAL.logtime_page_pane, nil)
+	-- rouvrir : aujourd'hui de nouveau, dans les mois
+	page.open(new_window(w), w.new_pane())
+	check("rouvrir : aujourd'hui", day_of(), "2026-10-13")
+	-- le détail dans une fenêtre trop petite
+	w.GLOBAL.logtime_page_view = calendar_page.VIEW.DAY
+	check(
+		"détail, fenêtre trop petite : le message",
+		strip(page.build_text({ cols = 30, rows = 20 })):find("Fenêtre trop petite", 1, true) == 1,
+		true
+	)
+	check(
+		"détail du 13 (rien compté : 6 lignes), 8 lignes : ça tient (aide, ligne vide, 6 lignes)",
+		strip(page.build_text({ cols = 60, rows = 8 })):find("Fenêtre trop petite", 1, true),
+		nil
+	)
+	check(
+		"détail, 7 lignes : trop bas",
+		strip(page.build_text({ cols = 60, rows = 7 })):find("Fenêtre trop petite", 1, true),
+		1
 	)
 end
 
