@@ -13,7 +13,14 @@ local function check(name, got, want)
 		passed = passed + 1
 	else
 		failed = failed + 1
-		print(string.format("ÉCHEC  %s\n         attendu : %s\n         obtenu  : %s", name, tostring(want), tostring(got)))
+		print(
+			string.format(
+				"ÉCHEC  %s\n         attendu : %s\n         obtenu  : %s",
+				name,
+				tostring(want),
+				tostring(got)
+			)
+		)
 	end
 end
 
@@ -54,14 +61,30 @@ end
 -- ============================================================
 -- encode
 -- ============================================================
-check("encode : ton vrai historique", days_mod.encode({ ["2026-10-10"] = 15231, ["2026-10-11"] = 1900 }), '{"2026-10-10":15231,"2026-10-11":1900}')
+check(
+	"encode : ton vrai historique",
+	days_mod.encode({ ["2026-10-10"] = 15231, ["2026-10-11"] = 1900 }),
+	'{"2026-10-10":15231,"2026-10-11":1900}'
+)
 check("encode : vide", days_mod.encode({}), "{}")
 check("encode : nil", days_mod.encode(nil), "{}")
-check("encode : dates triées", days_mod.encode({ ["2026-10-12"] = 3, ["2026-01-05"] = 1, ["2025-12-31"] = 2 }), '{"2025-12-31":2,"2026-01-05":1,"2026-10-12":3}')
-check("encode : les secondes décimales deviennent entières", days_mod.encode({ ["2026-10-10"] = 15231.9 }), '{"2026-10-10":15231}')
+check(
+	"encode : dates triées",
+	days_mod.encode({ ["2026-10-12"] = 3, ["2026-01-05"] = 1, ["2025-12-31"] = 2 }),
+	'{"2025-12-31":2,"2026-01-05":1,"2026-10-12":3}'
+)
+check(
+	"encode : les secondes décimales deviennent entières",
+	days_mod.encode({ ["2026-10-10"] = 15231.9 }),
+	'{"2026-10-10":15231}'
+)
 check("encode : zéro conservé", days_mod.encode({ ["2026-10-10"] = 0 }), '{"2026-10-10":0}')
 check("encode : grande valeur", days_mod.encode({ ["2026-10-10"] = 86400 * 3 }), '{"2026-10-10":259200}')
-check("encode : clé qui n'est pas une date ignorée", days_mod.encode({ ["2026-10-10"] = 5, truc = 7 }), '{"2026-10-10":5}')
+check(
+	"encode : clé qui n'est pas une date ignorée",
+	days_mod.encode({ ["2026-10-10"] = 5, truc = 7 }),
+	'{"2026-10-10":5}'
+)
 check("encode : valeur négative ignorée", days_mod.encode({ ["2026-10-10"] = -5 }), "{}")
 check("encode : valeur non numérique ignorée", days_mod.encode({ ["2026-10-10"] = "beaucoup" }), "{}")
 check("encode : NaN ignoré", days_mod.encode({ ["2026-10-10"] = 0 / 0 }), "{}")
@@ -202,19 +225,19 @@ check("save : dossier inexistant, une raison est donnée", type(why), "string")
 write(file, '{"2026-10-10":1}')
 local real_rename = os.rename
 os.rename = function(from, to)
-local existing = io.open(to, "rb")
-if existing then
-existing:close()
-return nil, "le fichier existe déjà (comportement de Windows)"
-end
-return real_rename(from, to)
+	local existing = io.open(to, "rb")
+	if existing then
+		existing:close()
+		return nil, "le fichier existe déjà (comportement de Windows)"
+	end
+	return real_rename(from, to)
 end
 local real_open = io.open
 io.open = function(p, m)
-if p == file and m == "wb" then
-return nil, "écriture directe interdite dans ce test"
-end
-return real_open(p, m)
+	if p == file and m == "wb" then
+		return nil, "écriture directe interdite dans ce test"
+	end
+	return real_open(p, m)
 end
 ok = days_mod.save(file, { ["2026-10-10"] = 777 })
 io.open = real_open
@@ -224,7 +247,7 @@ check("save : Windows, aucun fichier temporaire laissé", read(file .. ".tmp"), 
 
 -- Windows, cas extrême : rename ne marche jamais. Le dernier recours (copie directe) doit aboutir.
 os.rename = function()
-return nil, "toujours refusé"
+	return nil, "toujours refusé"
 end
 ok = days_mod.save(file, { ["2026-10-10"] = 888 })
 check("save : même quand rename échoue toujours, copie directe", ok, true)
@@ -250,7 +273,11 @@ check("quarantine : le fichier abîmé est à son nouvel emplacement", read(move
 check("quarantine : l'emplacement d'origine est libre", read(file), nil)
 write(file, "encore abîmé")
 local moved2 = days_mod.quarantine(file)
-check("quarantine : deux mises de côté dans la même seconde ne s'écrasent pas", moved2 ~= moved and read(moved) == "pas du json" and read(moved2) == "encore abîmé", true)
+check(
+	"quarantine : deux mises de côté dans la même seconde ne s'écrasent pas",
+	moved2 ~= moved and read(moved) == "pas du json" and read(moved2) == "encore abîmé",
+	true
+)
 check("quarantine : fichier absent, pas de plantage", select(1, days_mod.quarantine(dir .. "/absent.json")), nil)
 
 -- ============================================================
@@ -258,9 +285,9 @@ check("quarantine : fichier absent, pas de plantage", select(1, days_mod.quarant
 -- ============================================================
 local leaked = {}
 for k in pairs(_G) do
-if not globals_before[k] then
-leaked[#leaked + 1] = k
-end
+	if not globals_before[k] then
+		leaked[#leaked + 1] = k
+	end
 end
 check("aucune variable globale ajoutée", table.concat(leaked, ","), "")
 os.execute("rm -rf '" .. dir .. "'")

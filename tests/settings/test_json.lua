@@ -4,31 +4,38 @@ local root = (arg and arg[0] or ""):match("^(.*)[/\\]tests[/\\]settings[/\\]test
 
 local globals_before = {}
 for k in pairs(_G) do
-globals_before[k] = true
+	globals_before[k] = true
 end
 local cache = {}
 local function load_module(name)
-if not cache[name] then
-local chunk = assert(loadfile(root .. "/plugin/logtime/" .. name .. ".lua"))
-cache[name] = chunk(load_module)
-end
-return cache[name]
+	if not cache[name] then
+		local chunk = assert(loadfile(root .. "/plugin/logtime/" .. name .. ".lua"))
+		cache[name] = chunk(load_module)
+	end
+	return cache[name]
 end
 local json = load_module("settings/json")
 
 local passed, failed = 0, 0
 local function check(name, got, want)
-if got == want then
-passed = passed + 1
-else
-failed = failed + 1
-print(string.format("ÉCHEC  %s\n         attendu : %s\n         obtenu  : %s", name, tostring(want), tostring(got)))
-end
+	if got == want then
+		passed = passed + 1
+	else
+		failed = failed + 1
+		print(
+			string.format(
+				"ÉCHEC  %s\n         attendu : %s\n         obtenu  : %s",
+				name,
+				tostring(want),
+				tostring(got)
+			)
+		)
+	end
 end
 local function bad(name, text)
-local value, err = json.decode(text)
-check(name .. " : refusé", value, nil)
-check(name .. " : avec un message en français", type(err) == "string" and #err > 5, true)
+	local value, err = json.decode(text)
+	check(name .. " : refusé", value, nil)
+	check(name .. " : avec un message en français", type(err) == "string" and #err > 5, true)
 end
 
 -- ---- valeurs simples
@@ -77,8 +84,12 @@ check("nil n'est pas une liste", json.is_array(nil), false)
 check("une liste dans un objet est reconnue", json.is_array(json.decode('{"a": [1]}').a), true)
 check("clé en double : la dernière gagne", json.decode('{"a": 1, "a": 2}').a, 2)
 check("clé avec un échappement", json.decode('{"a\\u0062": 1}').ab, 1)
-check("marque BOM au début", json.decode("\239\187\191{\"a\": 1}").a, 1)
-check("lecture d'un fichier écrit par le plugin", json.decode('{\n  "gradient_color": "#3366CC",\n  "max_months": 6\n}\n').max_months, 6)
+check("marque BOM au début", json.decode('\239\187\191{"a": 1}').a, 1)
+check(
+	"lecture d'un fichier écrit par le plugin",
+	json.decode('{\n  "gradient_color": "#3366CC",\n  "max_months": 6\n}\n').max_months,
+	6
+)
 local nested = string.rep("[", 30) .. string.rep("]", 30)
 check("imbrication à 30 niveaux acceptée", type(json.decode(nested)), "table")
 
@@ -119,28 +130,29 @@ check("valeur qui n'est pas un texte : message", type(select(2, json.decode(nil)
 -- ---- jamais de plantage, même sur des morceaux au hasard
 local seed = 99
 local function rnd(n)
-seed = (seed * 1103515245 + 12345) % 2147483648
-return seed % n
+	seed = (seed * 1103515245 + 12345) % 2147483648
+	return seed % n
 end
-local pieces = { "{", "}", "[", "]", ",", ":", '"', "\\", "a", "1", "-", ".", "e", "true", "null", " ", "\n", "\\u", "00", "é" }
+local pieces =
+	{ "{", "}", "[", "]", ",", ":", '"', "\\", "a", "1", "-", ".", "e", "true", "null", " ", "\n", "\\u", "00", "é" }
 local crashed = false
 for _ = 1, 3000 do
-local parts = {}
-for i = 1, 1 + rnd(14) do
-parts[i] = pieces[1 + rnd(#pieces)]
-end
-local ok = pcall(json.decode, table.concat(parts))
-if not ok then
-crashed = true
-end
+	local parts = {}
+	for i = 1, 1 + rnd(14) do
+		parts[i] = pieces[1 + rnd(#pieces)]
+	end
+	local ok = pcall(json.decode, table.concat(parts))
+	if not ok then
+		crashed = true
+	end
 end
 check("3000 textes au hasard : aucun plantage", crashed, false)
 
 local leaked = {}
 for k in pairs(_G) do
-if not globals_before[k] then
-leaked[#leaked + 1] = k
-end
+	if not globals_before[k] then
+		leaked[#leaked + 1] = k
+	end
 end
 check("aucune variable globale ajoutée", table.concat(leaked, ","), "")
 

@@ -1,0 +1,9 @@
+# stylua.toml : la mise en forme du code Lua (https://github.com/JohnnyMorganz/StyLua).
+# Lancer depuis la racine du dépôt :   stylua plugin tests tools
+# Vérifier sans rien modifier :        stylua --check plugin tests tools
+column_width = 120
+line_endings = "Unix"
+indent_type = "Tabs"
+indent_width = 4
+quote_style = "AutoPreferDouble"
+call_parentheses = "Always"

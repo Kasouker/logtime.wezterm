@@ -72,7 +72,8 @@ local function cell(index, selected, colors, names)
 	local style = convert.bg(hex) .. convert.fg(convert.contrast(hex))
 	local name = truncate(names[index] or "", CELL)
 	local left, right = selected and "[" or " ", selected and "]" or " "
-	return left .. style .. center(tostring(index), CELL) .. convert.RESET .. right, left .. style .. center(name, CELL) .. convert.RESET .. right
+	return left .. style .. center(tostring(index), CELL) .. convert.RESET .. right,
+		left .. style .. center(name, CELL) .. convert.RESET .. right
 end
 
 -- La ligne 1 : le titre, puis les onglets ; l'onglet affiché est entre crochets.
@@ -238,7 +239,10 @@ local function render_list(state, labels)
 		end
 		local name = names[key] or key
 		local padding = string.rep(" ", math.max(1, NAME_WIDTH - (utf8.len(name) or #name)))
-		lines[#lines + 1] = (i == state.row and "▸ " or "  ") .. name .. padding .. M.format_value(definition, value, value_text(key, value, labels, state))
+		lines[#lines + 1] = (i == state.row and "▸ " or "  ")
+			.. name
+			.. padding
+			.. M.format_value(definition, value, value_text(key, value, labels, state))
 	end
 	lines[#lines + 1] = ""
 	local selected = list.settings[state.row]
@@ -335,49 +339,50 @@ end
 --             par défaut), consent_line = le texte de la question sur les couleurs du thème (ligne 4), ou nil }
 -- Renvoie les lignes et la largeur du tableau de couleurs (la largeur qu'on centre).
 function M.render(state, labels)
-if M.LISTS[state.tab] then
-	return render_list(state, labels)
-end
-local colors = state.colors or palette.COLORS
-local names = state.names or labels.palette or {}
-local lines = {}
-lines[#lines + 1] = title_line(M.TAB.COLORS, labels)
-lines[#lines + 1] = "  " .. labels.settings_help1
-lines[#lines + 1] = "  " .. labels.settings_help2
-lines[#lines + 1] = state.consent_line and ("  " .. state.consent_line) or ""
-lines[#lines + 1] = "  " .. labels.settings_color
-lines[#lines + 1] = ""
-for row = 0, ROWS - 1 do
-local first, second = { "  " }, { "  " }
-for col = 0, COLUMNS - 1 do
-local index = row * COLUMNS + col + 1
-local a, b = cell(index, index == state.index, colors, names)
-first[#first + 1] = a
-second[#second + 1] = b
-if col < COLUMNS - 1 then
-first[#first + 1] = " "
-second[#second + 1] = " "
-end
-end
-lines[#lines + 1] = table.concat(first)
-lines[#lines + 1] = table.concat(second)
-if row < ROWS - 1 then
-lines[#lines + 1] = ""
-end
-end
-lines[#lines + 1] = ""
-local chosen = colors[state.index]
-lines[#lines + 1] = "  " .. labels.settings_preview .. " : " .. gradient.make({ color = chosen }).legend()
-lines[#lines + 1] = "  " .. string.format(labels.settings_selected, state.index, names[state.index] or "", chosen)
-if state.current then
-local known = palette.index_of(state.current, colors) ~= nil
-lines[#lines + 1] = "  " .. string.format(known and labels.settings_current or labels.settings_current_custom, state.current)
-else
-lines[#lines + 1] = ""
-end
-lines[#lines + 1] = state.gradient_off and ("  " .. labels.settings_gradient_off) or ""
-lines[#lines + 1] = message_line(state.message, labels)
-return lines, M.GRID_WIDTH
+	if M.LISTS[state.tab] then
+		return render_list(state, labels)
+	end
+	local colors = state.colors or palette.COLORS
+	local names = state.names or labels.palette or {}
+	local lines = {}
+	lines[#lines + 1] = title_line(M.TAB.COLORS, labels)
+	lines[#lines + 1] = "  " .. labels.settings_help1
+	lines[#lines + 1] = "  " .. labels.settings_help2
+	lines[#lines + 1] = state.consent_line and ("  " .. state.consent_line) or ""
+	lines[#lines + 1] = "  " .. labels.settings_color
+	lines[#lines + 1] = ""
+	for row = 0, ROWS - 1 do
+		local first, second = { "  " }, { "  " }
+		for col = 0, COLUMNS - 1 do
+			local index = row * COLUMNS + col + 1
+			local a, b = cell(index, index == state.index, colors, names)
+			first[#first + 1] = a
+			second[#second + 1] = b
+			if col < COLUMNS - 1 then
+				first[#first + 1] = " "
+				second[#second + 1] = " "
+			end
+		end
+		lines[#lines + 1] = table.concat(first)
+		lines[#lines + 1] = table.concat(second)
+		if row < ROWS - 1 then
+			lines[#lines + 1] = ""
+		end
+	end
+	lines[#lines + 1] = ""
+	local chosen = colors[state.index]
+	lines[#lines + 1] = "  " .. labels.settings_preview .. " : " .. gradient.make({ color = chosen }).legend()
+	lines[#lines + 1] = "  " .. string.format(labels.settings_selected, state.index, names[state.index] or "", chosen)
+	if state.current then
+		local known = palette.index_of(state.current, colors) ~= nil
+		lines[#lines + 1] = "  "
+			.. string.format(known and labels.settings_current or labels.settings_current_custom, state.current)
+	else
+		lines[#lines + 1] = ""
+	end
+	lines[#lines + 1] = state.gradient_off and ("  " .. labels.settings_gradient_off) or ""
+	lines[#lines + 1] = message_line(state.message, labels)
+	return lines, M.GRID_WIDTH
 end
 
 -- ctx fournit ce que la page ne sait pas faire seule (days et today_key sont facultatifs : sans eux, pas d'aperçu) :
@@ -397,14 +402,14 @@ end
 --                       unavailable = "raison" } (ou { kind = "classic" })
 --   settings_key()      le nom de la touche qui ouvre cette page (pour la notification)
 function M.create(ctx)
-local wezterm, G, num = ctx.wezterm, ctx.G, ctx.num
-local act = wezterm.action
-local ui = screen.bind(wezterm)
-local page = {}
+	local wezterm, G, num = ctx.wezterm, ctx.G, ctx.num
+	local act = wezterm.action
+	local ui = screen.bind(wezterm)
+	local page = {}
 
--- L'état de la page, dans wezterm.GLOBAL sous forme de simples nombres :
---   logtime_settings_pane (le panneau de la page), logtime_settings_index (la couleur choisie), logtime_settings_message
-local function page_id()
+	-- L'état de la page, dans wezterm.GLOBAL sous forme de simples nombres :
+	--   logtime_settings_pane (le panneau de la page), logtime_settings_index (la couleur choisie), logtime_settings_message
+	local function page_id()
 		return num(G.logtime_settings_pane)
 	end
 
@@ -413,31 +418,31 @@ local function page_id()
 	end
 
 	-- La palette proposée : celle du thème si l'utilisateur a accepté et que le thème est lisible, sinon la classique.
--- Renvoie { kind, colors, unavailable }.
-local function active_palette()
-local given = ctx.palette and ctx.palette() or nil
-if given and given.kind == "theme" and type(given.colors) == "table" and #given.colors == palette.COUNT then
-return { kind = "theme", colors = given.colors }
-end
-return { kind = "classic", colors = palette.COLORS, unavailable = given and given.unavailable or nil }
-end
+	-- Renvoie { kind, colors, unavailable }.
+	local function active_palette()
+		local given = ctx.palette and ctx.palette() or nil
+		if given and given.kind == "theme" and type(given.colors) == "table" and #given.colors == palette.COUNT then
+			return { kind = "theme", colors = given.colors }
+		end
+		return { kind = "classic", colors = palette.COLORS, unavailable = given and given.unavailable or nil }
+	end
 
--- Les choix de la couleur du trait : le gris, puis la palette proposée, avec ses noms.
-local function border_choices()
-local labels = ctx.labels()
-local active = active_palette()
-local names = (active.kind == "theme" and labels.palette_theme) or labels.palette
-return M.border_choices(active.colors, names, (labels.settings_values or {}).border_gray)
-end
+	-- Les choix de la couleur du trait : le gris, puis la palette proposée, avec ses noms.
+	local function border_choices()
+		local labels = ctx.labels()
+		local active = active_palette()
+		local names = (active.kind == "theme" and labels.palette_theme) or labels.palette
+		return M.border_choices(active.colors, names, (labels.settings_values or {}).border_gray)
+	end
 
--- Le numéro de cette couleur dans la palette proposée (exact, sinon le plus proche), ou nil.
-local function position_in(color, colors)
-return color and (palette.index_of(color, colors) or palette.nearest(color, colors)) or nil
-end
+	-- Le numéro de cette couleur dans la palette proposée (exact, sinon le plus proche), ou nil.
+	local function position_in(color, colors)
+		return color and (palette.index_of(color, colors) or palette.nearest(color, colors)) or nil
+	end
 
-local DEFAULT_COLOR = palette.COLORS[palette.DEFAULT_INDEX]
+	local DEFAULT_COLOR = palette.COLORS[palette.DEFAULT_INDEX]
 
--- La couleur choisie au départ : celle qui est enregistrée (ou la plus proche si ce n'est pas une couleur de la palette).
+	-- La couleur choisie au départ : celle qui est enregistrée (ou la plus proche si ce n'est pas une couleur de la palette).
 	local function initial_index()
 		local colors = active_palette().colors
 		return position_in(current_color(), colors) or position_in(DEFAULT_COLOR, colors) or 1
@@ -497,212 +502,244 @@ local DEFAULT_COLOR = palette.COLORS[palette.DEFAULT_INDEX]
 
 	-- Le texte de la page (lignes) pour cette taille de fenêtre. Renvoie les lignes, la largeur à centrer, et true si la
 	-- page tient en entier. Si elle ne tient pas, ce sont les lignes d'un message « fenêtre trop petite ».
-function page.build_lines(dims)
-local labels = ctx.labels()
-local active = active_palette()
-local consent_line
-if ctx.consent then
-local answer = ctx.consent()
-if answer == nil then
-consent_line = labels.consent_ask
-elseif answer == true then
-consent_line = (active.kind == "theme") and labels.consent_yes or labels.consent_unavailable
-else
-consent_line = labels.consent_no
-end
-end
-local values = {}
-for _, list in pairs(M.LISTS) do
-	for _, key in ipairs(list.settings) do
-		values[key] = setting_value(key)
+	function page.build_lines(dims)
+		local labels = ctx.labels()
+		local active = active_palette()
+		local consent_line
+		if ctx.consent then
+			local answer = ctx.consent()
+			if answer == nil then
+				consent_line = labels.consent_ask
+			elseif answer == true then
+				consent_line = (active.kind == "theme") and labels.consent_yes or labels.consent_unavailable
+			else
+				consent_line = labels.consent_no
+			end
+		end
+		local values = {}
+		for _, list in pairs(M.LISTS) do
+			for _, key in ipairs(list.settings) do
+				values[key] = setting_value(key)
+			end
+		end
+		local lines, width = M.render({
+			tab = current_tab(),
+			row = current_row(),
+			values = values,
+			border_choices = border_choices(),
+			index = selected_index(),
+			current = current_color(),
+			gradient_off = ctx.cfg().gradient == false,
+			message = num(G.logtime_settings_message) or M.MESSAGE.NONE,
+			colors = active.colors,
+			names = (active.kind == "theme" and labels.palette_theme) or labels.palette,
+			consent_line = consent_line,
+		}, labels)
+		-- avec les encadrés : la page dans un cadre, avec les traits du calendrier
+		local b, color = assemble.border_of(ctx.cfg())
+		if b then
+			lines, width = M.frame(lines, width, b, color)
+		end
+		if dims and ((tonumber(dims.cols) or 0) < width or (tonumber(dims.rows) or 0) < #lines) then
+			local title = labels.settings_too_small
+			local hint = string.format(labels.settings_too_small_hint, width, #lines)
+			return { title, hint }, math.max(layout.visible_width(title), layout.visible_width(hint)), false
+		end
+		-- l'aperçu du mois actuel, s'il y a la place (les réglages passent avant)
+		local preview = dims and page.preview_block(labels, active) or nil
+		if preview then
+			lines, width = M.place(
+				lines,
+				width,
+				preview.lines,
+				preview.width,
+				tonumber(dims.cols) or 0,
+				tonumber(dims.rows) or 0,
+				labels
+			)
+		end
+		return lines, width, true
 	end
-end
-local lines, width = M.render({
-tab = current_tab(),
-row = current_row(),
-values = values,
-border_choices = border_choices(),
-index = selected_index(),
-current = current_color(),
-gradient_off = ctx.cfg().gradient == false,
-message = num(G.logtime_settings_message) or M.MESSAGE.NONE,
-colors = active.colors,
-names = (active.kind == "theme" and labels.palette_theme) or labels.palette,
-consent_line = consent_line,
-}, labels)
--- avec les encadrés : la page dans un cadre, avec les traits du calendrier
-local b, color = assemble.border_of(ctx.cfg())
-if b then
-	lines, width = M.frame(lines, width, b, color)
-end
-if dims and ((tonumber(dims.cols) or 0) < width or (tonumber(dims.rows) or 0) < #lines) then
-local title = labels.settings_too_small
-local hint = string.format(labels.settings_too_small_hint, width, #lines)
-return { title, hint }, math.max(layout.visible_width(title), layout.visible_width(hint)), false
-end
--- l'aperçu du mois actuel, s'il y a la place (les réglages passent avant)
-local preview = dims and page.preview_block(labels, active) or nil
-if preview then
-	lines, width = M.place(lines, width, preview.lines, preview.width, tonumber(dims.cols) or 0, tonumber(dims.rows) or 0, labels)
-end
-return lines, width, true
-end
 
--- L'aperçu : le mois actuel, avec les vraies heures, dessiné comme dans le calendrier avec les réglages en cours.
--- Dans l'onglet Couleurs, avec la couleur sous le curseur (avant même Entrée). Sans ctx.days ou ctx.today_key : nil.
-function page.preview_block(labels, active)
-	if not ctx.days or not ctx.today_key then
-		return nil
+	-- L'aperçu : le mois actuel, avec les vraies heures, dessiné comme dans le calendrier avec les réglages en cours.
+	-- Dans l'onglet Couleurs, avec la couleur sous le curseur (avant même Entrée). Sans ctx.days ou ctx.today_key : nil.
+	function page.preview_block(labels, active)
+		if not ctx.days or not ctx.today_key then
+			return nil
+		end
+		local key = ctx.today_key()
+		local year, month = tostring(key):match("^(%d+)-(%d+)")
+		if not year then
+			return nil
+		end
+		local cfg = {}
+		for k, value in pairs(ctx.cfg()) do
+			cfg[k] = value
+		end
+		if current_tab() == M.TAB.COLORS then
+			cfg.gradient_color = (active or active_palette()).colors[selected_index()]
+		end
+		return assemble.month_block(
+			ctx.days(),
+			tonumber(year),
+			tonumber(month),
+			key,
+			gradient.apply_to(cfg),
+			labels,
+			false
+		)
 	end
-	local key = ctx.today_key()
-	local year, month = tostring(key):match("^(%d+)-(%d+)")
-	if not year then
-		return nil
+
+	local function redraw(pane, first)
+		local dims = dims_of(pane)
+		local lines, width, fits = page.build_lines(dims)
+		if dims then
+			lines = layout.center(lines, width, dims.cols, dims.rows)
+		end
+		safe.trace(
+			wezterm,
+			string.format(
+				"logtime : dessin de la page de personnalisation dans le panneau %s (choix %d, %s)",
+				tostring(pane:pane_id()),
+				selected_index(),
+				fits and "complète" or "fenêtre trop petite"
+			)
+		)
+		ui.draw(pane, table.concat(lines, "\n"), first)
 	end
-	local cfg = {}
-	for k, value in pairs(ctx.cfg()) do
-		cfg[k] = value
+
+	function page.is_page(pane)
+		local id = page_id()
+		return id ~= nil and pane:pane_id() == id
 	end
-	if current_tab() == M.TAB.COLORS then
-		cfg.gradient_color = (active or active_palette()).colors[selected_index()]
+
+	local function redraw_later(pane_id, delays)
+		ui.later(pane_id, delays, function(pane)
+			if page_id() == pane:pane_id() then
+				redraw(pane, false)
+			end
+		end)
 	end
-	return assemble.month_block(ctx.days(), tonumber(year), tonumber(month), key, gradient.apply_to(cfg), labels, false)
-end
 
-local function redraw(pane, first)
-local dims = dims_of(pane)
-local lines, width, fits = page.build_lines(dims)
-if dims then
-lines = layout.center(lines, width, dims.cols, dims.rows)
-end
-safe.trace(wezterm, string.format("logtime : dessin de la page de personnalisation dans le panneau %s (choix %d, %s)", tostring(pane:pane_id()), selected_index(), fits and "complète" or "fenêtre trop petite"))
-ui.draw(pane, table.concat(lines, "\n"), first)
-end
+	-- Ouvre la page dans un nouvel onglet (ou remet devant celle qui existe déjà).
+	function page.open(window, pane)
+		local existing = ui.find_pane(page_id())
+		if existing then
+			pcall(function()
+				existing:tab():activate()
+			end)
+			keytable.activate(wezterm, window, existing, M.TABLE_NAME)
+			redraw(existing, false)
+			return
+		end
+		G.logtime_settings_pane = nil
 
-function page.is_page(pane)
-local id = page_id()
-return id ~= nil and pane:pane_id() == id
-end
+		local tab, page_pane = window:mux_window():spawn_tab({
+			domain = { DomainName = "local" },
+			args = ctx.blocker_args(),
+		})
+		pcall(function()
+			tab:activate()
+		end)
 
-local function redraw_later(pane_id, delays)
-ui.later(pane_id, delays, function(pane)
-if page_id() == pane:pane_id() then
-redraw(pane, false)
-end
-end)
-end
-
--- Ouvre la page dans un nouvel onglet (ou remet devant celle qui existe déjà).
-function page.open(window, pane)
-local existing = ui.find_pane(page_id())
-if existing then
-pcall(function()
-existing:tab():activate()
-end)
-keytable.activate(wezterm, window, existing, M.TABLE_NAME)
-redraw(existing, false)
-return
-end
-G.logtime_settings_pane = nil
-
-local tab, page_pane = window:mux_window():spawn_tab({
-domain = { DomainName = "local" },
-args = ctx.blocker_args(),
-})
-pcall(function()
-tab:activate()
-end)
-
-G.logtime_settings_pane = page_pane:pane_id()
-G.logtime_settings_index = initial_index()
-G.logtime_settings_message = M.MESSAGE.NONE
-G.logtime_settings_tab = M.TAB.COLORS
-G.logtime_settings_row = 1
-safe.trace(wezterm, "logtime : page de personnalisation ouverte dans le panneau " .. tostring(page_pane:pane_id()))
-
-redraw(page_pane, true)
-redraw_later(page_pane:pane_id(), { 0.4, 1.2 })
-keytable.activate(wezterm, window, page_pane, M.TABLE_NAME)
-end
-
--- Enregistre un réglage dans le fichier de réglages (en gardant les autres réglages qui y sont) et l'applique tout de
--- suite. Renvoie true si c'est fait ; sinon l'erreur est écrite dans les journaux et le message d'échec est préparé.
-local function store_setting(key, value)
-	local path = ctx.settings_path()
-	local current = ctx.store.load(path)
-	current[key] = value
-	local ok, err = ctx.store.save(path, current)
-	if not ok then
-		wezterm.log_error("logtime : enregistrement des réglages impossible : " .. tostring(err))
-		G.logtime_settings_message = M.MESSAGE.FAILED
-		return false
-	end
-	ctx.apply({ [key] = value })
-	return true
-end
-
--- Onglet Calendrier : enregistre la nouvelle valeur du réglage et redessine le calendrier s'il est ouvert.
-local function change_setting(window, pane, key, value)
-	if value == setting_value(key) then
-		redraw(pane, false) -- déjà à cette valeur (au bord, ou déjà la valeur par défaut) : rien à écrire
-		return
-	end
-	if store_setting(key, value) then
-		G.logtime_settings_message = M.MESSAGE.SETTING_SAVED
-		safe.trace(wezterm, "logtime : réglage enregistré : " .. key .. " = " .. tostring(value))
-		pcall(ctx.refresh_calendar, window, pane)
-	end
-	redraw(pane, false)
-end
-
-local function move(delta_row, delta_col)
-return function(window, pane)
-local list = current_list()
-if list then
-	if delta_row ~= 0 then
-		G.logtime_settings_row = math.max(1, math.min(#list, current_row() + delta_row))
+		G.logtime_settings_pane = page_pane:pane_id()
+		G.logtime_settings_index = initial_index()
 		G.logtime_settings_message = M.MESSAGE.NONE
+		G.logtime_settings_tab = M.TAB.COLORS
+		G.logtime_settings_row = 1
+		safe.trace(
+			wezterm,
+			"logtime : page de personnalisation ouverte dans le panneau " .. tostring(page_pane:pane_id())
+		)
+
+		redraw(page_pane, true)
+		redraw_later(page_pane:pane_id(), { 0.4, 1.2 })
+		keytable.activate(wezterm, window, page_pane, M.TABLE_NAME)
+	end
+
+	-- Enregistre un réglage dans le fichier de réglages (en gardant les autres réglages qui y sont) et l'applique tout de
+	-- suite. Renvoie true si c'est fait ; sinon l'erreur est écrite dans les journaux et le message d'échec est préparé.
+	local function store_setting(key, value)
+		local path = ctx.settings_path()
+		local current = ctx.store.load(path)
+		current[key] = value
+		local ok, err = ctx.store.save(path, current)
+		if not ok then
+			wezterm.log_error("logtime : enregistrement des réglages impossible : " .. tostring(err))
+			G.logtime_settings_message = M.MESSAGE.FAILED
+			return false
+		end
+		ctx.apply({ [key] = value })
+		return true
+	end
+
+	-- Onglet Calendrier : enregistre la nouvelle valeur du réglage et redessine le calendrier s'il est ouvert.
+	local function change_setting(window, pane, key, value)
+		if value == setting_value(key) then
+			redraw(pane, false) -- déjà à cette valeur (au bord, ou déjà la valeur par défaut) : rien à écrire
+			return
+		end
+		if store_setting(key, value) then
+			G.logtime_settings_message = M.MESSAGE.SETTING_SAVED
+			safe.trace(wezterm, "logtime : réglage enregistré : " .. key .. " = " .. tostring(value))
+			pcall(ctx.refresh_calendar, window, pane)
+		end
 		redraw(pane, false)
-	else
-		local key = list[current_row()]
-		local definition = schema.get(key)
-		if definition.kind == "color" then
-			change_setting(window, pane, key, M.step_choice(border_choices(), setting_value(key), delta_col))
-		else
-			change_setting(window, pane, key, M.step(definition, setting_value(key), delta_col))
+	end
+
+	local function move(delta_row, delta_col)
+		return function(window, pane)
+			local list = current_list()
+			if list then
+				if delta_row ~= 0 then
+					G.logtime_settings_row = math.max(1, math.min(#list, current_row() + delta_row))
+					G.logtime_settings_message = M.MESSAGE.NONE
+					redraw(pane, false)
+				else
+					local key = list[current_row()]
+					local definition = schema.get(key)
+					if definition.kind == "color" then
+						change_setting(
+							window,
+							pane,
+							key,
+							M.step_choice(border_choices(), setting_value(key), delta_col)
+						)
+					else
+						change_setting(window, pane, key, M.step(definition, setting_value(key), delta_col))
+					end
+				end
+				return
+			end
+			local index = selected_index() - 1
+			local row = math.max(0, math.min(ROWS - 1, index // COLUMNS + delta_row))
+			local col = math.max(0, math.min(COLUMNS - 1, index % COLUMNS + delta_col))
+			G.logtime_settings_index = row * COLUMNS + col + 1
+			G.logtime_settings_message = M.MESSAGE.NONE
+			redraw(pane, false)
 		end
 	end
-	return
-end
-local index = selected_index() - 1
-local row = math.max(0, math.min(ROWS - 1, index // COLUMNS + delta_row))
-local col = math.max(0, math.min(COLUMNS - 1, index % COLUMNS + delta_col))
-G.logtime_settings_index = row * COLUMNS + col + 1
-G.logtime_settings_message = M.MESSAGE.NONE
-redraw(pane, false)
-end
-end
 
--- Enregistre la couleur dans le fichier de réglages (en gardant les autres réglages qui y sont), l'applique tout de
+	-- Enregistre la couleur dans le fichier de réglages (en gardant les autres réglages qui y sont), l'applique tout de
 	-- suite et redessine le calendrier s'il est ouvert.
-local function save(window, pane, color)
-if store_setting("gradient_color", color) then
-G.logtime_settings_message = M.MESSAGE.SAVED
-safe.trace(wezterm, "logtime : couleur enregistrée : " .. color)
-pcall(ctx.refresh_calendar, window, pane)
-end
-redraw(pane, false)
-end
+	local function save(window, pane, color)
+		if store_setting("gradient_color", color) then
+			G.logtime_settings_message = M.MESSAGE.SAVED
+			safe.trace(wezterm, "logtime : couleur enregistrée : " .. color)
+			pcall(ctx.refresh_calendar, window, pane)
+		end
+		redraw(pane, false)
+	end
 
--- Entrée : enregistre la couleur choisie (les onglets de réglages n'en ont pas besoin : chaque changement y est enregistré).
-local function choose(window, pane)
-if current_tab() ~= M.TAB.COLORS then
-	return
-end
-save(window, pane, active_palette().colors[selected_index()])
-end
+	-- Entrée : enregistre la couleur choisie (les onglets de réglages n'en ont pas besoin : chaque changement y est enregistré).
+	local function choose(window, pane)
+		if current_tab() ~= M.TAB.COLORS then
+			return
+		end
+		save(window, pane, active_palette().colors[selected_index()])
+	end
 
--- d : la couleur par défaut du plugin (l'or), et dans la palette proposée la case qui lui ressemble le plus.
+	-- d : la couleur par défaut du plugin (l'or), et dans la palette proposée la case qui lui ressemble le plus.
 	-- Dans un onglet de réglages : la valeur par défaut du réglage choisi (ou « aucun » s'il n'en a pas).
 	local function default(window, pane)
 		local list = current_list()
@@ -740,7 +777,7 @@ end
 	end
 
 	-- Au chargement de la config : tant que l'utilisateur n'a pas répondu, une notification (une seule fois par session de
--- WezTerm) lui dit où répondre. Une notification qui échoue (Windows peut les masquer) ne gêne rien.
+	-- WezTerm) lui dit où répondre. Une notification qui échoue (Windows peut les masquer) ne gêne rien.
 	function page.on_config_loaded(window, pane)
 		if not ctx.consent or ctx.consent() ~= nil or num(G.logtime_consent_notified) then
 			return
@@ -748,7 +785,12 @@ end
 		G.logtime_consent_notified = 1
 		local labels = ctx.labels()
 		pcall(function()
-			window:toast_notification("logtime", string.format(labels.consent_toast, ctx.settings_key and ctx.settings_key() or "F4"), nil, 20000)
+			window:toast_notification(
+				"logtime",
+				string.format(labels.consent_toast, ctx.settings_key and ctx.settings_key() or "F4"),
+				nil,
+				20000
+			)
 		end)
 		safe.trace(wezterm, "logtime : notification : question sur les couleurs du thème")
 	end

@@ -35,15 +35,15 @@ end
 
 -- La liste des noms de réglages, dans l'ordre de la définition.
 function M.keys()
-local out = {}
-for _, definition in ipairs(M.DEFINITIONS) do
-out[#out + 1] = definition.key
-end
-return out
+	local out = {}
+	for _, definition in ipairs(M.DEFINITIONS) do
+		out[#out + 1] = definition.key
+	end
+	return out
 end
 
 function M.is_known(key)
-return BY_KEY[key] ~= nil
+	return BY_KEY[key] ~= nil
 end
 
 -- La définition d'un réglage (nil s'il n'existe pas).
@@ -53,66 +53,66 @@ end
 
 -- Les valeurs par défaut (sans les réglages qui n'en ont pas).
 function M.defaults()
-local out = {}
-for _, definition in ipairs(M.DEFINITIONS) do
-if definition.default ~= nil then
-out[definition.key] = definition.default
-end
-end
-return out
+	local out = {}
+	for _, definition in ipairs(M.DEFINITIONS) do
+		if definition.default ~= nil then
+			out[definition.key] = definition.default
+		end
+	end
+	return out
 end
 
 local function quoted(list)
-local parts = {}
-for i, value in ipairs(list) do
-parts[i] = "« " .. value .. " »"
-end
-return table.concat(parts, " ou ")
+	local parts = {}
+	for i, value in ipairs(list) do
+		parts[i] = "« " .. value .. " »"
+	end
+	return table.concat(parts, " ou ")
 end
 
 -- Vérifie une valeur. Renvoie true et la valeur normalisée (couleur en majuscules avec #, entier sans décimale),
 -- ou false et la raison en français.
 function M.validate(key, value)
-local definition = BY_KEY[key]
-if not definition then
-return false, "réglage inconnu"
-end
-local kind = definition.kind
-if kind == "enum" then
-for _, allowed in ipairs(definition.values) do
-if value == allowed then
-return true, value
-end
-end
-return false, "doit être " .. quoted(definition.values)
-elseif kind == "boolean" then
-if type(value) == "boolean" then
-return true, value
-end
-return false, "doit être true ou false"
-elseif kind == "color" then
-if type(value) == "string" and value:match("^#?%x%x%x%x%x%x$") then
-return true, "#" .. value:gsub("^#", ""):upper()
-end
-return false, "doit être un code couleur comme « #C9AB6B »"
-end
--- number ou integer
-if type(value) ~= "number" or value ~= value or value == math.huge or value == -math.huge then
-return false, "doit être un nombre"
-end
-if definition.none ~= nil and value == definition.none then
-return true, math.tointeger(value) or value
-end
-if kind == "integer" and value ~= math.floor(value) then
-return false, "doit être un nombre entier"
-end
-if value < definition.min or value > definition.max then
-return false, string.format("doit être compris entre %g et %g", definition.min, definition.max)
-end
-if kind == "integer" then
-return true, math.tointeger(value)
-end
-return true, value
+	local definition = BY_KEY[key]
+	if not definition then
+		return false, "réglage inconnu"
+	end
+	local kind = definition.kind
+	if kind == "enum" then
+		for _, allowed in ipairs(definition.values) do
+			if value == allowed then
+				return true, value
+			end
+		end
+		return false, "doit être " .. quoted(definition.values)
+	elseif kind == "boolean" then
+		if type(value) == "boolean" then
+			return true, value
+		end
+		return false, "doit être true ou false"
+	elseif kind == "color" then
+		if type(value) == "string" and value:match("^#?%x%x%x%x%x%x$") then
+			return true, "#" .. value:gsub("^#", ""):upper()
+		end
+		return false, "doit être un code couleur comme « #C9AB6B »"
+	end
+	-- number ou integer
+	if type(value) ~= "number" or value ~= value or value == math.huge or value == -math.huge then
+		return false, "doit être un nombre"
+	end
+	if definition.none ~= nil and value == definition.none then
+		return true, math.tointeger(value) or value
+	end
+	if kind == "integer" and value ~= math.floor(value) then
+		return false, "doit être un nombre entier"
+	end
+	if value < definition.min or value > definition.max then
+		return false, string.format("doit être compris entre %g et %g", definition.min, definition.max)
+	end
+	if kind == "integer" then
+		return true, math.tointeger(value)
+	end
+	return true, value
 end
 
 return M

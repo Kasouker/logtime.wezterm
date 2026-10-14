@@ -14,45 +14,45 @@ M.version = "2.2.0-reglages"
 -- ------------------------------------------------------------
 -- Un dossier est le bon s'il contient plugin/logtime/core/counter.lua.
 local function is_plugin_dir(dir)
-if type(dir) ~= "string" or dir == "" then
-return false
-end
-local f = io.open(table.concat({ dir, "plugin", "logtime", "core", "counter.lua" }, sep), "rb")
-if f then
-f:close()
-return true
-end
-return false
+	if type(dir) ~= "string" or dir == "" then
+		return false
+	end
+	local f = io.open(table.concat({ dir, "plugin", "logtime", "core", "counter.lua" }, sep), "rb")
+	if f then
+		f:close()
+		return true
+	end
+	return false
 end
 
 -- Trois pistes : le dossier transmis par le chargeur (logtime_plugin.lua), la liste des plugins de WezTerm,
 -- puis un dossier "logtime.wezterm" placé dans le dossier de config.
 local function find_plugin_dir(given)
-if is_plugin_dir(given) then
-return given
-end
-local ok, list = pcall(function()
-return wezterm.plugin.list()
-end)
-if ok and type(list) == "table" then
-for _, p in ipairs(list) do
-if is_plugin_dir(p.plugin_dir) then
-return p.plugin_dir
-end
-end
-end
-if type(wezterm.config_dir) == "string" then
-local candidate = wezterm.config_dir .. sep .. "logtime.wezterm"
-if is_plugin_dir(candidate) then
-return candidate
-end
-end
-return nil
+	if is_plugin_dir(given) then
+		return given
+	end
+	local ok, list = pcall(function()
+		return wezterm.plugin.list()
+	end)
+	if ok and type(list) == "table" then
+		for _, p in ipairs(list) do
+			if is_plugin_dir(p.plugin_dir) then
+				return p.plugin_dir
+			end
+		end
+	end
+	if type(wezterm.config_dir) == "string" then
+		local candidate = wezterm.config_dir .. sep .. "logtime.wezterm"
+		if is_plugin_dir(candidate) then
+			return candidate
+		end
+	end
+	return nil
 end
 
 local DIR = find_plugin_dir(...)
 if not DIR then
-error("logtime : dossier du plugin introuvable (il doit contenir plugin/logtime/core/counter.lua)", 0)
+	error("logtime : dossier du plugin introuvable (il doit contenir plugin/logtime/core/counter.lua)", 0)
 end
 
 -- ------------------------------------------------------------
@@ -60,21 +60,21 @@ end
 -- ------------------------------------------------------------
 local cache = {}
 local function load_module(name)
-if cache[name] == nil then
-local path = table.concat({ DIR, "plugin", "logtime", (name:gsub("/", sep)) .. ".lua" }, sep)
-local f = io.open(path, "rb")
-if not f then
-error("logtime : module introuvable : " .. path, 0)
-end
-local source = f:read("*a")
-f:close()
-local chunk, err = load(source, "@" .. path)
-if not chunk then
-error(err, 0)
-end
-cache[name] = chunk(load_module)
-end
-return cache[name]
+	if cache[name] == nil then
+		local path = table.concat({ DIR, "plugin", "logtime", (name:gsub("/", sep)) .. ".lua" }, sep)
+		local f = io.open(path, "rb")
+		if not f then
+			error("logtime : module introuvable : " .. path, 0)
+		end
+		local source = f:read("*a")
+		f:close()
+		local chunk, err = load(source, "@" .. path)
+		if not chunk then
+			error(err, 0)
+		end
+		cache[name] = chunk(load_module)
+	end
+	return cache[name]
 end
 
 local day = load_module("core/day")
@@ -90,21 +90,34 @@ local theme = load_module("color/theme")
 
 -- Options provisoires : elles iront dans config/defaults.lua à une étape suivante.
 local cfg = {
-normal_gap = 5, -- un écart de 5 s ou moins entre deux mises à jour est du temps normal
-sleep_limit = 3900, -- veille comptée par épisode : 65 min
-settle_time = 60, -- secondes d'utilisation continue avant de rendre le budget de veille
+	normal_gap = 5, -- un écart de 5 s ou moins entre deux mises à jour est du temps normal
+	sleep_limit = 3900, -- veille comptée par épisode : 65 min
+	settle_time = 60, -- secondes d'utilisation continue avant de rendre le budget de veille
 	day_offset = 0, -- 0 : la journée change à minuit
 	save_every = 10, -- sauvegarde dans le fichier toutes les 10 secondes (s'il y a du nouveau)
-data_file = nil, -- nil : <dossier personnel>/.logtime.json
-week_starts_on = "monday", -- ou "sunday"
-goal_hours = nil, -- nombre d'heures par jour qui comptent pour « objectif atteint » (nil : pas d'objectif)
-lang = "fr", -- "fr" ou "en"
-open_key = "F2", -- la touche qui ouvre le calendrier
-settings_key = "F4", -- la touche qui ouvre la page de personnalisation
+	data_file = nil, -- nil : <dossier personnel>/.logtime.json
+	week_starts_on = "monday", -- ou "sunday"
+	goal_hours = nil, -- nombre d'heures par jour qui comptent pour « objectif atteint » (nil : pas d'objectif)
+	lang = "fr", -- "fr" ou "en"
+	open_key = "F2", -- la touche qui ouvre le calendrier
+	settings_key = "F4", -- la touche qui ouvre la page de personnalisation
 }
 
 -- Les noms d'options valables en plus de ceux du schéma des réglages (settings/schema.lua).
-local EXTRA_OPTIONS = { "normal_gap", "sleep_limit", "settle_time", "day_offset", "save_every", "data_file", "settings_file", "settings_key", "open_key", "cell_color", "heat", "thresholds" }
+local EXTRA_OPTIONS = {
+	"normal_gap",
+	"sleep_limit",
+	"settle_time",
+	"day_offset",
+	"save_every",
+	"data_file",
+	"settings_file",
+	"settings_key",
+	"open_key",
+	"cell_color",
+	"heat",
+	"thresholds",
+}
 
 -- Le fichier des réglages choisis par l'utilisateur : <dossier personnel>/.logtime_settings.json
 local function settings_path()
@@ -130,7 +143,7 @@ function M.setup(opts)
 end
 
 local function data_path()
-return cfg.data_file or (wezterm.home_dir .. sep .. ".logtime.json")
+	return cfg.data_file or (wezterm.home_dir .. sep .. ".logtime.json")
 end
 
 -- ------------------------------------------------------------
@@ -153,11 +166,11 @@ end
 local G = wezterm.GLOBAL
 
 local function num(v, default)
-if type(v) == "number" then
-return v
-end
-if v ~= nil then
-local ok, n = pcall(function()
+	if type(v) == "number" then
+		return v
+	end
+	if v ~= nil then
+		local ok, n = pcall(function()
 			return v + 0
 		end)
 		if ok and type(n) == "number" then
@@ -169,198 +182,210 @@ end
 
 -- L'ancienne version gardait une table dans GLOBAL : on la retire, elle ne sert plus.
 pcall(function()
-G.logtime_days = nil
+	G.logtime_days = nil
 end)
 
 -- Les heures par jour de cette session : une vraie table Lua, reconstruite depuis GLOBAL après un rechargement.
 local days_mem = nil
 
 local function get_days()
-if not days_mem then
-local text = G.logtime_days_json
-local decoded = type(text) == "string" and storage.decode(text) or nil
-days_mem = decoded or {}
-if not decoded and G.logtime_storage_ready then
--- le texte gardé en mémoire est illisible : on relira le fichier plutôt que de repartir de zéro
-G.logtime_storage_ready = false
-end
-end
-return days_mem
+	if not days_mem then
+		local text = G.logtime_days_json
+		local decoded = type(text) == "string" and storage.decode(text) or nil
+		days_mem = decoded or {}
+		if not decoded and G.logtime_storage_ready then
+			-- le texte gardé en mémoire est illisible : on relira le fichier plutôt que de repartir de zéro
+			G.logtime_storage_ready = false
+		end
+	end
+	return days_mem
 end
 
 local function remember(days)
-G.logtime_days_json = storage.encode(days)
+	G.logtime_days_json = storage.encode(days)
 end
 
 -- Lit le fichier et le fusionne avec ce qui est déjà compté en mémoire : pour chaque jour, la plus grande des deux
 -- valeurs (jamais la somme : on ne risque pas de compter deux fois). Un fichier illisible est mis de côté, jamais écrasé.
 -- Quand la lecture échoue, on réessaie une minute plus tard (pas à chaque seconde) et on ne l'écrit qu'une fois dans les journaux.
 local function sync_failed(now, message)
-G.logtime_sync_retry_at = now + 60
-G.logtime_save_failed = true
-if not G.logtime_sync_error_logged then
-G.logtime_sync_error_logged = true
-wezterm.log_error(message)
-end
+	G.logtime_sync_retry_at = now + 60
+	G.logtime_save_failed = true
+	if not G.logtime_sync_error_logged then
+		G.logtime_sync_error_logged = true
+		wezterm.log_error(message)
+	end
 end
 
 local function sync_from_file(now)
-local path = data_path()
-local ok, from_file, state, err = pcall(storage.load, path)
-if not ok then
-sync_failed(now, "logtime : lecture du fichier d'heures impossible : " .. tostring(from_file))
-return
-end
+	local path = data_path()
+	local ok, from_file, state, err = pcall(storage.load, path)
+	if not ok then
+		sync_failed(now, "logtime : lecture du fichier d'heures impossible : " .. tostring(from_file))
+		return
+	end
 
-if state == "corrupt" then
-local moved, qerr = storage.quarantine(path)
-if not moved then
--- impossible de le mettre de côté : on ne l'écrase surtout pas, on compte en mémoire seulement
-sync_failed(now, "logtime : le fichier d'heures est illisible (" .. tostring(err) .. ") et n'a pas pu être mis de côté (" .. tostring(qerr) .. ") : rien n'est sauvegardé")
-return
-end
-wezterm.log_error("logtime : le fichier d'heures était illisible (" .. tostring(err) .. ") : il a été mis de côté dans " .. moved)
-end
+	if state == "corrupt" then
+		local moved, qerr = storage.quarantine(path)
+		if not moved then
+			-- impossible de le mettre de côté : on ne l'écrase surtout pas, on compte en mémoire seulement
+			sync_failed(
+				now,
+				"logtime : le fichier d'heures est illisible ("
+					.. tostring(err)
+					.. ") et n'a pas pu être mis de côté ("
+					.. tostring(qerr)
+					.. ") : rien n'est sauvegardé"
+			)
+			return
+		end
+		wezterm.log_error(
+			"logtime : le fichier d'heures était illisible ("
+				.. tostring(err)
+				.. ") : il a été mis de côté dans "
+				.. moved
+		)
+	end
 
-local memory = get_days()
-local merged, dirty = {}, false
-for key, secs in pairs(from_file) do
-merged[key] = secs
-end
-for key, secs in pairs(memory) do
-if (merged[key] or 0) < secs then
-merged[key] = secs
-dirty = true
-end
-end
-days_mem = merged
-remember(merged)
-G.logtime_dirty = dirty
-G.logtime_storage_ready = true
-G.logtime_sync_error_logged = false
-G.logtime_save_failed = false
+	local memory = get_days()
+	local merged, dirty = {}, false
+	for key, secs in pairs(from_file) do
+		merged[key] = secs
+	end
+	for key, secs in pairs(memory) do
+		if (merged[key] or 0) < secs then
+			merged[key] = secs
+			dirty = true
+		end
+	end
+	days_mem = merged
+	remember(merged)
+	G.logtime_dirty = dirty
+	G.logtime_storage_ready = true
+	G.logtime_sync_error_logged = false
+	G.logtime_save_failed = false
 end
 
 local function maybe_save(now, days)
-if not G.logtime_dirty then
-return
-end
-local last_save = num(G.logtime_saved)
-if last_save and last_save <= now and now - last_save < cfg.save_every then
-return
-end
+	if not G.logtime_dirty then
+		return
+	end
+	local last_save = num(G.logtime_saved)
+	if last_save and last_save <= now and now - last_save < cfg.save_every then
+		return
+	end
 
-local path = data_path()
-if not G.logtime_backup_done then
-pcall(storage.backup, path) -- copie de sécurité de l'état d'avant les écritures de la session
-G.logtime_backup_done = true
-end
+	local path = data_path()
+	if not G.logtime_backup_done then
+		pcall(storage.backup, path) -- copie de sécurité de l'état d'avant les écritures de la session
+		G.logtime_backup_done = true
+	end
 
-local ok, saved, err = pcall(storage.save, path, days)
-G.logtime_saved = now
-if ok and saved then
-G.logtime_dirty = false
-G.logtime_save_failed = false
-else
-if not G.logtime_save_failed then
-wezterm.log_error("logtime : sauvegarde impossible : " .. tostring(ok and err or saved))
-end
-G.logtime_save_failed = true
-end
+	local ok, saved, err = pcall(storage.save, path, days)
+	G.logtime_saved = now
+	if ok and saved then
+		G.logtime_dirty = false
+		G.logtime_save_failed = false
+	else
+		if not G.logtime_save_failed then
+			wezterm.log_error("logtime : sauvegarde impossible : " .. tostring(ok and err or saved))
+		end
+		G.logtime_save_failed = true
+	end
 end
 
 -- Lit le fichier d'heures si ce n'est pas encore fait (ou si la dernière tentative a échoué il y a plus d'une minute).
 local function ensure_synced(now)
-if G.logtime_storage_ready then
-return
-end
-local retry_at = num(G.logtime_sync_retry_at)
-if not retry_at or now >= retry_at or retry_at > now + 3600 then
-sync_from_file(now)
-end
+	if G.logtime_storage_ready then
+		return
+	end
+	local retry_at = num(G.logtime_sync_retry_at)
+	if not retry_at or now >= retry_at or retry_at > now + 3600 then
+		sync_from_file(now)
+	end
 end
 
 -- ------------------------------------------------------------
 -- Le comptage
 -- ------------------------------------------------------------
 local function compute()
-local now = os.time()
-local days = get_days()
-ensure_synced(now)
-days = get_days()
+	local now = os.time()
+	local days = get_days()
+	ensure_synced(now)
+	days = get_days()
 
-local last = num(G.logtime_last)
-local state = { budget = num(G.logtime_budget, 0), calm = num(G.logtime_calm, 0) }
+	local last = num(G.logtime_last)
+	local state = { budget = num(G.logtime_budget, 0), calm = num(G.logtime_calm, 0) }
 
-if counter.advance(days, last, now, cfg, state) then
-remember(days)
-G.logtime_dirty = true
-end
-G.logtime_budget = state.budget
-G.logtime_calm = state.calm
+	if counter.advance(days, last, now, cfg, state) then
+		remember(days)
+		G.logtime_dirty = true
+	end
+	G.logtime_budget = state.budget
+	G.logtime_calm = state.calm
 
-if not last or now > last then
-G.logtime_last = now
-end
+	if not last or now > last then
+		G.logtime_last = now
+	end
 
-if G.logtime_storage_ready then
-maybe_save(now, days)
-end
-return days[day.key(now, cfg.day_offset)] or 0
+	if G.logtime_storage_ready then
+		maybe_save(now, days)
+	end
+	return days[day.key(now, cfg.day_offset)] or 0
 end
 
 -- Les secondes comptées aujourd'hui
 function M.today_seconds()
-local days = get_days()
-return days[day.key(os.time(), cfg.day_offset)] or 0
+	local days = get_days()
+	return days[day.key(os.time(), cfg.day_offset)] or 0
 end
 
 -- À appeler chaque seconde par la barre d'onglets : fait avancer le compteur et renvoie le texte à afficher.
 -- Une erreur ne doit jamais casser la barre : elle est écrite dans les journaux de WezTerm, une seule fois tant que
 -- c'est la même (et de nouveau si elle revient après un passage normal).
 function M.tick(window)
-local ok, result = pcall(compute)
-if not ok then
-local message = tostring(result)
-if G.logtime_error_message ~= message then
-G.logtime_error_message = message
-wezterm.log_error("logtime : " .. message)
-end
-return "logtime : erreur (voir les journaux)"
-end
-if G.logtime_error_message ~= nil then
-G.logtime_error_message = nil
-end
-local text = status.text(result)
-if G.logtime_save_failed then
-text = text .. " ⚠"
-end
-return text
+	local ok, result = pcall(compute)
+	if not ok then
+		local message = tostring(result)
+		if G.logtime_error_message ~= message then
+			G.logtime_error_message = message
+			wezterm.log_error("logtime : " .. message)
+		end
+		return "logtime : erreur (voir les journaux)"
+	end
+	if G.logtime_error_message ~= nil then
+		G.logtime_error_message = nil
+	end
+	local text = status.text(result)
+	if G.logtime_save_failed then
+		text = text .. " ⚠"
+	end
+	return text
 end
 
 -- Les heures par jour, à jour (le fichier est lu si ce n'est pas encore fait). La page du calendrier s'en sert.
 local function days_for_page()
-get_days()
-ensure_synced(os.time())
-return get_days()
+	get_days()
+	ensure_synced(os.time())
+	return get_days()
 end
 
 -- Une copie des heures par jour : { ["2026-10-12"] = secondes, ... }
 function M.days_snapshot()
-local copy = {}
-for key, secs in pairs(days_for_page()) do
-copy[key] = secs
-end
-return copy
+	local copy = {}
+	for key, secs in pairs(days_for_page()) do
+		copy[key] = secs
+	end
+	return copy
 end
 
 -- Les textes dans la langue choisie (le français si la langue demandée n'existe pas).
 local function labels()
-local ok, found = pcall(load_module, "i18n/" .. tostring(cfg.lang))
-if ok then
-return found
-end
-return load_module("i18n/fr")
+	local ok, found = pcall(load_module, "i18n/" .. tostring(cfg.lang))
+	if ok then
+		return found
+	end
+	return load_module("i18n/fr")
 end
 
 -- À appeler dans wezterm.lua, APRÈS les autres réglages de touches (keys.lua remplace config.keys) :
@@ -374,81 +399,90 @@ function M.apply_to_config(config, opts, ...)
 			wezterm.log_error("logtime : " .. message)
 		end
 		if extra > 0 then
-			wezterm.log_error("logtime : apply_to_config reçoit deux arguments (config, réglages) ; " .. extra .. " argument(s) en trop ignoré(s). Mets tous tes réglages dans UNE seule table : apply_to_config(config, { ... })")
+			wezterm.log_error(
+				"logtime : apply_to_config reçoit deux arguments (config, réglages) ; "
+					.. extra
+					.. " argument(s) en trop ignoré(s). Mets tous tes réglages dans UNE seule table : apply_to_config(config, { ... })"
+			)
 		end
 		M.setup(opts)
-local page = calendar_page.create({
-wezterm = wezterm,
-G = G,
-num = num,
-days = days_for_page,
-today_key = function()
-return day.key(os.time(), cfg.day_offset)
-end,
-cfg = function()
-return cfg
-end,
-labels = labels,
-blocker_args = function()
-return platform.blocker_args(platform.os_name(wezterm.target_triple))
-end,
-})
-keys.apply(config, wezterm, { page = page, open_key = cfg.open_key, table_name = calendar_page.TABLE_NAME })
-local settings_view = settings_page.create({
-	wezterm = wezterm,
-	G = G,
-	num = num,
-	cfg = function()
-		return cfg
-	end,
-	labels = labels,
-	blocker_args = function()
-		return platform.blocker_args(platform.os_name(wezterm.target_triple))
-	end,
-	store = settings,
-	days = days_for_page, -- pour l'aperçu du mois actuel
-	today_key = function()
-		return day.key(os.time(), cfg.day_offset)
-	end,
-	palette = function()
-		if cfg.theme_colors == true then
-			local colors, reason = theme.extract(config, wezterm)
-			if colors then
-				return { kind = "theme", colors = colors }
-			end
-			return { kind = "classic", unavailable = reason }
-		end
-		return { kind = "classic" }
-	end,
-	consent = function()
-		return cfg.theme_colors
-	end,
-	settings_key = function()
-		return cfg.settings_key
-	end,
-	settings_path = settings_path,
-	apply = function(changes)
-		for key, value in pairs(changes) do
-			cfg[key] = value
-		end
-	end,
-	refresh_calendar = function(window, pane)
-		page.on_resize(window, pane)
-	end,
-})
-keys.apply(config, wezterm, { page = settings_view, open_key = cfg.settings_key, table_name = settings_page.TABLE_NAME, open_event = "logtime-settings-open" })
-wezterm.on("window-config-reloaded", function(window, pane)
-	pcall(settings_view.on_config_loaded, window, pane)
-end)
-end)
-if not ok then
-wezterm.log_error("logtime : apply_to_config a échoué : " .. tostring(err))
-end
-return config
+		local page = calendar_page.create({
+			wezterm = wezterm,
+			G = G,
+			num = num,
+			days = days_for_page,
+			today_key = function()
+				return day.key(os.time(), cfg.day_offset)
+			end,
+			cfg = function()
+				return cfg
+			end,
+			labels = labels,
+			blocker_args = function()
+				return platform.blocker_args(platform.os_name(wezterm.target_triple))
+			end,
+		})
+		keys.apply(config, wezterm, { page = page, open_key = cfg.open_key, table_name = calendar_page.TABLE_NAME })
+		local settings_view = settings_page.create({
+			wezterm = wezterm,
+			G = G,
+			num = num,
+			cfg = function()
+				return cfg
+			end,
+			labels = labels,
+			blocker_args = function()
+				return platform.blocker_args(platform.os_name(wezterm.target_triple))
+			end,
+			store = settings,
+			days = days_for_page, -- pour l'aperçu du mois actuel
+			today_key = function()
+				return day.key(os.time(), cfg.day_offset)
+			end,
+			palette = function()
+				if cfg.theme_colors == true then
+					local colors, reason = theme.extract(config, wezterm)
+					if colors then
+						return { kind = "theme", colors = colors }
+					end
+					return { kind = "classic", unavailable = reason }
+				end
+				return { kind = "classic" }
+			end,
+			consent = function()
+				return cfg.theme_colors
+			end,
+			settings_key = function()
+				return cfg.settings_key
+			end,
+			settings_path = settings_path,
+			apply = function(changes)
+				for key, value in pairs(changes) do
+					cfg[key] = value
+				end
+			end,
+			refresh_calendar = function(window, pane)
+				page.on_resize(window, pane)
+			end,
+		})
+		keys.apply(config, wezterm, {
+			page = settings_view,
+			open_key = cfg.settings_key,
+			table_name = settings_page.TABLE_NAME,
+			open_event = "logtime-settings-open",
+		})
+		wezterm.on("window-config-reloaded", function(window, pane)
+			pcall(settings_view.on_config_loaded, window, pane)
+		end)
+	end)
+	if not ok then
+		wezterm.log_error("logtime : apply_to_config a échoué : " .. tostring(err))
+	end
+	return config
 end
 
 if wezterm.log_info then
-wezterm.log_info("logtime : version " .. M.version .. " chargée depuis " .. DIR)
+	wezterm.log_info("logtime : version " .. M.version .. " chargée depuis " .. DIR)
 end
 
 return M

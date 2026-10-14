@@ -14,10 +14,58 @@ M.WIDTH = 65
 --   tl tr bl br : les coins ; h v : les traits ; t b : les jonctions du haut et du bas ; l r : de gauche et de droite ;
 --   x : les croisements.
 M.BORDER_STYLES = {
-	rounded = { tl = "╭", tr = "╮", bl = "╰", br = "╯", h = "─", v = "│", t = "┬", b = "┴", l = "├", r = "┤", x = "┼" },
-	single = { tl = "┌", tr = "┐", bl = "└", br = "┘", h = "─", v = "│", t = "┬", b = "┴", l = "├", r = "┤", x = "┼" },
-	double = { tl = "╔", tr = "╗", bl = "╚", br = "╝", h = "═", v = "║", t = "╦", b = "╩", l = "╠", r = "╣", x = "╬" },
-	heavy = { tl = "┏", tr = "┓", bl = "┗", br = "┛", h = "━", v = "┃", t = "┳", b = "┻", l = "┣", r = "┫", x = "╋" },
+	rounded = {
+		tl = "╭",
+		tr = "╮",
+		bl = "╰",
+		br = "╯",
+		h = "─",
+		v = "│",
+		t = "┬",
+		b = "┴",
+		l = "├",
+		r = "┤",
+		x = "┼",
+	},
+	single = {
+		tl = "┌",
+		tr = "┐",
+		bl = "└",
+		br = "┘",
+		h = "─",
+		v = "│",
+		t = "┬",
+		b = "┴",
+		l = "├",
+		r = "┤",
+		x = "┼",
+	},
+	double = {
+		tl = "╔",
+		tr = "╗",
+		bl = "╚",
+		br = "╝",
+		h = "═",
+		v = "║",
+		t = "╦",
+		b = "╩",
+		l = "╠",
+		r = "╣",
+		x = "╬",
+	},
+	heavy = {
+		tl = "┏",
+		tr = "┓",
+		bl = "┗",
+		br = "┛",
+		h = "━",
+		v = "┃",
+		t = "┳",
+		b = "┻",
+		l = "┣",
+		r = "┫",
+		x = "╋",
+	},
 }
 M.BORDER_COLOR = "#8B8E99" -- la couleur des traits par défaut : le gris des jours vides (réglage border_color)
 
@@ -110,7 +158,17 @@ local function edge_with_text(chars, text, color)
 	end
 	text = without_margin(text)
 	local covered = visible_len(text) + 2 -- le texte et un espace de chaque côté
-	return MARGIN .. color .. chars[1] .. chars[2] .. convert.RESET .. " " .. text .. " " .. color .. table.concat(chars, "", 3 + covered) .. convert.RESET
+	return MARGIN
+		.. color
+		.. chars[1]
+		.. chars[2]
+		.. convert.RESET
+		.. " "
+		.. text
+		.. " "
+		.. color
+		.. table.concat(chars, "", 3 + covered)
+		.. convert.RESET
 end
 
 -- Une ligne de texte dans le cadre d'un mois : « │ texte … │ ».
@@ -128,40 +186,40 @@ M.HEIGHT = 21
 -- Réglages par défaut. cell_color (facultatif) : une fonction secondes -> code couleur "#RRGGBB" (ou nil pour « pas de fond »),
 -- qui remplace les quatre niveaux ci-dessous (c'est là que se branchera le dégradé).
 M.DEFAULTS = {
-week_starts_on = "monday",
-goal_hours = nil,
-goal_days = 5, -- jours où l'objectif est atteint qui font une semaine réussie
-borders = false, -- encadrés des cases (une grille)
-border_style = "rounded", -- "rounded", "single", "double" ou "heavy" (voir M.BORDER_STYLES)
-heat = { "#2E3644", "#5A5240", "#8C7A4A", "#C9AB6B" },
-thresholds = { 1, 3, 6 },
-cell_color = nil,
+	week_starts_on = "monday",
+	goal_hours = nil,
+	goal_days = 5, -- jours où l'objectif est atteint qui font une semaine réussie
+	borders = false, -- encadrés des cases (une grille)
+	border_style = "rounded", -- "rounded", "single", "double" ou "heavy" (voir M.BORDER_STYLES)
+	heat = { "#2E3644", "#5A5240", "#8C7A4A", "#C9AB6B" },
+	thresholds = { 1, 3, 6 },
+	cell_color = nil,
 }
 
 local function with_defaults(cfg)
-local out = {}
-for key, value in pairs(M.DEFAULTS) do
-out[key] = value
-end
-for key, value in pairs(cfg or {}) do
-out[key] = value
-end
-return out
+	local out = {}
+	for key, value in pairs(M.DEFAULTS) do
+		out[key] = value
+	end
+	for key, value in pairs(cfg or {}) do
+		out[key] = value
+	end
+	return out
 end
 
 -- Centre un texte dans une largeur donnée (compte les caractères, pas les octets)
 local function center(s, width)
-local len = utf8.len(s) or #s
-if len >= width then
-return s
-end
-local left = math.floor((width - len) / 2)
-return string.rep(" ", left) .. s .. string.rep(" ", width - len - left)
+	local len = utf8.len(s) or #s
+	if len >= width then
+		return s
+	end
+	local left = math.floor((width - len) / 2)
+	return string.rep(" ", left) .. s .. string.rep(" ", width - len - left)
 end
 
 -- Niveau de couleur d'un jour : 0 (rien) à 4 (le plus fort)
 local function level(secs, thresholds)
-if secs <= 0 then
+	if secs <= 0 then
 		return 0
 	end
 	local hours = secs / 3600
@@ -179,22 +237,22 @@ end
 
 -- La couleur de fond d'un jour (ou nil : pas de fond)
 local function background(secs, cfg)
-if cfg.cell_color then
-return cfg.cell_color(secs)
-end
-local lv = level(secs, cfg.thresholds)
-if lv == 0 then
-return nil
-end
-return cfg.heat[lv]
+	if cfg.cell_color then
+		return cfg.cell_color(secs)
+	end
+	local lv = level(secs, cfg.thresholds)
+	if lv == 0 then
+		return nil
+	end
+	return cfg.heat[lv]
 end
 
 local function style(secs, cfg)
-local bg = background(secs, cfg)
-if not bg then
-return convert.fg("#8B8E99")
-end
-return convert.bg(bg) .. convert.fg(convert.contrast(bg))
+	local bg = background(secs, cfg)
+	if not bg then
+		return convert.fg("#8B8E99")
+	end
+	return convert.bg(bg) .. convert.fg(convert.contrast(bg))
 end
 
 -- L'en-tête des jours de la semaine
@@ -214,7 +272,11 @@ local function header_line(cfg, labels)
 		for i = 1, 7 do
 			local len = utf8.len(names[i]) or #names[i]
 			local left = math.floor((8 - len) / 2)
-			parts[#parts + 1] = string.rep(b.h, left) .. convert.RESET .. names[i] .. color .. string.rep(b.h, 8 - len - left)
+			parts[#parts + 1] = string.rep(b.h, left)
+				.. convert.RESET
+				.. names[i]
+				.. color
+				.. string.rep(b.h, 8 - len - left)
 			if i < 7 then
 				parts[#parts + 1] = b.t
 			end
@@ -301,7 +363,15 @@ local function validated_text(days, year, month, cfg, s, labels)
 	if not weeks then
 		return nil
 	end
-	return string.format("%s : %d/%d / %s : %d/%d", labels.validated_weeks, weeks, total_weeks, labels.validated_days, s.goal_days, dates.days_in_month(year, month))
+	return string.format(
+		"%s : %d/%d / %s : %d/%d",
+		labels.validated_weeks,
+		weeks,
+		total_weeks,
+		labels.validated_days,
+		s.goal_days,
+		dates.days_in_month(year, month)
+	)
 end
 
 -- Une ligne de traits de la grille : left .. (8 traits .. join) x 6 .. 8 traits .. right, dans la couleur des traits.
@@ -366,29 +436,29 @@ end
 
 -- La légende des couleurs en une ligne (seulement pour les quatre niveaux par défaut, sinon juste l'étoile)
 local function legend_line(cfg, labels)
-if cfg.cell_color then
-	if cfg.legend_text then
-		return "  " .. cfg.legend_text .. "     " .. labels.today
+	if cfg.cell_color then
+		if cfg.legend_text then
+			return "  " .. cfg.legend_text .. "     " .. labels.today
+		end
+		return "  " .. labels.today
 	end
-	return "  " .. labels.today
-end
-local t = cfg.thresholds
-local legend = {
-{ cfg.heat[1], string.format("<%gh", t[1]) },
-{ cfg.heat[2], string.format("%g-%gh", t[1], t[2]) },
-{ cfg.heat[3], string.format("%g-%gh", t[2], t[3]) },
-{ cfg.heat[4], string.format("%gh+", t[3]) },
-}
-local parts = {}
-for _, item in ipairs(legend) do
-parts[#parts + 1] = convert.fg(item[1]) .. "██" .. convert.RESET .. " " .. item[2]
-end
-return "  " .. table.concat(parts, "   ") .. "     " .. labels.today
+	local t = cfg.thresholds
+	local legend = {
+		{ cfg.heat[1], string.format("<%gh", t[1]) },
+		{ cfg.heat[2], string.format("%g-%gh", t[1], t[2]) },
+		{ cfg.heat[3], string.format("%g-%gh", t[2], t[3]) },
+		{ cfg.heat[4], string.format("%gh+", t[3]) },
+	}
+	local parts = {}
+	for _, item in ipairs(legend) do
+		parts[#parts + 1] = convert.fg(item[1]) .. "██" .. convert.RESET .. " " .. item[2]
+	end
+	return "  " .. table.concat(parts, "   ") .. "     " .. labels.today
 end
 
 -- La légende des couleurs (une ligne), pour la page qui affiche plusieurs mois.
 function M.legend(cfg, labels)
-return legend_line(with_defaults(cfg), labels)
+	return legend_line(with_defaults(cfg), labels)
 end
 
 -- Dessine un mois complet. Renvoie le texte (lignes séparées par "\n").
@@ -412,7 +482,13 @@ function M.render_month(days, year, month, today_key, cfg, labels)
 	end
 	add("")
 	if b then
-		add(edge_with_text(edge_chars(b.tl, b.tr, b), string.format("%s %d   %s", labels.months[month], year, totals_text(s, labels)), color))
+		add(
+			edge_with_text(
+				edge_chars(b.tl, b.tr, b),
+				string.format("%s %d   %s", labels.months[month], year, totals_text(s, labels)),
+				color
+			)
+		)
 	else
 		add(string.format("  %s : %s %d   %s", labels.title, labels.months[month], year, totals_text(s, labels)))
 		add("")
@@ -448,35 +524,35 @@ end
 -- les semaines, et en bas les semaines et jours validés (ligne vide sans objectif).
 -- selected : le titre est alors en gras. Renvoie { lines = { ... }, width = M.width(cfg) }.
 function M.month_block(days, year, month, today_key, cfg, labels, selected)
-cfg = with_defaults(cfg)
-local s = stats.month_stats(days, year, month, cfg.goal_hours)
-local title = string.format("  %s %d", labels.months[month], year)
-if selected then
-title = "\27[1m" .. title .. convert.RESET
-end
-title = title .. "   " .. totals_text(s, labels)
-local validated = validated_text(days, year, month, cfg, s, labels)
-local b, color = M.border_of(cfg)
-if b then
-	-- Le mois dans son cadre, en 20 lignes : le titre sur le haut du cadre, les jours de la semaine sur la jonction,
-	-- toujours 6 semaines (les dernières vides si besoin : les mois côte à côte ont la même hauteur), les semaines et
-	-- jours validés sur le bas du cadre.
-	local lines = { edge_with_text(edge_chars(b.tl, b.tr, b), title, color), header_line(cfg, labels) }
-	for _, line in ipairs(week_lines(days, year, month, today_key, cfg, 6)) do
+	cfg = with_defaults(cfg)
+	local s = stats.month_stats(days, year, month, cfg.goal_hours)
+	local title = string.format("  %s %d", labels.months[month], year)
+	if selected then
+		title = "\27[1m" .. title .. convert.RESET
+	end
+	title = title .. "   " .. totals_text(s, labels)
+	local validated = validated_text(days, year, month, cfg, s, labels)
+	local b, color = M.border_of(cfg)
+	if b then
+		-- Le mois dans son cadre, en 20 lignes : le titre sur le haut du cadre, les jours de la semaine sur la jonction,
+		-- toujours 6 semaines (les dernières vides si besoin : les mois côte à côte ont la même hauteur), les semaines et
+		-- jours validés sur le bas du cadre.
+		local lines = { edge_with_text(edge_chars(b.tl, b.tr, b), title, color), header_line(cfg, labels) }
+		for _, line in ipairs(week_lines(days, year, month, today_key, cfg, 6)) do
+			lines[#lines + 1] = line
+		end
+		lines[#lines + 1] = edge_with_text(rule_chars(b.bl, b.b, b.br, b), validated, color)
+		return { lines = lines, width = M.width(cfg) }
+	end
+	local lines = { title, header_line(cfg, labels) }
+	for _, line in ipairs(week_lines(days, year, month, today_key, cfg)) do
 		lines[#lines + 1] = line
 	end
-	lines[#lines + 1] = edge_with_text(rule_chars(b.bl, b.b, b.br, b), validated, color)
+	while #lines < M.height(cfg) - 1 do
+		lines[#lines + 1] = ""
+	end
+	lines[#lines + 1] = validated and ("  " .. validated) or ""
 	return { lines = lines, width = M.width(cfg) }
-end
-local lines = { title, header_line(cfg, labels) }
-for _, line in ipairs(week_lines(days, year, month, today_key, cfg)) do
-lines[#lines + 1] = line
-end
-while #lines < M.height(cfg) - 1 do
-lines[#lines + 1] = ""
-end
-lines[#lines + 1] = validated and ("  " .. validated) or ""
-return { lines = lines, width = M.width(cfg) }
 end
 
 return M

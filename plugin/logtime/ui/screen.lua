@@ -30,41 +30,41 @@ function M.bind(wezterm)
 
 	-- Le panneau portant cet identifiant, ou nil s'il n'existe plus.
 	-- wezterm.mux.get_pane LÈVE une erreur ("pane id N not found in mux") pour un panneau disparu : on l'enveloppe.
-function api.find_pane(id)
-if id == nil or not (wezterm.mux and wezterm.mux.get_pane) then
-return nil
-end
-local ok, pane = pcall(wezterm.mux.get_pane, id)
-if ok then
-return pane
-end
-return nil
-end
+	function api.find_pane(id)
+		if id == nil or not (wezterm.mux and wezterm.mux.get_pane) then
+			return nil
+		end
+		local ok, pane = pcall(wezterm.mux.get_pane, id)
+		if ok then
+			return pane
+		end
+		return nil
+	end
 
--- Dessine `text` dans le panneau, à la taille actuelle de sa fenêtre.
-function api.draw(pane, text, first, keep_last)
-local dims = pane:get_dimensions()
-pane:inject_output(M.frame(text, dims.viewport_rows, first, keep_last))
-end
+	-- Dessine `text` dans le panneau, à la taille actuelle de sa fenêtre.
+	function api.draw(pane, text, first, keep_last)
+		local dims = pane:get_dimensions()
+		pane:inject_output(M.frame(text, dims.viewport_rows, first, keep_last))
+	end
 
--- Redessine plus tard (après chaque délai, en secondes) : certains systèmes (ConPTY sous Windows) repeignent l'écran
+	-- Redessine plus tard (après chaque délai, en secondes) : certains systèmes (ConPTY sous Windows) repeignent l'écran
 	-- juste après le démarrage ou un redimensionnement, ce qui effacerait un dessin fait trop tôt.
 	-- `redraw(pane)` n'est appelée que si le panneau existe encore.
-function api.later(pane_id, delays, redraw)
-if not (wezterm.time and wezterm.time.call_after) then
-return
-end
-for _, delay in ipairs(delays) do
-wezterm.time.call_after(delay, function()
-local pane = api.find_pane(pane_id)
-if pane then
-pcall(redraw, pane)
-end
-end)
-end
-end
+	function api.later(pane_id, delays, redraw)
+		if not (wezterm.time and wezterm.time.call_after) then
+			return
+		end
+		for _, delay in ipairs(delays) do
+			wezterm.time.call_after(delay, function()
+				local pane = api.find_pane(pane_id)
+				if pane then
+					pcall(redraw, pane)
+				end
+			end)
+		end
+	end
 
-return api
+	return api
 end
 
 return M

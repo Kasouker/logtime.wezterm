@@ -7,8 +7,8 @@ local M = {}
 
 -- 25020 -> "6h57"
 function M.hm(secs)
-local total_minutes = math.floor(math.max(0, secs) / 60)
-return string.format("%dh%02d", math.floor(total_minutes / 60), total_minutes % 60)
+	local total_minutes = math.floor(math.max(0, secs) / 60)
+	return string.format("%dh%02d", math.floor(total_minutes / 60), total_minutes % 60)
 end
 
 -- Nombre de jours consécutifs avec du temps compté, jusqu'à aujourd'hui.

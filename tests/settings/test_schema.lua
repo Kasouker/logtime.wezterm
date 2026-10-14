@@ -25,7 +25,14 @@ local function check(name, got, want)
 		passed = passed + 1
 	else
 		failed = failed + 1
-		print(string.format("ÉCHEC  %s\n         attendu : %s\n         obtenu  : %s", name, tostring(want), tostring(got)))
+		print(
+			string.format(
+				"ÉCHEC  %s\n         attendu : %s\n         obtenu  : %s",
+				name,
+				tostring(want),
+				tostring(got)
+			)
+		)
 	end
 end
 local function ok(key, value)
@@ -78,7 +85,11 @@ rejects("semaine samedi", "week_starts_on", "saturday")
 accepts("ancre last", "months_anchor", "last")
 accepts("ancre first", "months_anchor", "first")
 rejects("ancre milieu", "months_anchor", "middle")
-check("la raison d'une liste cite les valeurs", select(2, schema.validate("lang", "de")):find("« fr » ou « en »", 1, true) ~= nil, true)
+check(
+	"la raison d'une liste cite les valeurs",
+	select(2, schema.validate("lang", "de")):find("« fr » ou « en »", 1, true) ~= nil,
+	true
+)
 
 -- ---- booléens
 accepts("center vrai", "center", true, true)
@@ -136,7 +147,11 @@ accepts("gradient_curve 0,1", "gradient_curve", 0.1, 0.1)
 accepts("gradient_curve 3", "gradient_curve", 3, 3)
 rejects("gradient_curve 0", "gradient_curve", 0)
 rejects("gradient_curve 3,1", "gradient_curve", 3.1)
-check("la raison d'un intervalle cite les bornes", select(2, schema.validate("gradient_curve", 5)), "doit être compris entre 0.1 et 3")
+check(
+	"la raison d'un intervalle cite les bornes",
+	select(2, schema.validate("gradient_curve", 5)),
+	"doit être compris entre 0.1 et 3"
+)
 
 rejects("goal_hours NaN", "goal_hours", 0 / 0)
 rejects("goal_hours infini", "goal_hours", math.huge)
@@ -159,13 +174,17 @@ for key, value in pairs(defaults) do
 end
 check("toutes les valeurs par défaut sont acceptées par le schéma", all_valid, true)
 check("goal_hours n'a pas de valeur par défaut", defaults.goal_hours, nil)
-check("quinze valeurs par défaut", (function()
-	local n = 0
-	for _ in pairs(defaults) do
-		n = n + 1
-	end
-	return n
-end)(), 15)
+check(
+	"quinze valeurs par défaut",
+	(function()
+		local n = 0
+		for _ in pairs(defaults) do
+			n = n + 1
+		end
+		return n
+	end)(),
+	15
+)
 check("border_color : gris par défaut", defaults.border_color, "#8B8E99")
 accepts("border_color en minuscules", "border_color", "#3366cc", "#3366CC")
 rejects("border_color pas une couleur", "border_color", "bleu")

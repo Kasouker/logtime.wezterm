@@ -37,7 +37,14 @@ local function check(name, got, want)
 		passed = passed + 1
 	else
 		failed = failed + 1
-		print(string.format("ÉCHEC  %s\n         attendu : %s\n         obtenu  : %s", name, tostring(want), tostring(got)))
+		print(
+			string.format(
+				"ÉCHEC  %s\n         attendu : %s\n         obtenu  : %s",
+				name,
+				tostring(want),
+				tostring(got)
+			)
+		)
 	end
 end
 
@@ -70,31 +77,31 @@ end
 
 -- Lit la grille d'un mois rendu : une liste de semaines, chaque semaine = 7 cases { day, star, text }.
 local function grid(text)
-local lines = lines_of(strip(text))
-local weeks = {}
-local i = 5 -- ligne 1 vide, 2 titre, 3 vide, 4 en-tête, puis les semaines par trois lignes (nombres, durées, vide)
-while lines[i] and lines[i + 1] and lines[i]:match("%d") and not lines[i]:find(":", 1, true) do
-local week = {}
-for col = 1, 7 do
-local top = usub(lines[i], 3 + (col - 1) * 9, 2 + col * 9)
-local bottom = usub(lines[i + 1], 3 + (col - 1) * 9, 2 + col * 9)
-local star, num = top:match("^(%*?)%s*(%d+)")
-week[col] = { day = num and tonumber(num) or nil, star = star == "*", text = bottom:match("^%s*(.-)%s*$") }
-end
-weeks[#weeks + 1] = week
-i = i + 3
-end
-return weeks
+	local lines = lines_of(strip(text))
+	local weeks = {}
+	local i = 5 -- ligne 1 vide, 2 titre, 3 vide, 4 en-tête, puis les semaines par trois lignes (nombres, durées, vide)
+	while lines[i] and lines[i + 1] and lines[i]:match("%d") and not lines[i]:find(":", 1, true) do
+		local week = {}
+		for col = 1, 7 do
+			local top = usub(lines[i], 3 + (col - 1) * 9, 2 + col * 9)
+			local bottom = usub(lines[i + 1], 3 + (col - 1) * 9, 2 + col * 9)
+			local star, num = top:match("^(%*?)%s*(%d+)")
+			week[col] = { day = num and tonumber(num) or nil, star = star == "*", text = bottom:match("^%s*(.-)%s*$") }
+		end
+		weeks[#weeks + 1] = week
+		i = i + 3
+	end
+	return weeks
 end
 local function day_numbers(week)
-local out = {}
-for col = 1, 7 do
-out[col] = week[col].day or "."
-end
-return table.concat(out, ",")
+	local out = {}
+	for col = 1, 7 do
+		out[col] = week[col].day or "."
+	end
+	return table.concat(out, ",")
 end
 local function width(line)
-return utf8.len(strip(line))
+	return utf8.len(strip(line))
 end
 
 -- ============================================================
@@ -105,8 +112,8 @@ check("rgb : #C9AB6B", r .. "," .. g .. "," .. b, "201,171,107")
 r, g, b = convert.rgb("c9ab6b")
 check("rgb : sans dièse et en minuscules", r .. "," .. g .. "," .. b, "201,171,107")
 for _, bad in ipairs({ "zzzzzz", "#12345", "#1234567", "", "rouge" }) do
-r, g, b = convert.rgb(bad)
-check("rgb : code invalide « " .. bad .. " » = blanc", r .. "," .. g .. "," .. b, "255,255,255")
+	r, g, b = convert.rgb(bad)
+	check("rgb : code invalide « " .. bad .. " » = blanc", r .. "," .. g .. "," .. b, "255,255,255")
 end
 r, g, b = convert.rgb(nil)
 check("rgb : nil = blanc", r .. "," .. g .. "," .. b, "255,255,255")
@@ -125,7 +132,7 @@ check("key : zéros ajoutés", dates.key(2026, 3, 5), "2026-03-05")
 check("key : date à deux chiffres", dates.key(2026, 12, 31), "2026-12-31")
 local expected_len = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 }
 for m = 1, 12 do
-check("days_in_month 2026-" .. m, dates.days_in_month(2026, m), expected_len[m])
+	check("days_in_month 2026-" .. m, dates.days_in_month(2026, m), expected_len[m])
 end
 check("février 2024 (bissextile)", dates.days_in_month(2024, 2), 29)
 check("février 2028 (bissextile)", dates.days_in_month(2028, 2), 29)
@@ -157,20 +164,42 @@ check("hm : plus de 99 h", stats.hm(360000), "100h00")
 check("hm : décimales ignorées", stats.hm(3661.9), "1h01")
 
 local function streak(days, today)
-return stats.streak(days, today)
+	return stats.streak(days, today)
 end
-check("série : 3 jours dont aujourd'hui", streak({ ["2026-10-10"] = 5, ["2026-10-11"] = 5, ["2026-10-12"] = 5 }, "2026-10-12"), 3)
+check(
+	"série : 3 jours dont aujourd'hui",
+	streak({ ["2026-10-10"] = 5, ["2026-10-11"] = 5, ["2026-10-12"] = 5 }, "2026-10-12"),
+	3
+)
 check("série : rien aujourd'hui, on part d'hier", streak({ ["2026-10-10"] = 5, ["2026-10-11"] = 5 }, "2026-10-12"), 2)
-check("série : un trou interrompt la série", streak({ ["2026-10-09"] = 5, ["2026-10-11"] = 5, ["2026-10-12"] = 5 }, "2026-10-12"), 2)
-check("série : un jour à zéro interrompt la série", streak({ ["2026-10-10"] = 5, ["2026-10-11"] = 0, ["2026-10-12"] = 5 }, "2026-10-12"), 1)
+check(
+	"série : un trou interrompt la série",
+	streak({ ["2026-10-09"] = 5, ["2026-10-11"] = 5, ["2026-10-12"] = 5 }, "2026-10-12"),
+	2
+)
+check(
+	"série : un jour à zéro interrompt la série",
+	streak({ ["2026-10-10"] = 5, ["2026-10-11"] = 0, ["2026-10-12"] = 5 }, "2026-10-12"),
+	1
+)
 check("série : aucun historique", streak({}, "2026-10-12"), 0)
 check("série : hier vide et aujourd'hui vide", streak({ ["2026-10-09"] = 5 }, "2026-10-12"), 0)
-check("série : à cheval sur deux années", streak({ ["2026-12-31"] = 5, ["2027-01-01"] = 5, ["2027-01-02"] = 5 }, "2027-01-02"), 3)
+check(
+	"série : à cheval sur deux années",
+	streak({ ["2026-12-31"] = 5, ["2027-01-01"] = 5, ["2027-01-02"] = 5 }, "2027-01-02"),
+	3
+)
 check("série : à cheval sur deux mois", streak({ ["2026-09-30"] = 5, ["2026-10-01"] = 5 }, "2026-10-01"), 2)
 check("série : clé de date invalide", streak({}, "n'importe quoi"), 0)
 check("série : clé nil", streak({}, nil), 0)
 
-local oct = { ["2026-10-10"] = 15231, ["2026-10-11"] = 1900, ["2026-10-12"] = 3600, ["2026-09-30"] = 99999, ["2026-11-01"] = 99999 }
+local oct = {
+	["2026-10-10"] = 15231,
+	["2026-10-11"] = 1900,
+	["2026-10-12"] = 3600,
+	["2026-09-30"] = 99999,
+	["2026-11-01"] = 99999,
+}
 local s = stats.month_stats(oct, 2026, 10)
 check("month_stats : total (septembre et novembre ignorés)", s.total, 15231 + 1900 + 3600)
 check("month_stats : jours actifs", s.active, 3)
@@ -197,9 +226,17 @@ local days = { ["2026-10-10"] = 15231, ["2026-10-11"] = 1900, ["2026-10-12"] = 3
 local text = render(days, 2026, 10, "2026-10-12")
 local lines = lines_of(strip(text))
 check("première ligne vide", lines[1], "")
-check("titre, avec le total et les jours actifs", lines[2], "  Logtime : Octobre 2026   Total du mois : 5h45 / Jours actifs : 3")
+check(
+	"titre, avec le total et les jours actifs",
+	lines[2],
+	"  Logtime : Octobre 2026   Total du mois : 5h45 / Jours actifs : 3"
+)
 check("en-tête : commence par Lun", lines[4]:match("^%s*(%a+)"), "Lun")
-check("en-tête : sept jours dans l'ordre", table.concat({ lines[4]:match("(%a+)%s+(%a+)%s+(%a+)%s+(%a+)%s+(%a+)%s+(%a+)%s+(%a+)") }, ","), "Lun,Mar,Mer,Jeu,Ven,Sam,Dim")
+check(
+	"en-tête : sept jours dans l'ordre",
+	table.concat({ lines[4]:match("(%a+)%s+(%a+)%s+(%a+)%s+(%a+)%s+(%a+)%s+(%a+)%s+(%a+)") }, ","),
+	"Lun,Mar,Mer,Jeu,Ven,Sam,Dim"
+)
 check("largeur de l'en-tête", width(lines[4]), assemble.WIDTH)
 
 local weeks = grid(text)
@@ -214,28 +251,34 @@ check("un jour sans temps affiche un point", weeks[2][1].text, "·")
 check("l'étoile marque aujourd'hui (le 12)", weeks[3][1].star, true)
 local stars = 0
 for _, week in ipairs(weeks) do
-for _, cell in ipairs(week) do
-if cell.star then
-stars = stars + 1
-end
-end
+	for _, cell in ipairs(week) do
+		if cell.star then
+			stars = stars + 1
+		end
+	end
 end
 check("une seule étoile dans le mois", stars, 1)
 local stars_elsewhere = 0
 for _, week in ipairs(grid(render(days, 2026, 10, "2026-11-20"))) do
-for _, cell in ipairs(week) do
-if cell.star then
-stars_elsewhere = stars_elsewhere + 1
-end
-end
+	for _, cell in ipairs(week) do
+		if cell.star then
+			stars_elsewhere = stars_elsewhere + 1
+		end
+	end
 end
 check("pas d'étoile quand aujourd'hui n'est pas dans ce mois", stars_elsewhere, 0)
 
 for _, case in ipairs({
-{ 2026, 10, 5 }, { 2026, 2, 5 }, { 2028, 2, 5 }, { 2026, 8, 6 }, { 2027, 2, 4 }, { 2026, 12, 5 }, { 2024, 1, 5 },
+	{ 2026, 10, 5 },
+	{ 2026, 2, 5 },
+	{ 2028, 2, 5 },
+	{ 2026, 8, 6 },
+	{ 2027, 2, 4 },
+	{ 2026, 12, 5 },
+	{ 2024, 1, 5 },
 }) do
-local w = grid(render({}, case[1], case[2], "x"))
-check(string.format("%d-%02d : %d semaines", case[1], case[2], case[3]), #w, case[3])
+	local w = grid(render({}, case[1], case[2], "x"))
+	check(string.format("%d-%02d : %d semaines", case[1], case[2], case[3]), #w, case[3])
 end
 weeks = grid(render({}, 2026, 2, "x"))
 check("février 2026 : le 1er est un dimanche, dernière colonne", day_numbers(weeks[1]), ".,.,.,.,.,.,1")
@@ -254,29 +297,49 @@ check("dimanche d'abord : et finit par Sam", sunday_header:match("(%a+)%s*$"), "
 -- alignement : toutes les lignes de la grille ont la même largeur
 local widths_ok = true
 for _, year in ipairs({ 2026, 2028 }) do
-for month = 1, 12 do
-for _, start in ipairs({ "monday", "sunday" }) do
-local out = lines_of(render({ ["2026-10-10"] = 15231 }, year, month, "x", { week_starts_on = start }))
-for i = 4, #out - 3 do
-if out[i] ~= "" and width(out[i]) ~= assemble.WIDTH then
-widths_ok = false
+	for month = 1, 12 do
+		for _, start in ipairs({ "monday", "sunday" }) do
+			local out = lines_of(render({ ["2026-10-10"] = 15231 }, year, month, "x", { week_starts_on = start }))
+			for i = 4, #out - 3 do
+				if out[i] ~= "" and width(out[i]) ~= assemble.WIDTH then
+					widths_ok = false
+				end
+			end
+		end
+	end
 end
-end
-end
-end
-end
-check("alignement : l'en-tête et toutes les semaines ont la même largeur, tous les mois de 2026 et 2028", widths_ok, true)
+check(
+	"alignement : l'en-tête et toutes les semaines ont la même largeur, tous les mois de 2026 et 2028",
+	widths_ok,
+	true
+)
 
 -- ============================================================
 -- calendar/assemble.lua : les statistiques et la légende
 -- ============================================================
-check("statistiques : première ligne (le total est monté dans le titre)", lines[#lines - 2], "  Moyenne par jour actif : 1h55")
+check(
+	"statistiques : première ligne (le total est monté dans le titre)",
+	lines[#lines - 2],
+	"  Moyenne par jour actif : 1h55"
+)
 check("statistiques : deuxième ligne", lines[#lines - 1], "  Meilleur jour : 10 (4h13)   Série en cours : 3 j")
-check("légende : niveaux par défaut", lines[#lines], "  ██ <1h   ██ 1-3h   ██ 3-6h   ██ 6h+     * = aujourd'hui")
+check(
+	"légende : niveaux par défaut",
+	lines[#lines],
+	"  ██ <1h   ██ 1-3h   ██ 3-6h   ██ 6h+     * = aujourd'hui"
+)
 local with_goal = lines_of(strip(render(days, 2026, 10, "2026-10-12", { goal_hours = 3 })))
-check("objectif : 1 jour validé sur 31, aucune semaine", with_goal[#with_goal - 1], "  Semaines validées : 0/5 / Jours validés : 1/31")
+check(
+	"objectif : 1 jour validé sur 31, aucune semaine",
+	with_goal[#with_goal - 1],
+	"  Semaines validées : 0/5 / Jours validés : 1/31"
+)
 local goal_zero = lines_of(strip(render(days, 2026, 10, "2026-10-12", { goal_hours = 0 })))
-check("objectif 0 (« aucun ») : pas de ligne Objectif", goal_zero[#goal_zero - 1], "  Meilleur jour : 10 (4h13)   Série en cours : 3 j")
+check(
+	"objectif 0 (« aucun ») : pas de ligne Objectif",
+	goal_zero[#goal_zero - 1],
+	"  Meilleur jour : 10 (4h13)   Série en cours : 3 j"
+)
 check("has_goal : 0 n'est pas un objectif", stats.has_goal(0), false)
 check("has_goal : nil n'est pas un objectif", stats.has_goal(nil), false)
 check("has_goal : 0,5 est un objectif", stats.has_goal(0.5), true)
@@ -296,9 +359,21 @@ local goal_raw = render(days, 2026, 10, "2026-10-12", { goal_hours = 3 })
 local raw_line = durations_line(goal_raw, " 10 ")
 local plain_line = strip(raw_line)
 check("objectif atteint (le 10, 4h13 ≥ 3h) : « ✓ 4h13 »", plain_line:find("✓ 4h13", 1, true) ~= nil, true)
-check("objectif pas atteint, jour passé (le 11, 0h31) : la durée est rayée", raw_line:find("\27[9m0h31\27[29m", 1, true) ~= nil, true)
-check("rayé : seulement le texte, les espaces autour ne le sont pas", raw_line:find("\27[9m 0h31", 1, true) == nil and raw_line:find("0h31 \27[29m", 1, true) == nil, true)
-check("aujourd'hui (le 12, 1h00 < 3h) : pas rayé, la journée n'est pas finie", raw_line:find("\27[9m1h00", 1, true), nil)
+check(
+	"objectif pas atteint, jour passé (le 11, 0h31) : la durée est rayée",
+	raw_line:find("\27[9m0h31\27[29m", 1, true) ~= nil,
+	true
+)
+check(
+	"rayé : seulement le texte, les espaces autour ne le sont pas",
+	raw_line:find("\27[9m 0h31", 1, true) == nil and raw_line:find("0h31 \27[29m", 1, true) == nil,
+	true
+)
+check(
+	"aujourd'hui (le 12, 1h00 < 3h) : pas rayé, la journée n'est pas finie",
+	raw_line:find("\27[9m1h00", 1, true),
+	nil
+)
 check("aujourd'hui : pas de ✓ non plus", plain_line:find("✓ 1h00", 1, true), nil)
 local function struck_days(text)
 	return select(2, text:gsub("\27%[9m%d+h%d%d", ""))
@@ -309,15 +384,45 @@ end
 check("un seul jour rayé dans le mois", struck_days(goal_raw), 1)
 check("un seul ✓ de jour dans le mois", select(2, goal_raw:gsub("✓ %d+h", "")), 1)
 check("avec un objectif, la ligne garde ses 65 colonnes, ✓ et rayé compris", utf8.len(plain_line), 65)
-check("sans objectif, la ligne fait toujours 65", utf8.len(strip(durations_line(render(days, 2026, 10, "2026-10-12", {}), " 10 "))), 65)
-check("objectif atteint pile (3h00 = 3h) : ✓", strip(render({ ["2026-10-05"] = 10800 }, 2026, 10, "2026-10-12", { goal_hours = 3 })):find("✓ 3h00", 1, true) ~= nil, true)
-check("objectif 2h59 pour 3h : rayé", render({ ["2026-10-05"] = 10799 }, 2026, 10, "2026-10-12", { goal_hours = 3 }):find("\27[9m2h59", 1, true) ~= nil, true)
-check("une longue durée avec ✓ tient dans la case (« ✓ 12h30 »)", strip(render({ ["2026-10-05"] = 45000 }, 2026, 10, "2026-10-12", { goal_hours = 3 })):find("✓ 12h30", 1, true) ~= nil, true)
+check(
+	"sans objectif, la ligne fait toujours 65",
+	utf8.len(strip(durations_line(render(days, 2026, 10, "2026-10-12", {}), " 10 "))),
+	65
+)
+check(
+	"objectif atteint pile (3h00 = 3h) : ✓",
+	strip(render({ ["2026-10-05"] = 10800 }, 2026, 10, "2026-10-12", { goal_hours = 3 })):find("✓ 3h00", 1, true)
+		~= nil,
+	true
+)
+check(
+	"objectif 2h59 pour 3h : rayé",
+	render({ ["2026-10-05"] = 10799 }, 2026, 10, "2026-10-12", { goal_hours = 3 }):find("\27[9m2h59", 1, true) ~= nil,
+	true
+)
+check(
+	"une longue durée avec ✓ tient dans la case (« ✓ 12h30 »)",
+	strip(render({ ["2026-10-05"] = 45000 }, 2026, 10, "2026-10-12", { goal_hours = 3 })):find("✓ 12h30", 1, true)
+		~= nil,
+	true
+)
 local no_goal = render(days, 2026, 10, "2026-10-12", {})
-check("sans objectif : ni ✓ ni rayé", no_goal:find("✓", 1, true) == nil and no_goal:find("\27[9m", 1, true) == nil, true)
+check(
+	"sans objectif : ni ✓ ni rayé",
+	no_goal:find("✓", 1, true) == nil and no_goal:find("\27[9m", 1, true) == nil,
+	true
+)
 local zero_goal = render(days, 2026, 10, "2026-10-12", { goal_hours = 0 })
-check("objectif « aucun » (0) : ni ✓ ni rayé", zero_goal:find("✓", 1, true) == nil and zero_goal:find("\27[9m", 1, true) == nil, true)
-check("mois sans rien : ni jour ni semaine rayés (comme un jour vide, une semaine sans travail n'est pas ratée)", render({}, 2026, 10, "2026-10-12", { goal_hours = 3 }):find("\27[9m", 1, true), nil)
+check(
+	"objectif « aucun » (0) : ni ✓ ni rayé",
+	zero_goal:find("✓", 1, true) == nil and zero_goal:find("\27[9m", 1, true) == nil,
+	true
+)
+check(
+	"mois sans rien : ni jour ni semaine rayés (comme un jour vide, une semaine sans travail n'est pas ratée)",
+	render({}, 2026, 10, "2026-10-12", { goal_hours = 3 }):find("\27[9m", 1, true),
+	nil
+)
 local past_month = render({ ["2026-09-01"] = 60, ["2026-09-30"] = 60 }, 2026, 9, "2026-10-12", { goal_hours = 3 })
 check("mois passé entier : tous les jours pas atteints sont rayés", struck_days(past_month), 2)
 check("mois passé entier : les semaines ne sont jamais rayées (plus de colonne)", struck_weeks(past_month), 0)
@@ -333,87 +438,236 @@ local function vw(data, y, m, cfg)
 end
 check("validated_weeks : sans objectif, rien", assemble.validated_weeks(five, 2026, 10, {}), nil)
 check("validated_weeks : objectif 0 (aucun), rien", assemble.validated_weeks(five, 2026, 10, { goal_hours = 0 }), nil)
-check("octobre 2026 (lundi) : 5 semaines affichées, 1 validée (5 jours sur 5)", vw(five, 2026, 10, { goal_hours = 3 }), "1/5")
-check("4 jours sur 5 : pas validée", vw({ ["2026-10-05"] = 4 * 3600, ["2026-10-06"] = 4 * 3600, ["2026-10-07"] = 4 * 3600, ["2026-10-08"] = 4 * 3600 }, 2026, 10, { goal_hours = 3 }), "0/5")
+check(
+	"octobre 2026 (lundi) : 5 semaines affichées, 1 validée (5 jours sur 5)",
+	vw(five, 2026, 10, { goal_hours = 3 }),
+	"1/5"
+)
+check(
+	"4 jours sur 5 : pas validée",
+	vw(
+		{ ["2026-10-05"] = 4 * 3600, ["2026-10-06"] = 4 * 3600, ["2026-10-07"] = 4 * 3600, ["2026-10-08"] = 4 * 3600 },
+		2026,
+		10,
+		{ goal_hours = 3 }
+	),
+	"0/5"
+)
 check("goal_days = 3 : 5 jours suffisent largement", vw(five, 2026, 10, { goal_hours = 3, goal_days = 3 }), "1/5")
 check("goal_days = 6 : 5 jours ne suffisent pas", vw(five, 2026, 10, { goal_hours = 3, goal_days = 6 }), "0/5")
 check("objectif 5 h : des jours de 4 h ne comptent pas", vw(five, 2026, 10, { goal_hours = 5 }), "0/5")
-local with_sunday = { ["2026-10-05"] = 4 * 3600, ["2026-10-06"] = 4 * 3600, ["2026-10-07"] = 4 * 3600, ["2026-10-08"] = 4 * 3600, ["2026-10-11"] = 4 * 3600 }
+local with_sunday = {
+	["2026-10-05"] = 4 * 3600,
+	["2026-10-06"] = 4 * 3600,
+	["2026-10-07"] = 4 * 3600,
+	["2026-10-08"] = 4 * 3600,
+	["2026-10-11"] = 4 * 3600,
+}
 check("le 7e jour de la semaine (dimanche 11) compte aussi", vw(with_sunday, 2026, 10, { goal_hours = 3 }), "1/5")
-local across = { ["2026-09-28"] = 4 * 3600, ["2026-09-29"] = 4 * 3600, ["2026-09-30"] = 4 * 3600, ["2026-10-01"] = 4 * 3600, ["2026-10-02"] = 4 * 3600 }
-check("semaine du 28 sept. au 4 oct., en octobre : les jours de septembre comptent", vw(across, 2026, 10, { goal_hours = 3 }), "1/5")
+local across = {
+	["2026-09-28"] = 4 * 3600,
+	["2026-09-29"] = 4 * 3600,
+	["2026-09-30"] = 4 * 3600,
+	["2026-10-01"] = 4 * 3600,
+	["2026-10-02"] = 4 * 3600,
+}
+check(
+	"semaine du 28 sept. au 4 oct., en octobre : les jours de septembre comptent",
+	vw(across, 2026, 10, { goal_hours = 3 }),
+	"1/5"
+)
 check("la même semaine, en septembre : validée aussi", vw(across, 2026, 9, { goal_hours = 3 }), "1/5")
-check("semaine du dimanche : novembre 2026 (commence un dimanche) a 5 semaines", vw({}, 2026, 11, { goal_hours = 3, week_starts_on = "sunday" }), "0/5")
+check(
+	"semaine du dimanche : novembre 2026 (commence un dimanche) a 5 semaines",
+	vw({}, 2026, 11, { goal_hours = 3, week_starts_on = "sunday" }),
+	"0/5"
+)
 check("semaine du lundi : novembre 2026 a 6 semaines", vw({}, 2026, 11, { goal_hours = 3 }), "0/6")
 check("février 2021 (commence un lundi, 28 jours) : 4 semaines", vw({}, 2021, 2, { goal_hours = 3 }), "0/4")
 
 -- les lignes : total et jours actifs en haut, semaines et jours validés en bas
 local wk = lines_of(strip(render(five, 2026, 10, "2026-10-20", { goal_hours = 3 })))
-check("mois seul : le titre avec le total et les jours actifs", wk[2], "  Logtime : Octobre 2026   Total du mois : 20h00 / Jours actifs : 5")
-check("mois seul : semaines et jours validés (jours sur le nombre de jours du mois)", wk[#wk - 1], "  Semaines validées : 1/5 / Jours validés : 5/31")
-check("mois seul sans objectif : pas de ligne « validées »", strip(render(five, 2026, 10, "2026-10-20", {})):find("validé", 1, true), nil)
+check(
+	"mois seul : le titre avec le total et les jours actifs",
+	wk[2],
+	"  Logtime : Octobre 2026   Total du mois : 20h00 / Jours actifs : 5"
+)
+check(
+	"mois seul : semaines et jours validés (jours sur le nombre de jours du mois)",
+	wk[#wk - 1],
+	"  Semaines validées : 1/5 / Jours validés : 5/31"
+)
+check(
+	"mois seul sans objectif : pas de ligne « validées »",
+	strip(render(five, 2026, 10, "2026-10-20", {})):find("validé", 1, true),
+	nil
+)
 local blk_goal = assemble.month_block(five, 2026, 9, "2026-10-20", { goal_hours = 3 }, fr, false)
-check("plusieurs mois : septembre, 30 jours, 0 jour validé (les jours d'octobre ne comptent pas pour les jours)", strip(blk_goal.lines[#blk_goal.lines]), "  Semaines validées : 0/5 / Jours validés : 0/30")
+check(
+	"plusieurs mois : septembre, 30 jours, 0 jour validé (les jours d'octobre ne comptent pas pour les jours)",
+	strip(blk_goal.lines[#blk_goal.lines]),
+	"  Semaines validées : 0/5 / Jours validés : 0/30"
+)
 local blk_oct = assemble.month_block(five, 2026, 10, "2026-10-20", { goal_hours = 3 }, en, true)
-check("plusieurs mois, anglais : la ligne du bas", strip(blk_oct.lines[#blk_oct.lines]), "  Validated weeks : 1/5 / Validated days : 5/31")
+check(
+	"plusieurs mois, anglais : la ligne du bas",
+	strip(blk_oct.lines[#blk_oct.lines]),
+	"  Validated weeks : 1/5 / Validated days : 5/31"
+)
 check("plusieurs mois : toujours 21 lignes", #blk_oct.lines, 21)
-check("plusieurs mois : le titre le plus long tient dans 65 colonnes", (function()
-	local long = {}
-	for d = 1, 30 do
-		long[string.format("2026-09-%02d", d)] = 86399
-	end
-	for _, labels in ipairs({ fr, en }) do
-		local b = assemble.month_block(long, 2026, 9, "2026-10-20", { goal_hours = 3 }, labels, true)
-		for _, line in ipairs(b.lines) do
-			if utf8.len(strip(line)) > 65 then
-				return strip(line)
+check(
+	"plusieurs mois : le titre le plus long tient dans 65 colonnes",
+	(function()
+		local long = {}
+		for d = 1, 30 do
+			long[string.format("2026-09-%02d", d)] = 86399
+		end
+		for _, labels in ipairs({ fr, en }) do
+			local b = assemble.month_block(long, 2026, 9, "2026-10-20", { goal_hours = 3 }, labels, true)
+			for _, line in ipairs(b.lines) do
+				if utf8.len(strip(line)) > 65 then
+					return strip(line)
+				end
 			end
 		end
-	end
-	return true
-end)(), true)
+		return true
+	end)(),
+	true
+)
 -- ---- les encadrés : chaque mois dans son cadre, compact (les textes sont posés sur les traits)
 local grid_cfg = { borders = true }
 local boxed = lines_of(strip(render(days, 2026, 10, "2026-10-12", grid_cfg)))
 -- mois seul, octobre 2026 (5 semaines) : vide, haut (titre), jonction (jours), 5 semaines de 2 lignes séparées par un
 -- trait, la fermeture de la grille, moyenne, meilleur jour, bas, légende
-check("cadre : le titre sur le haut du cadre, sans « Logtime : »", boxed[2], " ╭─ Octobre 2026   Total du mois : 5h45 / Jours actifs : 3 ─────╮")
-check("cadre : les jours de la semaine sur la jonction", boxed[3], " ├──Lun───┬──Mar───┬──Mer───┬──Jeu───┬──Ven───┬──Sam───┬──Dim───┤")
-check("cadre : la 1re semaine, numéros", boxed[4], " │        │        │        │  1     │  2     │  3     │  4     │")
-check("cadre : la 1re semaine, durées", boxed[5], " │        │        │        │   ·    │   ·    │   ·    │   ·    │")
-check("cadre : un trait entre deux semaines", boxed[6], " ├────────┼────────┼────────┼────────┼────────┼────────┼────────┤")
-check("cadre : la dernière semaine (numéros, durées), puis directement la fermeture de la grille", boxed[16]:find(" │ 26", 1, true) == 1 and boxed[17]:find("├", 1, true) == nil and boxed[18]:find("┴", 1, true) ~= nil, true)
-check("cadre : la grille se ferme avant les statistiques", boxed[18], " ├────────┴────────┴────────┴────────┴────────┴────────┴────────┤")
-check("cadre : la moyenne dans le cadre", boxed[19], " │ Moyenne par jour actif : 1h55                                │")
-check("cadre : le meilleur jour dans le cadre", boxed[20], " │ Meilleur jour : 10 (4h13)   Série en cours : 3 j             │")
-check("cadre sans objectif : le bas, sans texte", boxed[21], " ╰──────────────────────────────────────────────────────────────╯")
-check("cadre : la légende des couleurs reste dehors", boxed[22], "  ██ <1h   ██ 1-3h   ██ 3-6h   ██ 6h+     * = aujourd'hui")
-check("cadre : un seul haut et un seul bas", select(2, table.concat(boxed, "\n"):gsub("╭", "")) .. select(2, table.concat(boxed, "\n"):gsub("╰", "")), "11")
+check(
+	"cadre : le titre sur le haut du cadre, sans « Logtime : »",
+	boxed[2],
+	" ╭─ Octobre 2026   Total du mois : 5h45 / Jours actifs : 3 ─────╮"
+)
+check(
+	"cadre : les jours de la semaine sur la jonction",
+	boxed[3],
+	" ├──Lun───┬──Mar───┬──Mer───┬──Jeu───┬──Ven───┬──Sam───┬──Dim───┤"
+)
+check(
+	"cadre : la 1re semaine, numéros",
+	boxed[4],
+	" │        │        │        │  1     │  2     │  3     │  4     │"
+)
+check(
+	"cadre : la 1re semaine, durées",
+	boxed[5],
+	" │        │        │        │   ·    │   ·    │   ·    │   ·    │"
+)
+check(
+	"cadre : un trait entre deux semaines",
+	boxed[6],
+	" ├────────┼────────┼────────┼────────┼────────┼────────┼────────┤"
+)
+check(
+	"cadre : la dernière semaine (numéros, durées), puis directement la fermeture de la grille",
+	boxed[16]:find(" │ 26", 1, true) == 1
+		and boxed[17]:find("├", 1, true) == nil
+		and boxed[18]:find("┴", 1, true) ~= nil,
+	true
+)
+check(
+	"cadre : la grille se ferme avant les statistiques",
+	boxed[18],
+	" ├────────┴────────┴────────┴────────┴────────┴────────┴────────┤"
+)
+check(
+	"cadre : la moyenne dans le cadre",
+	boxed[19],
+	" │ Moyenne par jour actif : 1h55                                │"
+)
+check(
+	"cadre : le meilleur jour dans le cadre",
+	boxed[20],
+	" │ Meilleur jour : 10 (4h13)   Série en cours : 3 j             │"
+)
+check(
+	"cadre sans objectif : le bas, sans texte",
+	boxed[21],
+	" ╰──────────────────────────────────────────────────────────────╯"
+)
+check(
+	"cadre : la légende des couleurs reste dehors",
+	boxed[22],
+	"  ██ <1h   ██ 1-3h   ██ 3-6h   ██ 6h+     * = aujourd'hui"
+)
+check(
+	"cadre : un seul haut et un seul bas",
+	select(2, table.concat(boxed, "\n"):gsub("╭", "")) .. select(2, table.concat(boxed, "\n"):gsub("╰", "")),
+	"11"
+)
 check("cadre : la 2e semaine, avec la durée du 10", boxed[8]:find("│  4h13  │", 1, true) ~= nil, true)
 local boxed_goal_lines = lines_of(strip(render(days, 2026, 10, "2026-10-12", { borders = true, goal_hours = 3 })))
-check("cadre avec un objectif : les validés sur le bas du cadre", boxed_goal_lines[21], " ╰─ Semaines validées : 0/5 / Jours validés : 1/31 ─────────────╯")
-check("cadre : toutes les lignes du cadre font 65 colonnes, pour les 4 styles", (function()
-	for style in pairs(assemble.BORDER_STYLES) do
-		local ls = lines_of(strip(render(days, 2026, 10, "2026-10-12", { borders = true, border_style = style, goal_hours = 3 })))
-		for i = 2, #ls - 1 do
-			if utf8.len(ls[i]) ~= 65 then
-				return style .. " ligne " .. i .. " : " .. utf8.len(ls[i])
+check(
+	"cadre avec un objectif : les validés sur le bas du cadre",
+	boxed_goal_lines[21],
+	" ╰─ Semaines validées : 0/5 / Jours validés : 1/31 ─────────────╯"
+)
+check(
+	"cadre : toutes les lignes du cadre font 65 colonnes, pour les 4 styles",
+	(function()
+		for style in pairs(assemble.BORDER_STYLES) do
+			local ls = lines_of(
+				strip(render(days, 2026, 10, "2026-10-12", { borders = true, border_style = style, goal_hours = 3 }))
+			)
+			for i = 2, #ls - 1 do
+				if utf8.len(ls[i]) ~= 65 then
+					return style .. " ligne " .. i .. " : " .. utf8.len(ls[i])
+				end
 			end
 		end
-	end
-	return true
-end)(), true)
+		return true
+	end)(),
+	true
+)
 local dbl = lines_of(strip(render(days, 2026, 10, "2026-10-12", { borders = true, border_style = "double" })))
 check("cadre double : ses coins, ses jonctions", dbl[2]:sub(1, 4) .. dbl[3]:sub(1, 4), " ╔ ╠")
-check("cadre épais : ses croisements", lines_of(strip(render(days, 2026, 10, "2026-10-12", { borders = true, border_style = "heavy" })))[6]:find("╋", 1, true) ~= nil, true)
-check("cadre : style inconnu, l'arrondi", lines_of(strip(render(days, 2026, 10, "2026-10-12", { borders = true, border_style = "zzz" })))[2]:sub(1, 4), " ╭")
-check("cadre : les traits sont dans leur couleur (gris)", render(days, 2026, 10, "2026-10-12", grid_cfg):find(convert.fg(assemble.BORDER_COLOR) .. "╭", 1, true) ~= nil, true)
-check("cadre : les noms des jours ne sont pas dans la couleur des traits (la couleur est remise à zéro juste avant)", render(days, 2026, 10, "2026-10-12", grid_cfg):find(convert.RESET .. "Lun", 1, true) ~= nil, true)
-check("cadre : le titre non plus", render(days, 2026, 10, "2026-10-12", grid_cfg):find(convert.RESET .. " Octobre", 1, true) ~= nil, true)
+check(
+	"cadre épais : ses croisements",
+	lines_of(strip(render(days, 2026, 10, "2026-10-12", { borders = true, border_style = "heavy" })))[6]:find(
+		"╋",
+		1,
+		true
+	) ~= nil,
+	true
+)
+check(
+	"cadre : style inconnu, l'arrondi",
+	lines_of(strip(render(days, 2026, 10, "2026-10-12", { borders = true, border_style = "zzz" })))[2]:sub(1, 4),
+	" ╭"
+)
+check(
+	"cadre : les traits sont dans leur couleur (gris)",
+	render(days, 2026, 10, "2026-10-12", grid_cfg):find(convert.fg(assemble.BORDER_COLOR) .. "╭", 1, true) ~= nil,
+	true
+)
+check(
+	"cadre : les noms des jours ne sont pas dans la couleur des traits (la couleur est remise à zéro juste avant)",
+	render(days, 2026, 10, "2026-10-12", grid_cfg):find(convert.RESET .. "Lun", 1, true) ~= nil,
+	true
+)
+check(
+	"cadre : le titre non plus",
+	render(days, 2026, 10, "2026-10-12", grid_cfg):find(convert.RESET .. " Octobre", 1, true) ~= nil,
+	true
+)
 local grid_goal = render(days, 2026, 10, "2026-10-12", { borders = true, goal_hours = 3 })
-check("cadre : ✓ et rayé toujours là", strip(grid_goal):find("✓ 4h13", 1, true) ~= nil and grid_goal:find("\27[9m0h31", 1, true) ~= nil, true)
+check(
+	"cadre : ✓ et rayé toujours là",
+	strip(grid_goal):find("✓ 4h13", 1, true) ~= nil and grid_goal:find("\27[9m0h31", 1, true) ~= nil,
+	true
+)
 local nov = lines_of(strip(render({}, 2026, 11, "x", grid_cfg)))
-check("cadre : novembre 2026 (6 semaines), la grille se ferme après la 6e semaine", nov[4 + 6 * 3 - 1]:sub(1, 4), " ├")
+check(
+	"cadre : novembre 2026 (6 semaines), la grille se ferme après la 6e semaine",
+	nov[4 + 6 * 3 - 1]:sub(1, 4),
+	" ├"
+)
 -- plusieurs mois : un bloc de 65 x 20, toujours 6 semaines
 local grid_block = assemble.month_block(days, 2026, 10, "2026-10-12", { borders = true, goal_hours = 3 }, fr, false)
 local grid_block_plain = {}
@@ -422,44 +676,97 @@ for i, l in ipairs(grid_block.lines) do
 end
 check("plusieurs mois encadrés : 20 lignes", #grid_block.lines, 20)
 check("plusieurs mois encadrés : largeur 65", grid_block.width, 65)
-check("plusieurs mois encadrés : le titre sur le haut", grid_block_plain[1], " ╭─ Octobre 2026   Total du mois : 5h45 / Jours actifs : 3 ─────╮")
-check("plusieurs mois encadrés : les jours sur la jonction", grid_block_plain[2], " ├──Lun───┬──Mar───┬──Mer───┬──Jeu───┬──Ven───┬──Sam───┬──Dim───┤")
-check("plusieurs mois encadrés : une 6e semaine vide (octobre en a 5)", grid_block_plain[18] .. "|" .. grid_block_plain[19], " │        │        │        │        │        │        │        │| │        │        │        │        │        │        │        │")
-check("plusieurs mois encadrés : les validés sur le bas, avec les jonctions des cases après le texte", grid_block_plain[20], " ╰─ Semaines validées : 0/5 / Jours validés : 1/31 ────┴────────╯")
-check("plusieurs mois encadrés sans objectif : le bas avec ses jonctions", strip(assemble.month_block(days, 2026, 10, "x", grid_cfg, fr, false).lines[20]), " ╰────────┴────────┴────────┴────────┴────────┴────────┴────────╯")
-check("plusieurs mois encadrés : chaque ligne fait 65 colonnes", (function()
-	for i, l in ipairs(grid_block_plain) do
-		if utf8.len(l) ~= 65 then
-			return i
+check(
+	"plusieurs mois encadrés : le titre sur le haut",
+	grid_block_plain[1],
+	" ╭─ Octobre 2026   Total du mois : 5h45 / Jours actifs : 3 ─────╮"
+)
+check(
+	"plusieurs mois encadrés : les jours sur la jonction",
+	grid_block_plain[2],
+	" ├──Lun───┬──Mar───┬──Mer───┬──Jeu───┬──Ven───┬──Sam───┬──Dim───┤"
+)
+check(
+	"plusieurs mois encadrés : une 6e semaine vide (octobre en a 5)",
+	grid_block_plain[18] .. "|" .. grid_block_plain[19],
+	" │        │        │        │        │        │        │        │| │        │        │        │        │        │        │        │"
+)
+check(
+	"plusieurs mois encadrés : les validés sur le bas, avec les jonctions des cases après le texte",
+	grid_block_plain[20],
+	" ╰─ Semaines validées : 0/5 / Jours validés : 1/31 ────┴────────╯"
+)
+check(
+	"plusieurs mois encadrés sans objectif : le bas avec ses jonctions",
+	strip(assemble.month_block(days, 2026, 10, "x", grid_cfg, fr, false).lines[20]),
+	" ╰────────┴────────┴────────┴────────┴────────┴────────┴────────╯"
+)
+check(
+	"plusieurs mois encadrés : chaque ligne fait 65 colonnes",
+	(function()
+		for i, l in ipairs(grid_block_plain) do
+			if utf8.len(l) ~= 65 then
+				return i
+			end
 		end
-	end
-	return true
-end)(), true)
+		return true
+	end)(),
+	true
+)
 local selected_block = assemble.month_block(days, 2026, 10, "2026-10-12", { borders = true, goal_hours = 3 }, fr, true)
-check("mois choisi encadré : le titre en gras, aligné comme les autres", strip(selected_block.lines[1]), grid_block_plain[1])
+check(
+	"mois choisi encadré : le titre en gras, aligné comme les autres",
+	strip(selected_block.lines[1]),
+	grid_block_plain[1]
+)
 check("mois choisi encadré : le gras est bien là", selected_block.lines[1]:find("\27[1m", 1, true) ~= nil, true)
-check("février 2021 (4 semaines) encadré : 20 lignes aussi", #assemble.month_block({}, 2021, 2, "x", grid_cfg, fr, false).lines, 20)
-check("novembre 2026 (6 semaines) encadré : 20 lignes", #assemble.month_block({}, 2026, 11, "x", grid_cfg, fr, false).lines, 20)
-check("le titre le plus long tient sur le haut du cadre (septembre, 744h00, 30 jours actifs)", (function()
-	local long = {}
-	for d = 1, 30 do
-		long[string.format("2026-09-%02d", d)] = 89280
-	end
-	for _, labels in ipairs({ fr, en }) do
-		local first = strip(assemble.month_block(long, 2026, 9, "x", grid_cfg, labels, true).lines[1])
-		if utf8.len(first) ~= 65 or not first:find("╮$") then
-			return first
+check(
+	"février 2021 (4 semaines) encadré : 20 lignes aussi",
+	#assemble.month_block({}, 2021, 2, "x", grid_cfg, fr, false).lines,
+	20
+)
+check(
+	"novembre 2026 (6 semaines) encadré : 20 lignes",
+	#assemble.month_block({}, 2026, 11, "x", grid_cfg, fr, false).lines,
+	20
+)
+check(
+	"le titre le plus long tient sur le haut du cadre (septembre, 744h00, 30 jours actifs)",
+	(function()
+		local long = {}
+		for d = 1, 30 do
+			long[string.format("2026-09-%02d", d)] = 89280
 		end
-	end
-	return true
-end)(), true)
+		for _, labels in ipairs({ fr, en }) do
+			local first = strip(assemble.month_block(long, 2026, 9, "x", grid_cfg, labels, true).lines[1])
+			if utf8.len(first) ~= 65 or not first:find("╮$") then
+				return first
+			end
+		end
+		return true
+	end)(),
+	true
+)
 check("assemble.width / height : sans encadrés", assemble.width({}) .. "x" .. assemble.height({}), "65x21")
-check("assemble.width / height : avec (plus petit que sans)", assemble.width(grid_cfg) .. "x" .. assemble.height(grid_cfg), "65x20")
+check(
+	"assemble.width / height : avec (plus petit que sans)",
+	assemble.width(grid_cfg) .. "x" .. assemble.height(grid_cfg),
+	"65x20"
+)
 check("sans encadrés : aucune ligne de trait", render(days, 2026, 10, "2026-10-12", {}):find("─", 1, true), nil)
 
 local blue = render(days, 2026, 10, "2026-10-12", { borders = true, border_color = "#3366CC" })
-check("couleur du trait : le cadre du mois dans cette couleur", blue:find(convert.fg("#3366CC") .. "╭", 1, true) ~= nil, true)
-check("couleur du trait : la grille des cases aussi", blue:find(convert.fg("#3366CC") .. "├────────┼", 1, true) ~= nil and blue:find(convert.fg("#3366CC") .. "│", 1, true) ~= nil, true)
+check(
+	"couleur du trait : le cadre du mois dans cette couleur",
+	blue:find(convert.fg("#3366CC") .. "╭", 1, true) ~= nil,
+	true
+)
+check(
+	"couleur du trait : la grille des cases aussi",
+	blue:find(convert.fg("#3366CC") .. "├────────┼", 1, true) ~= nil
+		and blue:find(convert.fg("#3366CC") .. "│", 1, true) ~= nil,
+	true
+)
 -- (le gris reste celui du texte des jours vides : on ne cherche que les traits en gris)
 local function gray_border(text)
 	for _, c in ipairs({ "╭", "╮", "╰", "╯", "│", "├", "┤", "─" }) do
@@ -470,28 +777,75 @@ local function gray_border(text)
 	return nil
 end
 check("couleur du trait : plus aucun trait gris", gray_border(blue), nil)
-check("couleur du trait mal écrite : le gris", render(days, 2026, 10, "2026-10-12", { borders = true, border_color = "bleu" }):find(convert.fg(assemble.BORDER_COLOR) .. "╭", 1, true) ~= nil, true)
-check("couleur du trait en minuscules : acceptée", render(days, 2026, 10, "2026-10-12", { borders = true, border_color = "#3366cc" }):find(convert.fg("#3366CC") .. "╭", 1, true) ~= nil, true)
-local blue_block = table.concat(assemble.month_block(days, 2026, 10, "x", { borders = true, border_color = "#3366CC" }, fr, true).lines, "\n")
-check("couleur du trait : plusieurs mois aussi", blue_block:find(convert.fg("#3366CC") .. "╰", 1, true) ~= nil and gray_border(blue_block) == nil, true)
+check(
+	"couleur du trait mal écrite : le gris",
+	render(days, 2026, 10, "2026-10-12", { borders = true, border_color = "bleu" }):find(
+		convert.fg(assemble.BORDER_COLOR) .. "╭",
+		1,
+		true
+	) ~= nil,
+	true
+)
+check(
+	"couleur du trait en minuscules : acceptée",
+	render(days, 2026, 10, "2026-10-12", { borders = true, border_color = "#3366cc" }):find(
+		convert.fg("#3366CC") .. "╭",
+		1,
+		true
+	) ~= nil,
+	true
+)
+local blue_block = table.concat(
+	assemble.month_block(days, 2026, 10, "x", { borders = true, border_color = "#3366CC" }, fr, true).lines,
+	"\n"
+)
+check(
+	"couleur du trait : plusieurs mois aussi",
+	blue_block:find(convert.fg("#3366CC") .. "╰", 1, true) ~= nil and gray_border(blue_block) == nil,
+	true
+)
 
 check("dates.key_any : le 0 octobre est le 30 septembre", dates.key_any(2026, 10, 0), "2026-09-30")
 check("dates.key_any : le 32 décembre est le 1er janvier", dates.key_any(2026, 12, 32), "2027-01-01")
 check("dates.key_any : un jour normal", dates.key_any(2026, 10, 12), "2026-10-12")
 check("dates.key_any : au changement d'heure (25 octobre 2026)", dates.key_any(2026, 10, 25), "2026-10-25")
-check("month_block sans objectif : largeur 65", assemble.month_block(days, 2026, 10, "2026-10-12", {}, fr, false).width, 65)
-check("month_block avec un objectif : largeur 65 aussi", assemble.month_block(days, 2026, 10, "2026-10-12", { goal_hours = 3 }, fr, false).width, 65)
+check(
+	"month_block sans objectif : largeur 65",
+	assemble.month_block(days, 2026, 10, "2026-10-12", {}, fr, false).width,
+	65
+)
+check(
+	"month_block avec un objectif : largeur 65 aussi",
+	assemble.month_block(days, 2026, 10, "2026-10-12", { goal_hours = 3 }, fr, false).width,
+	65
+)
 check("assemble.width : objectif 0 (aucun) = 65", assemble.width({ goal_hours = 0 }), 65)
-check("mois à venir : rien n'est rayé", render({ ["2026-11-01"] = 60 }, 2026, 11, "2026-10-12", { goal_hours = 3 }):find("\27[9m", 1, true), nil)
+check(
+	"mois à venir : rien n'est rayé",
+	render({ ["2026-11-01"] = 60 }, 2026, 11, "2026-10-12", { goal_hours = 3 }):find("\27[9m", 1, true),
+	nil
+)
 local block = assemble.month_block(days, 2026, 10, "2026-10-12", { goal_hours = 3 }, fr, false)
 local block_text = table.concat(block.lines, "\n")
-check("plusieurs mois (month_block) : ✓ et rayé aussi", block_text:find("✓ 4h13", 1, true) ~= nil and block_text:find("\27[9m0h31", 1, true) ~= nil, true)
+check(
+	"plusieurs mois (month_block) : ✓ et rayé aussi",
+	block_text:find("✓ 4h13", 1, true) ~= nil and block_text:find("\27[9m0h31", 1, true) ~= nil,
+	true
+)
 local empty = lines_of(strip(render({}, 2026, 10, "2026-10-12")))
-check("mois vide : totaux à zéro (dans le titre)", empty[2], "  Logtime : Octobre 2026   Total du mois : 0h00 / Jours actifs : 0")
+check(
+	"mois vide : totaux à zéro (dans le titre)",
+	empty[2],
+	"  Logtime : Octobre 2026   Total du mois : 0h00 / Jours actifs : 0"
+)
 check("mois vide : moyenne à zéro", empty[#empty - 2], "  Moyenne par jour actif : 0h00")
 check("mois vide : pas de meilleur jour, série à zéro", empty[#empty - 1], "  Série en cours : 0 j")
 local custom_thresholds = lines_of(strip(render({}, 2026, 10, "x", { thresholds = { 2, 4, 8 } })))
-check("légende : seuils personnalisés", custom_thresholds[#custom_thresholds], "  ██ <2h   ██ 2-4h   ██ 4-8h   ██ 8h+     * = aujourd'hui")
+check(
+	"légende : seuils personnalisés",
+	custom_thresholds[#custom_thresholds],
+	"  ██ <2h   ██ 2-4h   ██ 4-8h   ██ 8h+     * = aujourd'hui"
+)
 
 -- anglais
 local english = lines_of(strip(render(days, 2026, 10, "2026-10-12", {}, en)))
@@ -505,19 +859,19 @@ check("anglais : légende", english[#english]:match("%* = today$"), "* = today")
 -- calendar/assemble.lua : les couleurs
 -- ============================================================
 local function single_day(secs, cfg)
-return render({ ["2026-10-05"] = secs }, 2026, 10, "x", cfg)
+	return render({ ["2026-10-05"] = secs }, 2026, 10, "x", cfg)
 end
 local HEAT = { "#2E3644", "#5A5240", "#8C7A4A", "#C9AB6B" }
 local function has_bg(text, hex)
-return text:find(convert.bg(hex), 1, true) ~= nil
+	return text:find(convert.bg(hex), 1, true) ~= nil
 end
 local function only_bg(text, hex)
-for _, other in ipairs(HEAT) do
-if (other == hex) ~= has_bg(text, other) then
-return false
-end
-end
-return true
+	for _, other in ipairs(HEAT) do
+		if (other == hex) ~= has_bg(text, other) then
+			return false
+		end
+	end
+	return true
 end
 check("niveau 1 : 3599 s (juste sous 1 h)", only_bg(single_day(3599), HEAT[1]), true)
 check("niveau 2 : 3600 s (1 h pile)", only_bg(single_day(3600), HEAT[2]), true)
@@ -529,34 +883,50 @@ check("niveau 4 : 100000 s", only_bg(single_day(100000), HEAT[4]), true)
 check("aucun temps : aucun fond", only_bg(single_day(0), "aucun"), true)
 check("texte clair sur le fond bronze (niveau 3)", single_day(10800):find(convert.fg("#ECE6D9"), 1, true) ~= nil, true)
 check("texte sombre sur le fond doré (niveau 4)", single_day(21600):find(convert.fg("#17191F"), 1, true) ~= nil, true)
-check("seuils personnalisés : 1 h est maintenant le niveau 1 avec {2,4,8}", only_bg(single_day(3600, { thresholds = { 2, 4, 8 } }), HEAT[1]), true)
-check("couleurs personnalisées : le fond du niveau 2", has_bg(single_day(3600, { heat = { "#111111", "#222222", "#333333", "#444444" } }), "#222222"), true)
+check(
+	"seuils personnalisés : 1 h est maintenant le niveau 1 avec {2,4,8}",
+	only_bg(single_day(3600, { thresholds = { 2, 4, 8 } }), HEAT[1]),
+	true
+)
+check(
+	"couleurs personnalisées : le fond du niveau 2",
+	has_bg(single_day(3600, { heat = { "#111111", "#222222", "#333333", "#444444" } }), "#222222"),
+	true
+)
 
 -- une fonction de couleur personnalisée (la future échelle de dégradé) remplace les niveaux
 local received = {}
 local function gradient(secs)
-received[#received + 1] = secs
-if secs <= 0 then
-return nil
-end
-return "#123456"
+	received[#received + 1] = secs
+	if secs <= 0 then
+		return nil
+	end
+	return "#123456"
 end
 local custom = single_day(7200, { cell_color = gradient })
 check("fonction de couleur : son fond est utilisé", has_bg(custom, "#123456"), true)
 check("fonction de couleur : aucun niveau par défaut", has_bg(custom, HEAT[2]) or has_bg(custom, HEAT[1]), false)
-check("fonction de couleur : appelée avec des secondes entières", received[1] ~= nil and math.type(received[1]) == "integer", true)
+check(
+	"fonction de couleur : appelée avec des secondes entières",
+	received[1] ~= nil and math.type(received[1]) == "integer",
+	true
+)
 check("fonction de couleur : appelée pour chaque jour du mois", #received, 31)
 received = {}
 render({ ["2026-10-05"] = -500, ["2026-10-06"] = 3600 }, 2026, 10, "x", { cell_color = gradient })
 local negative = 0
 for _, secs in ipairs(received) do
-if secs < 0 then
-negative = negative + 1
-end
+	if secs < 0 then
+		negative = negative + 1
+	end
 end
 check("fonction de couleur : jamais appelée avec une valeur négative", negative, 0)
 local custom_lines = lines_of(strip(custom))
-check("fonction de couleur : pas de légende des niveaux, seulement l'étoile", custom_lines[#custom_lines], "  * = aujourd'hui")
+check(
+	"fonction de couleur : pas de légende des niveaux, seulement l'étoile",
+	custom_lines[#custom_lines],
+	"  * = aujourd'hui"
+)
 
 -- ============================================================
 -- calendar/assemble.lua : robustesse
@@ -568,33 +938,37 @@ check("valeur énorme : affichée sans erreur", odd[2][3].text ~= "", true)
 
 local property_ok = true
 for year = 2020, 2031 do
-for month = 1, 12 do
-for _, start in ipairs({ "monday", "sunday" }) do
-local ok, weeks_out = pcall(function()
-return grid(render({ [dates.key(year, month, 1)] = 100 }, year, month, "x", { week_starts_on = start }))
-end)
-if not ok or #weeks_out < 4 or #weeks_out > 6 then
-property_ok = false
-else
-local expected_day, in_order = 1, true
-for _, week in ipairs(weeks_out) do
-for col = 1, 7 do
-if week[col].day then
-if week[col].day ~= expected_day then
-in_order = false
+	for month = 1, 12 do
+		for _, start in ipairs({ "monday", "sunday" }) do
+			local ok, weeks_out = pcall(function()
+				return grid(render({ [dates.key(year, month, 1)] = 100 }, year, month, "x", { week_starts_on = start }))
+			end)
+			if not ok or #weeks_out < 4 or #weeks_out > 6 then
+				property_ok = false
+			else
+				local expected_day, in_order = 1, true
+				for _, week in ipairs(weeks_out) do
+					for col = 1, 7 do
+						if week[col].day then
+							if week[col].day ~= expected_day then
+								in_order = false
+							end
+							expected_day = expected_day + 1
+						end
+					end
+				end
+				if expected_day - 1 ~= dates.days_in_month(year, month) or not in_order then
+					property_ok = false
+				end
+			end
+		end
+	end
 end
-expected_day = expected_day + 1
-end
-end
-end
-if expected_day - 1 ~= dates.days_in_month(year, month) or not in_order then
-property_ok = false
-end
-end
-end
-end
-end
-check("144 mois (2020 à 2031, deux conventions) : jours 1..n dans l'ordre, 4 à 6 semaines, aucune erreur", property_ok, true)
+check(
+	"144 mois (2020 à 2031, deux conventions) : jours 1..n dans l'ordre, 4 à 6 semaines, aucune erreur",
+	property_ok,
+	true
+)
 check("rendu déterministe", render(days, 2026, 10, "2026-10-12"), render(days, 2026, 10, "2026-10-12"))
 
 -- ============================================================
@@ -603,9 +977,9 @@ check("rendu déterministe", render(days, 2026, 10, "2026-10-12"), render(days, 
 check("aucune écriture sur le disque", #writes, 0)
 local leaked = {}
 for k in pairs(_G) do
-if not globals_before[k] then
-leaked[#leaked + 1] = k
-end
+	if not globals_before[k] then
+		leaked[#leaked + 1] = k
+	end
 end
 check("aucune variable globale ajoutée", table.concat(leaked, ","), "")
 

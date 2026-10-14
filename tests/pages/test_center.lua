@@ -35,7 +35,14 @@ local function check(name, got, want)
 		passed = passed + 1
 	else
 		failed = failed + 1
-		print(string.format("ÉCHEC  %s\n         attendu : %s\n         obtenu  : %s", name, tostring(want), tostring(got)))
+		print(
+			string.format(
+				"ÉCHEC  %s\n         attendu : %s\n         obtenu  : %s",
+				name,
+				tostring(want),
+				tostring(got)
+			)
+		)
 	end
 end
 
@@ -82,9 +89,17 @@ out = layout.center(sample(5, 65), 65, 65, 5)
 check("fenêtre juste de la taille du calendrier : aucune marge à gauche", leading(out[1]), 0)
 check("fenêtre juste de la taille du calendrier : aucune marge en haut", empties(out), 0)
 out = layout.center(sample(40, 65), 65, 50, 20)
-check("fenêtre plus petite que le calendrier : aucune marge, jamais négative", leading(out[1]) == 0 and empties(out) == 0 and #out == 40, true)
+check(
+	"fenêtre plus petite que le calendrier : aucune marge, jamais négative",
+	leading(out[1]) == 0 and empties(out) == 0 and #out == 40,
+	true
+)
 out = layout.center(sample(3, 76), 65, 80, 10)
-check("une ligne plus large que le calendrier (l'aide, 76) : la marge est réduite pour qu'elle tienne (80 - 76)", leading(out[#out]), 4)
+check(
+	"une ligne plus large que le calendrier (l'aide, 76) : la marge est réduite pour qu'elle tienne (80 - 76)",
+	leading(out[#out]),
+	4
+)
 out = layout.center(sample(3, 76), 65, 70, 10)
 check("ligne plus large que la fenêtre : aucune marge", leading(out[#out]), 0)
 out = layout.center(sample(2, 65), 65, nil, nil)
@@ -103,7 +118,11 @@ check("la liste d'origine n'est pas modifiée", input[1] .. input[2] .. input[3]
 local colored = "\27[48;2;1;2;3m" .. string.rep("y", 65) .. "\27[0m"
 out = layout.center({ colored }, 65, 165, 3)
 check("lignes colorées : la marge est devant les codes de couleur", out[#out], string.rep(" ", 50) .. colored)
-check("lignes colorées : la largeur visible est celle du texte, pas des codes", layout.visible_width(out[#out]), 50 + 65)
+check(
+	"lignes colorées : la largeur visible est celle du texte, pas des codes",
+	layout.visible_width(out[#out]),
+	50 + 65
+)
 
 local seed = 777
 local function rnd(n)
@@ -137,13 +156,25 @@ check("400 tailles au hasard : centrer ne fait jamais déborder ce qui tenait, e
 -- ============================================================
 local function new_state()
 	local w = { events = {}, logs = { error = {}, info = {} }, panes = {}, spawned = {}, GLOBAL = {} }
-	w.log_error = function(m) w.logs.error[#w.logs.error + 1] = m end
-	w.log_info = function(m) w.logs.info[#w.logs.info + 1] = m end
+	w.log_error = function(m)
+		w.logs.error[#w.logs.error + 1] = m
+	end
+	w.log_info = function(m)
+		w.logs.info[#w.logs.info + 1] = m
+	end
 	w.action = {
-		EmitEvent = function(name) return { kind = "EmitEvent", name = name } end,
-		ActivateKeyTable = function(t) return { kind = "ActivateKeyTable", args = t } end,
-		SendKey = function(t) return { kind = "SendKey", args = t } end,
-		CloseCurrentTab = function(t) return { kind = "CloseCurrentTab", args = t } end,
+		EmitEvent = function(name)
+			return { kind = "EmitEvent", name = name }
+		end,
+		ActivateKeyTable = function(t)
+			return { kind = "ActivateKeyTable", args = t }
+		end,
+		SendKey = function(t)
+			return { kind = "SendKey", args = t }
+		end,
+		CloseCurrentTab = function(t)
+			return { kind = "CloseCurrentTab", args = t }
+		end,
 		PopKeyTable = { kind = "PopKeyTable" },
 	}
 	w.on = function(event, handler)
@@ -151,23 +182,34 @@ local function new_state()
 		table.insert(w.events[event], handler)
 	end
 	w.time = { call_after = function() end }
-	w.mux = { get_pane = function(id)
-		local pane = w.panes[id]
-		if not pane then
-			error("pane id " .. tostring(id) .. " not found in mux")
-		end
-		return pane
-	end }
+	w.mux = {
+		get_pane = function(id)
+			local pane = w.panes[id]
+			if not pane then
+				error("pane id " .. tostring(id) .. " not found in mux")
+			end
+			return pane
+		end,
+	}
 	w.next_id = 120
 	function w.new_pane(cols, rows)
 		w.next_id = w.next_id + 1
 		local tab = {}
 		function tab:activate() end
-		local pane = { id = w.next_id, injected = {}, dims = { viewport_rows = rows or 40, cols = cols or 120 }, the_tab = tab }
-		function pane:pane_id() return self.id end
-		function pane:get_dimensions() return self.dims end
-		function pane:inject_output(text) self.injected[#self.injected + 1] = text end
-		function pane:tab() return self.the_tab end
+		local pane =
+			{ id = w.next_id, injected = {}, dims = { viewport_rows = rows or 40, cols = cols or 120 }, the_tab = tab }
+		function pane:pane_id()
+			return self.id
+		end
+		function pane:get_dimensions()
+			return self.dims
+		end
+		function pane:inject_output(text)
+			self.injected[#self.injected + 1] = text
+		end
+		function pane:tab()
+			return self.the_tab
+		end
 		w.panes[pane.id] = pane
 		return pane
 	end
@@ -175,30 +217,54 @@ local function new_state()
 end
 local function new_window(w, cols, rows)
 	local win = { performed = {} }
-	function win:perform_action(action, pane) self.performed[#self.performed + 1] = action.kind end
+	function win:perform_action(action, pane)
+		self.performed[#self.performed + 1] = action.kind
+	end
 	function win:toast_notification() end
 	function win:mux_window()
-		return { spawn_tab = function(_, spec)
-			local pane = w.new_pane(cols, rows)
-			w.spawned[#w.spawned + 1] = pane
-			return pane.the_tab, pane, nil
-		end }
+		return {
+			spawn_tab = function(_, spec)
+				local pane = w.new_pane(cols, rows)
+				w.spawned[#w.spawned + 1] = pane
+				return pane.the_tab, pane, nil
+			end,
+		}
 	end
 	return win
 end
-local DAYS = { ["2026-10-10"] = 15231, ["2026-10-12"] = 3600, ["2026-09-14"] = 7200, ["2026-08-03"] = 3600, ["2026-07-21"] = 20000 }
+local DAYS = {
+	["2026-10-10"] = 15231,
+	["2026-10-12"] = 3600,
+	["2026-09-14"] = 7200,
+	["2026-08-03"] = 3600,
+	["2026-07-21"] = 20000,
+}
 local function new_page(w, cfg)
 	local settings = { week_starts_on = "monday", day_offset = 0 }
 	for k, v in pairs(cfg or {}) do
 		settings[k] = v
 	end
 	return calendar_page.create({
-wezterm = w, G = w.GLOBAL, num = function(v) return v end,
-days = function() return DAYS end,
-		today_key = function() return "2026-10-13" end,
-		cfg = function() return settings end,
-		labels = function() return fr end,
-		blocker_args = function() return platform.blocker_args("windows") end,
+		wezterm = w,
+		G = w.GLOBAL,
+		num = function(v)
+			return v
+		end,
+		days = function()
+			return DAYS
+		end,
+		today_key = function()
+			return "2026-10-13"
+		end,
+		cfg = function()
+			return settings
+		end,
+		labels = function()
+			return fr
+		end,
+		blocker_args = function()
+			return platform.blocker_args("windows")
+		end,
 	})
 end
 local function strip(text)
@@ -254,7 +320,11 @@ check("un mois : aucune ligne ne dépasse la largeur de la fenêtre", widest <= 
 -- centrage désactivé
 w, page, pane = open({ center = false }, 120, 40)
 lines = drawn(pane)
-check("center = false : la première ligne est l'aide, tout en haut", lines[1]:find("Logtime   ← →", 1, true) == 3, true)
+check(
+	"center = false : la première ligne est l'aide, tout en haut",
+	lines[1]:find("Logtime   ← →", 1, true) == 3,
+	true
+)
 _, header = find_line(lines, "Lun")
 check("center = false : l'en-tête garde sa position d'origine (5 espaces)", leading(header), 5)
 
@@ -263,7 +333,11 @@ local raw_text, count, width = page.build_text()
 check("build_text sans taille : première ligne = l'aide, sans marge", lines_of(raw_text)[1]:sub(1, 11), "  Logtime  ")
 check("build_text sans taille : un mois, de la largeur du calendrier", count == 1 and width == layout.BLOCK_WIDTH, true)
 raw_text, count, width = page.build_text({ cols = 140, rows = 60 })
-check("build_text avec taille : le texte lui-même n'est pas centré (c'est le dessin qui le fait)", lines_of(raw_text)[1]:sub(1, 11), "  Logtime  ")
+check(
+	"build_text avec taille : le texte lui-même n'est pas centré (c'est le dessin qui le fait)",
+	lines_of(raw_text)[1]:sub(1, 11),
+	"  Logtime  "
+)
 check("build_text : quatre mois, 2 x 65 + 3 de largeur", count == 4 and width == 133, true)
 raw_text, count, width = page.build_text({ cols = 400, rows = 25 })
 check("build_text : cinq mois sur une rangée, 5 x 65 + 4 x 3 de largeur", count == 5 and width == 337, true)
@@ -275,7 +349,11 @@ check("quatre mois : marge du haut = (60 - 47) / 2", empties(lines), 6)
 local _, first_title = find_line(lines, "Juillet 2026")
 check("quatre mois : marge à gauche = (140 - 133) / 2 = 3, plus les 2 espaces du titre", leading(first_title), 3 + 2)
 local _, second_title = find_line(lines, "Août 2026")
-check("quatre mois : le second mois est 68 colonnes plus loin (65 + 3)", second_title:find("Août", 1, true) - first_title:find("Juillet", 1, true), 68)
+check(
+	"quatre mois : le second mois est 68 colonnes plus loin (65 + 3)",
+	second_title:find("Août", 1, true) - first_title:find("Juillet", 1, true),
+	68
+)
 check("quatre mois : le dessin tient dans la fenêtre", #lines <= 60, true)
 widest = 0
 for _, line in ipairs(lines) do
@@ -308,31 +386,44 @@ check("aucune erreur pendant ces changements de taille", #w.logs.error, 0)
 -- jamais plus de lignes que la fenêtre, et jamais plus large qu'avant le centrage (la ligne d'aide, large de 77 colonnes,
 -- dépasse déjà d'une fenêtre très étroite : centrer ne doit pas aggraver ça)
 local always_fits = true
-for _, size in ipairs({ { 120, 40 }, { 140, 60 }, { 133, 47 }, { 100, 100 }, { 400, 25 }, { 65, 25 }, { 200, 80 }, { 90, 30 } }) do
-local _, _, centered = open({}, size[1], size[2])
-local _, _, plain = open({ center = false }, size[1], size[2])
-local shown, before = drawn(centered), drawn(plain)
-local widest_after, widest_before = 0, 0
-for _, line in ipairs(shown) do
-widest_after = math.max(widest_after, utf8.len(line))
+for _, size in ipairs({
+	{ 120, 40 },
+	{ 140, 60 },
+	{ 133, 47 },
+	{ 100, 100 },
+	{ 400, 25 },
+	{ 65, 25 },
+	{ 200, 80 },
+	{ 90, 30 },
+}) do
+	local _, _, centered = open({}, size[1], size[2])
+	local _, _, plain = open({ center = false }, size[1], size[2])
+	local shown, before = drawn(centered), drawn(plain)
+	local widest_after, widest_before = 0, 0
+	for _, line in ipairs(shown) do
+		widest_after = math.max(widest_after, utf8.len(line))
+	end
+	for _, line in ipairs(before) do
+		widest_before = math.max(widest_before, utf8.len(line))
+	end
+	if #shown > size[2] or widest_after > math.max(size[1], widest_before) then
+		always_fits = false
+	end
 end
-for _, line in ipairs(before) do
-widest_before = math.max(widest_before, utf8.len(line))
-end
-if #shown > size[2] or widest_after > math.max(size[1], widest_before) then
-always_fits = false
-end
-end
-check("8 tailles de fenêtre : le dessin centré ne dépasse jamais la fenêtre, ni plus qu'avant le centrage", always_fits, true)
+check(
+	"8 tailles de fenêtre : le dessin centré ne dépasse jamais la fenêtre, ni plus qu'avant le centrage",
+	always_fits,
+	true
+)
 
 -- ============================================================
 -- effets de bord
 -- ============================================================
 local leaked = {}
 for k in pairs(_G) do
-if not globals_before[k] then
-leaked[#leaked + 1] = k
-end
+	if not globals_before[k] then
+		leaked[#leaked + 1] = k
+	end
 end
 check("aucune variable globale ajoutée", table.concat(leaked, ","), "")
 

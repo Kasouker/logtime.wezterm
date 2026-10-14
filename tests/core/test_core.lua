@@ -19,7 +19,14 @@ local function check(name, got, want)
 		passed = passed + 1
 	else
 		failed = failed + 1
-		print(string.format("ÉCHEC  %s\n         attendu : %s\n         obtenu  : %s", name, tostring(want), tostring(got)))
+		print(
+			string.format(
+				"ÉCHEC  %s\n         attendu : %s\n         obtenu  : %s",
+				name,
+				tostring(want),
+				tostring(got)
+			)
+		)
 	end
 end
 local function ts(y, mo, d, h, mi, s)
@@ -110,14 +117,14 @@ local base = { normal_gap = 5, sleep_limit = 3600, settle_time = 60, day_offset 
 
 -- Rejoue des instants successifs en conservant l'état du budget de veille entre les appels
 local function run(cfg, steps)
-local days, last, state = {}, nil, {}
-for _, now in ipairs(steps) do
-counter.advance(days, last, now, cfg, state)
-if last == nil or now > last then
-last = now
-end
-end
-return days
+	local days, last, state = {}, nil, {}
+	for _, now in ipairs(steps) do
+		counter.advance(days, last, now, cfg, state)
+		if last == nil or now > last then
+			last = now
+		end
+	end
+	return days
 end
 
 local t0 = ts(2026, 10, 9, 12, 0, 0)
@@ -140,11 +147,17 @@ check("veille à cheval sur minuit : après", d["2026-10-10"], 1800)
 d = run({ normal_gap = 5, sleep_limit = 0, settle_time = 60, day_offset = 0 }, join(seq(t0, 11), { t0 + 10 + 600 }))
 check("sleep_limit = 0 : secondes normales comptées, veille ignorée", d["2026-10-09"], 10)
 
-d = run({ normal_gap = 5, sleep_limit = 86400, settle_time = 60, day_offset = 0 }, { ts(2026, 10, 9, 22, 0, 0), ts(2026, 10, 10, 6, 0, 0) })
+d = run(
+	{ normal_gap = 5, sleep_limit = 86400, settle_time = 60, day_offset = 0 },
+	{ ts(2026, 10, 9, 22, 0, 0), ts(2026, 10, 10, 6, 0, 0) }
+)
 check("sleep_limit très grand : 2 h le soir", d["2026-10-09"], 7200)
 check("sleep_limit très grand : 6 h le matin", d["2026-10-10"], 6 * 3600)
 
-d = run({ normal_gap = 5, sleep_limit = 3600, settle_time = 60, day_offset = -3600 }, seq(ts(2026, 10, 10, 0, 30, 0), 4))
+d = run(
+	{ normal_gap = 5, sleep_limit = 3600, settle_time = 60, day_offset = -3600 },
+	seq(ts(2026, 10, 10, 0, 30, 0), 4)
+)
 check("décalage de jour : 00:30 compte pour la veille", d["2026-10-09"], 3)
 
 local days = {}
@@ -152,7 +165,11 @@ check("même seconde : rien", counter.advance(days, 100, 100, base), false)
 check("horloge qui recule : rien", counter.advance(days, 100, 90, base), false)
 check("premier appel (pas d'instant précédent) : rien", counter.advance(days, nil, 100, base), false)
 check("temps ajouté : renvoie true", counter.advance({}, 100, 101, base), true)
-check("écart au-delà du budget épuisé : renvoie false", counter.advance({}, 0, 7200, base, { budget = 3600 }), false)
+check(
+	"écart au-delà du budget épuisé : renvoie false",
+	counter.advance({}, 0, 7200, base, { budget = 3600 }),
+	false
+)
 
 -- ------------------------------------------------------------
 -- Budget de veille PAR ÉPISODE (et non par écart), avec 65 minutes
@@ -161,54 +178,77 @@ local cfg65 = { normal_gap = 5, sleep_limit = 3900, settle_time = 60, day_offset
 
 -- La chronologie réelle relevée dans le journal Windows (heure de Paris) :
 -- veille à 18:59:09, réveil technique à 20:04:15 pour hiberner, reprise le lendemain à 11:03:31.
-local real = join(
-seq(ts(2026, 10, 10, 18, 58, 0), 60),
-{ ts(2026, 10, 10, 18, 59, 8), ts(2026, 10, 10, 20, 4, 15), ts(2026, 10, 10, 20, 4, 16), ts(2026, 10, 11, 11, 3, 31) },
-seq(ts(2026, 10, 11, 11, 3, 31), 121)
-)
+local real = join(seq(ts(2026, 10, 10, 18, 58, 0), 60), {
+	ts(2026, 10, 10, 18, 59, 8),
+	ts(2026, 10, 10, 20, 4, 15),
+	ts(2026, 10, 10, 20, 4, 16),
+	ts(2026, 10, 11, 11, 3, 31),
+}, seq(ts(2026, 10, 11, 11, 3, 31), 121))
 d = run(cfg65, real)
-check("chronologie réelle : veille de 65 min comptée UNE seule fois (59 + 3900 + 1 + 120)", total(d), 59 + 3900 + 1 + 120)
+check(
+	"chronologie réelle : veille de 65 min comptée UNE seule fois (59 + 3900 + 1 + 120)",
+	total(d),
+	59 + 3900 + 1 + 120
+)
 check("chronologie réelle : l'extinction ne compte pas, le 11 ne reçoit que l'utilisation", d["2026-10-11"], 120)
 
 -- Sans état partagé (ancienne règle : un écart = son propre plafond), la même chronologie comptait 1 h de trop
 local days_old, last_old = {}, nil
 for _, now in ipairs(real) do
-counter.advance(days_old, last_old, now, cfg65)
-if last_old == nil or now > last_old then
-last_old = now
-end
+	counter.advance(days_old, last_old, now, cfg65)
+	if last_old == nil or now > last_old then
+		last_old = now
+	end
 end
 check("sans état partagé : l'extinction comptait en trop (ancienne règle)", total(days_old) > total(d) + 3000, true)
 
 local first = ts(2026, 10, 9, 22, 0, 0)
 local steps = { first }
 for k = 1, 7 do
-steps[#steps + 1] = first + 3000 * k
+	steps[#steps + 1] = first + 3000 * k
 end
 check("réveils de maintenance toutes les 50 min : 65 min au total", total(run(cfg65, steps)), 3900)
 
 local t1 = ts(2026, 10, 9, 14, 0, 0)
-check("veille 30 min + 2 min d'utilisation + veille 40 min : tout compte",
-total(run(cfg65, join({ t1, t1 + 1800 }, seq(t1 + 1800, 121), { t1 + 1800 + 120 + 2400 }))), 1800 + 120 + 2400)
-check("moins de 60 s d'utilisation entre deux veilles : budget restant seulement",
-total(run(cfg65, join({ t1, t1 + 1800 }, seq(t1 + 1800, 31), { t1 + 1800 + 30 + 4000 }))), 1800 + 30 + 2100)
-check("60 s d'utilisation continue : le budget est rendu",
-total(run(cfg65, join({ t1, t1 + 3900 }, seq(t1 + 3900, 61), { t1 + 3900 + 60 + 3000 }))), 3900 + 60 + 3000)
-check("59 s d'utilisation : le budget n'est pas encore rendu",
-total(run(cfg65, join({ t1, t1 + 3900 }, seq(t1 + 3900, 60), { t1 + 3900 + 59 + 3000 }))), 3900 + 59)
+check(
+	"veille 30 min + 2 min d'utilisation + veille 40 min : tout compte",
+	total(run(cfg65, join({ t1, t1 + 1800 }, seq(t1 + 1800, 121), { t1 + 1800 + 120 + 2400 }))),
+	1800 + 120 + 2400
+)
+check(
+	"moins de 60 s d'utilisation entre deux veilles : budget restant seulement",
+	total(run(cfg65, join({ t1, t1 + 1800 }, seq(t1 + 1800, 31), { t1 + 1800 + 30 + 4000 }))),
+	1800 + 30 + 2100
+)
+check(
+	"60 s d'utilisation continue : le budget est rendu",
+	total(run(cfg65, join({ t1, t1 + 3900 }, seq(t1 + 3900, 61), { t1 + 3900 + 60 + 3000 }))),
+	3900 + 60 + 3000
+)
+check(
+	"59 s d'utilisation : le budget n'est pas encore rendu",
+	total(run(cfg65, join({ t1, t1 + 3900 }, seq(t1 + 3900, 60), { t1 + 3900 + 59 + 3000 }))),
+	3900 + 59
+)
 
 -- La frontière entre fonctionnement normal et trou : un écart de 5 s est normal, un écart de 6 s est un trou
 local function spaced(start, n, step)
-local out = {}
-for i = 0, n - 1 do
-out[#out + 1] = start + i * step
+	local out = {}
+	for i = 0, n - 1 do
+		out[#out + 1] = start + i * step
+	end
+	return out
 end
-return out
-end
-check("écarts de 5 s (normal) pendant 60 s : le budget est rendu",
-total(run(cfg65, join({ t1, t1 + 3900 }, spaced(t1 + 3900, 13, 5), { t1 + 3900 + 60 + 3000 }))), 3900 + 60 + 3000)
-check("écarts de 6 s (des trous) : le budget n'est jamais rendu",
-total(run(cfg65, join({ t1, t1 + 3900 }, spaced(t1 + 3900, 13, 6), { t1 + 3900 + 72 + 3000 }))), 3900)
+check(
+	"écarts de 5 s (normal) pendant 60 s : le budget est rendu",
+	total(run(cfg65, join({ t1, t1 + 3900 }, spaced(t1 + 3900, 13, 5), { t1 + 3900 + 60 + 3000 }))),
+	3900 + 60 + 3000
+)
+check(
+	"écarts de 6 s (des trous) : le budget n'est jamais rendu",
+	total(run(cfg65, join({ t1, t1 + 3900 }, spaced(t1 + 3900, 13, 6), { t1 + 3900 + 72 + 3000 }))),
+	3900
+)
 
 -- une horloge qui recule ne doit pas non plus abîmer l'état conservé entre deux appels
 local st_back = { budget = 5, calm = 7 }
@@ -218,10 +258,16 @@ check("horloge qui recule : calme de l'état intact", st_back.calm, 7)
 
 -- sans settle_time dans la configuration : 60 s par défaut
 local cfg_sans = { normal_gap = 5, sleep_limit = 3900, day_offset = 0 }
-check("settle_time absent : 59 s ne rendent pas le budget",
-total(run(cfg_sans, join({ t1, t1 + 3900 }, seq(t1 + 3900, 60), { t1 + 3900 + 59 + 3000 }))), 3900 + 59)
-check("settle_time absent : 60 s rendent le budget",
-total(run(cfg_sans, join({ t1, t1 + 3900 }, seq(t1 + 3900, 61), { t1 + 3900 + 60 + 3000 }))), 3900 + 60 + 3000)
+check(
+	"settle_time absent : 59 s ne rendent pas le budget",
+	total(run(cfg_sans, join({ t1, t1 + 3900 }, seq(t1 + 3900, 60), { t1 + 3900 + 59 + 3000 }))),
+	3900 + 59
+)
+check(
+	"settle_time absent : 60 s rendent le budget",
+	total(run(cfg_sans, join({ t1, t1 + 3900 }, seq(t1 + 3900, 61), { t1 + 3900 + 60 + 3000 }))),
+	3900 + 60 + 3000
+)
 
 local st = {}
 counter.advance({}, 0, 3000, cfg65, st)

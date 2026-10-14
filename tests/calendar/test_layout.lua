@@ -5,15 +5,15 @@ local root = (arg and arg[0] or ""):match("^(.*)[/\\]tests[/\\]calendar[/\\]test
 
 local globals_before = {}
 for k in pairs(_G) do
-globals_before[k] = true
+	globals_before[k] = true
 end
 local cache = {}
 local function load_module(name)
-if not cache[name] then
-local chunk = assert(loadfile(root .. "/plugin/logtime/" .. name .. ".lua"))
-cache[name] = chunk(load_module)
-end
-return cache[name]
+	if not cache[name] then
+		local chunk = assert(loadfile(root .. "/plugin/logtime/" .. name .. ".lua"))
+		cache[name] = chunk(load_module)
+	end
+	return cache[name]
 end
 local layout = load_module("calendar/layout")
 local assemble = load_module("calendar/assemble")
@@ -23,18 +23,25 @@ local en = load_module("i18n/en")
 
 local passed, failed = 0, 0
 local function check(name, got, want)
-if got == want then
-passed = passed + 1
-else
-failed = failed + 1
-print(string.format("ÉCHEC  %s\n         attendu : %s\n         obtenu  : %s", name, tostring(want), tostring(got)))
-end
+	if got == want then
+		passed = passed + 1
+	else
+		failed = failed + 1
+		print(
+			string.format(
+				"ÉCHEC  %s\n         attendu : %s\n         obtenu  : %s",
+				name,
+				tostring(want),
+				tostring(got)
+			)
+		)
+	end
 end
 local function strip(text)
-return (text:gsub("\27%[[%d;]*m", ""))
+	return (text:gsub("\27%[[%d;]*m", ""))
 end
 local function shape(plan)
-return plan.count .. ":" .. plan.columns .. "x" .. plan.rows
+	return plan.count .. ":" .. plan.columns .. "x" .. plan.rows
 end
 
 -- ============================================================
@@ -67,10 +74,22 @@ check("fenêtre de 132 x 25 : un seul", shape(layout.plan(132, 25)), "1:1x1")
 check("fenêtre de 120 x 40 (la taille par défaut de WezTerm) : un seul", shape(layout.plan(120, 40)), "1:1x1")
 check("fenêtre de 200 x 60 : 2 x 2", shape(layout.plan(200, 60)), "4:2x2")
 check("fenêtre de 65 x 100 : quatre empilés (une colonne)", shape(layout.plan(65, 100)), "4:1x4")
-check("fenêtre de 400 x 25 : cinq côte à côte (une seule rangée tient, et le plafond est de 12)", shape(layout.plan(400, 25)), "5:5x1")
-check("fenêtre de 269 x 91 : douze mois, 4 x 3 (le plafond par défaut est maintenant 12)", shape(layout.plan(269, 91)), "12:4x3")
+check(
+	"fenêtre de 400 x 25 : cinq côte à côte (une seule rangée tient, et le plafond est de 12)",
+	shape(layout.plan(400, 25)),
+	"5:5x1"
+)
+check(
+	"fenêtre de 269 x 91 : douze mois, 4 x 3 (le plafond par défaut est maintenant 12)",
+	shape(layout.plan(269, 91)),
+	"12:4x3"
+)
 check("fenêtre de 201 x 69 : neuf mois, 3 x 3", shape(layout.plan(201, 69)), "9:3x3")
-check("fenêtre de 250 x 60 : six mois, 3 x 2 (quatre seulement avec l'ancien plafond)", shape(layout.plan(250, 60)), "6:3x2")
+check(
+	"fenêtre de 250 x 60 : six mois, 3 x 2 (quatre seulement avec l'ancien plafond)",
+	shape(layout.plan(250, 60)),
+	"6:3x2"
+)
 check("fenêtre de 201 x 47 : six mois, 3 x 2", shape(layout.plan(201, 47)), "6:3x2")
 check("fenêtre de 201 x 25 : trois côte à côte", shape(layout.plan(201, 25)), "3:3x1")
 check("fenêtre de 20 x 5 : jamais moins de un", shape(layout.plan(20, 5)), "1:1x1")
@@ -99,39 +118,47 @@ check("plafond négatif : ramené à 1", layout.plan(1000, 300, -5).count, 1)
 check("plafond décimal : arrondi vers le bas", layout.plan(1000, 300, 2.9).count, 2)
 check("plafond en texte : le plafond par défaut", layout.plan(1000, 300, "beaucoup").count, 12)
 check("plafond de 3 dans une fenêtre 2 x 2 : trois mois, une case vide", shape(layout.plan(133, 47, 3)), "3:2x2")
-check("plafond de 3, fenêtre de 201 x 47 : trois côte à côte plutôt que 2 x 2 avec une case vide", shape(layout.plan(201, 47, 3)), "3:3x1")
+check(
+	"plafond de 3, fenêtre de 201 x 47 : trois côte à côte plutôt que 2 x 2 avec une case vide",
+	shape(layout.plan(201, 47, 3)),
+	"3:3x1"
+)
 
 -- jamais un mois coupé : ce que le plan annonce tient toujours dans la fenêtre
 local seed = 4242
 local function rnd(n)
-seed = (seed * 1103515245 + 12345) % 2147483648
-return seed % n
+	seed = (seed * 1103515245 + 12345) % 2147483648
+	return seed % n
 end
 local never_overflows = true
 for _ = 1, 400 do
-local cols, rows, max = 20 + rnd(400), 5 + rnd(120), 1 + rnd(12)
-local plan = layout.plan(cols, rows, max)
-local used_cols = plan.columns * layout.BLOCK_WIDTH + (plan.columns - 1) * layout.GAP
-local used_rows = layout.RESERVED_ROWS + plan.rows * layout.BLOCK_HEIGHT + (plan.rows - 1)
-local ok = plan.count >= 1 and plan.count <= max and plan.columns * plan.rows >= plan.count
-if plan.count > 1 then
-ok = ok and used_cols <= cols and used_rows <= rows
+	local cols, rows, max = 20 + rnd(400), 5 + rnd(120), 1 + rnd(12)
+	local plan = layout.plan(cols, rows, max)
+	local used_cols = plan.columns * layout.BLOCK_WIDTH + (plan.columns - 1) * layout.GAP
+	local used_rows = layout.RESERVED_ROWS + plan.rows * layout.BLOCK_HEIGHT + (plan.rows - 1)
+	local ok = plan.count >= 1 and plan.count <= max and plan.columns * plan.rows >= plan.count
+	if plan.count > 1 then
+		ok = ok and used_cols <= cols and used_rows <= rows
+	end
+	if not ok then
+		never_overflows = false
+	end
 end
-if not ok then
-never_overflows = false
-end
-end
-check("400 fenêtres au hasard : le plan tient toujours dans la fenêtre, sans dépasser le plafond", never_overflows, true)
+check(
+	"400 fenêtres au hasard : le plan tient toujours dans la fenêtre, sans dépasser le plafond",
+	never_overflows,
+	true
+)
 local grows = true
 for cols = 60, 420, 7 do
-local previous = 0
-for rows = 20, 130, 5 do
-local count = layout.plan(cols, rows, 12).count
-if count < previous then
-grows = false
-end
-previous = count
-end
+	local previous = 0
+	for rows = 20, 130, 5 do
+		local count = layout.plan(cols, rows, 12).count
+		if count < previous then
+			grows = false
+		end
+		previous = count
+	end
 end
 check("plus la fenêtre est haute, plus il y a de mois (jamais moins)", grows, true)
 
@@ -139,30 +166,42 @@ check("plus la fenêtre est haute, plus il y a de mois (jamais moins)", grows, t
 -- months : quels mois
 -- ============================================================
 local function list(months)
-local out = {}
-for _, m in ipairs(months) do
-out[#out + 1] = m.year .. "-" .. m.month
-end
-return table.concat(out, ",")
+	local out = {}
+	for _, m in ipairs(months) do
+		out[#out + 1] = m.year .. "-" .. m.month
+	end
+	return table.concat(out, ",")
 end
 check("le mois choisi est le dernier (par défaut)", list(layout.months(2026, 10, 4)), "2026-7,2026-8,2026-9,2026-10")
 check("ancre « last »", list(layout.months(2026, 10, 4, "last")), "2026-7,2026-8,2026-9,2026-10")
-check("ancre « first » : le mois choisi est le premier", list(layout.months(2026, 10, 4, "first")), "2026-10,2026-11,2026-12,2027-1")
+check(
+	"ancre « first » : le mois choisi est le premier",
+	list(layout.months(2026, 10, 4, "first")),
+	"2026-10,2026-11,2026-12,2027-1"
+)
 check("ancre inconnue : comme « last »", list(layout.months(2026, 10, 2, "milieu")), "2026-9,2026-10")
 check("un seul mois", list(layout.months(2026, 10, 1)), "2026-10")
-check("à cheval sur deux années (ancre « last »)", list(layout.months(2026, 1, 3, "last")), "2025-11,2025-12,2026-1")
+check(
+	"à cheval sur deux années (ancre « last »)",
+	list(layout.months(2026, 1, 3, "last")),
+	"2025-11,2025-12,2026-1"
+)
 check("à cheval sur deux années (ancre « first »)", list(layout.months(2026, 12, 2, "first")), "2026-12,2027-1")
 check("décembre en dernier", list(layout.months(2026, 12, 3, "last")), "2026-10,2026-11,2026-12")
-check("douze mois : une année entière", list(layout.months(2026, 12, 12, "last")), "2026-1,2026-2,2026-3,2026-4,2026-5,2026-6,2026-7,2026-8,2026-9,2026-10,2026-11,2026-12")
+check(
+	"douze mois : une année entière",
+	list(layout.months(2026, 12, 12, "last")),
+	"2026-1,2026-2,2026-3,2026-4,2026-5,2026-6,2026-7,2026-8,2026-9,2026-10,2026-11,2026-12"
+)
 local ordered = true
 for count = 1, 12 do
-local months = layout.months(2026, 3, count)
-for i = 2, #months do
-local a, b = months[i - 1], months[i]
-if b.year * 12 + b.month ~= a.year * 12 + a.month + 1 then
-ordered = false
-end
-end
+	local months = layout.months(2026, 3, count)
+	for i = 2, #months do
+		local a, b = months[i - 1], months[i]
+		if b.year * 12 + b.month ~= a.year * 12 + a.month + 1 then
+			ordered = false
+		end
+	end
 end
 check("les mois se suivent toujours, un par un", ordered, true)
 local m = layout.months(2026.0, 10.0, 2)
@@ -172,7 +211,7 @@ check("des nombres décimaux entiers donnent des mois utilisables", dates.key(m[
 -- arrange : côte à côte
 -- ============================================================
 local function block(lines, width)
-return { lines = lines, width = width }
+	return { lines = lines, width = width }
 end
 local out = layout.arrange({ block({ "ab", "cd" }, 4), block({ "ef", "gh" }, 4) }, 2, 3)
 check("deux blocs : première ligne", out[1], "ab     ef")
@@ -206,57 +245,87 @@ local days = { ["2026-10-10"] = 15231, ["2026-10-11"] = 1900, ["2026-10-12"] = 3
 local blk = assemble.month_block(days, 2026, 10, "2026-10-12", {}, fr, false)
 check("month_block : la largeur annoncée", blk.width, assemble.WIDTH)
 check("month_block : la hauteur est toujours la même", #blk.lines, assemble.HEIGHT)
-check("month_block : le titre, sans le préfixe du plugin, suivi du total et des jours actifs", strip(blk.lines[1]), "  Octobre 2026   Total du mois : 5h45 / Jours actifs : 3")
+check(
+	"month_block : le titre, sans le préfixe du plugin, suivi du total et des jours actifs",
+	strip(blk.lines[1]),
+	"  Octobre 2026   Total du mois : 5h45 / Jours actifs : 3"
+)
 check("month_block : pas de gras si le mois n'est pas le choisi", blk.lines[1]:find("\27[1m", 1, true), nil)
 check("month_block : l'en-tête est celui du dessin", strip(blk.lines[2]):match("^%s*(%a+)"), "Lun")
 check("month_block sans objectif : la dernière ligne est vide (rien à valider)", strip(blk.lines[#blk.lines]), "")
 local selected = assemble.month_block(days, 2026, 10, "2026-10-12", {}, fr, true)
-check("month_block : le mois choisi a son titre en gras (seulement le nom du mois)", selected.lines[1]:find("\27[1m  Octobre 2026\27[0m   Total", 1, true), 1)
-check("month_block : en gras, le reste est identique", table.concat(selected.lines, "\n", 2), table.concat(blk.lines, "\n", 2))
-check("month_block : anglais", strip(assemble.month_block(days, 2026, 10, "x", {}, en, false).lines[1]), "  October 2026   Month total : 5h45 / Active days : 3")
-check("month_block : semaine du dimanche", strip(assemble.month_block(days, 2026, 10, "x", { week_starts_on = "sunday" }, fr, false).lines[2]):match("^%s*(%a+)"), "Dim")
+check(
+	"month_block : le mois choisi a son titre en gras (seulement le nom du mois)",
+	selected.lines[1]:find("\27[1m  Octobre 2026\27[0m   Total", 1, true),
+	1
+)
+check(
+	"month_block : en gras, le reste est identique",
+	table.concat(selected.lines, "\n", 2),
+	table.concat(blk.lines, "\n", 2)
+)
+check(
+	"month_block : anglais",
+	strip(assemble.month_block(days, 2026, 10, "x", {}, en, false).lines[1]),
+	"  October 2026   Month total : 5h45 / Active days : 3"
+)
+check(
+	"month_block : semaine du dimanche",
+	strip(assemble.month_block(days, 2026, 10, "x", { week_starts_on = "sunday" }, fr, false).lines[2]):match(
+		"^%s*(%a+)"
+	),
+	"Dim"
+)
 local full = {}
 for line in (strip(assemble.render_month(days, 2026, 10, "2026-10-12", {}, fr)) .. "\n"):gmatch("(.-)\n") do
-full[#full + 1] = line
+	full[#full + 1] = line
 end
 local same_weeks = true
 for i = 3, 18 do
-if strip(blk.lines[i - 1]) ~= full[i + 1] then
-same_weeks = false
-end
+	if strip(blk.lines[i - 1]) ~= full[i + 1] then
+		same_weeks = false
+	end
 end
 check("month_block : les semaines sont exactement celles du mois seul", same_weeks, true)
 local legend_ok, heights_ok, widths_ok = true, true, true
 for year = 2020, 2031 do
-for month = 1, 12 do
-for _, start in ipairs({ "monday", "sunday" }) do
-local b = assemble.month_block({}, year, month, "x", { week_starts_on = start }, fr, false)
-if #b.lines ~= layout.BLOCK_HEIGHT then
-heights_ok = false
-end
-for _, line in ipairs(b.lines) do
-if layout.visible_width(line) > layout.BLOCK_WIDTH then
-widths_ok = false
-end
-end
-end
-end
+	for month = 1, 12 do
+		for _, start in ipairs({ "monday", "sunday" }) do
+			local b = assemble.month_block({}, year, month, "x", { week_starts_on = start }, fr, false)
+			if #b.lines ~= layout.BLOCK_HEIGHT then
+				heights_ok = false
+			end
+			for _, line in ipairs(b.lines) do
+				if layout.visible_width(line) > layout.BLOCK_WIDTH then
+					widths_ok = false
+				end
+			end
+		end
+	end
 end
 check("144 mois : tous ont exactement la hauteur prévue (4, 5 ou 6 semaines)", heights_ok, true)
 check("144 mois : aucune ligne n'est plus large que prévu", widths_ok, true)
 local tail = strip(assemble.render_month(days, 2026, 10, "x", {}, fr))
 check("legend : identique à la dernière ligne du mois seul", strip(assemble.legend({}, fr)), tail:match("([^\n]*)$"))
-check("legend : avec une fonction de couleur, seulement l'étoile", strip(assemble.legend({ cell_color = function() end }, fr)), "  * = aujourd'hui")
-check("legend : seuils personnalisés", strip(assemble.legend({ thresholds = { 2, 4, 8 } }, fr)):find("<2h", 1, true) ~= nil, true)
+check(
+	"legend : avec une fonction de couleur, seulement l'étoile",
+	strip(assemble.legend({ cell_color = function() end }, fr)),
+	"  * = aujourd'hui"
+)
+check(
+	"legend : seuils personnalisés",
+	strip(assemble.legend({ thresholds = { 2, 4, 8 } }, fr)):find("<2h", 1, true) ~= nil,
+	true
+)
 
 -- ============================================================
 -- effets de bord
 -- ============================================================
 local leaked = {}
 for k in pairs(_G) do
-if not globals_before[k] then
-leaked[#leaked + 1] = k
-end
+	if not globals_before[k] then
+		leaked[#leaked + 1] = k
+	end
 end
 check("aucune variable globale ajoutée", table.concat(leaked, ","), "")
 

@@ -21,12 +21,12 @@ M.TABLE_NAME = "logtime_page"
 --   labels()      les textes dans la langue choisie
 --   blocker_args() le programme qui garde l'onglet ouvert
 function M.create(ctx)
-local wezterm, G, num = ctx.wezterm, ctx.G, ctx.num
-local act = wezterm.action
-local ui = screen.bind(wezterm)
-local page = {}
+	local wezterm, G, num = ctx.wezterm, ctx.G, ctx.num
+	local act = wezterm.action
+	local ui = screen.bind(wezterm)
+	local page = {}
 
--- L'état de la page, gardé dans wezterm.GLOBAL sous forme de simples nombres :
+	-- L'état de la page, gardé dans wezterm.GLOBAL sous forme de simples nombres :
 	--   logtime_page_pane (le panneau de la page), logtime_page_year, logtime_page_month (le mois affiché)
 	local function page_id()
 		return num(G.logtime_page_pane)
@@ -60,8 +60,8 @@ local page = {}
 	end
 
 	-- Le texte de la page : une ligne d'aide, puis le ou les mois. Le nombre de mois dépend de la taille de la fenêtre
--- (dims = { cols, rows } ; sans taille, un seul mois). Renvoie le texte, le nombre de mois affichés et la largeur
--- du calendrier (la largeur qu'on centre).
+	-- (dims = { cols, rows } ; sans taille, un seul mois). Renvoie le texte, le nombre de mois affichés et la largeur
+	-- du calendrier (la largeur qu'on centre).
 	function page.build_text(dims)
 		local labels, cfg = ctx.labels(), with_gradient(ctx.cfg())
 		local year, month = selected_month()
@@ -110,7 +110,16 @@ local page = {}
 		local year, month = selected_month()
 		local dims = dims_of(pane)
 		local text, count, width = page.build_text(dims)
-		safe.trace(wezterm, string.format("logtime : dessin du mois %d-%02d dans le panneau %s (%d mois)", year, month, tostring(pane:pane_id()), count))
+		safe.trace(
+			wezterm,
+			string.format(
+				"logtime : dessin du mois %d-%02d dans le panneau %s (%d mois)",
+				year,
+				month,
+				tostring(pane:pane_id()),
+				count
+			)
+		)
 		ui.draw(pane, centered(text, dims, width), first)
 	end
 
@@ -123,7 +132,7 @@ local page = {}
 	-- Redessine plus tard, mais seulement si la page existe toujours.
 	local function redraw_later(pane_id, delays)
 		ui.later(pane_id, delays, function(pane)
-if page_id() == pane:pane_id() then
+			if page_id() == pane:pane_id() then
 				redraw(pane, false)
 			end
 		end)
@@ -141,11 +150,11 @@ if page_id() == pane:pane_id() then
 			return
 		end
 		-- panneau périmé (onglet fermé autrement qu'avec q) : on l'oublie et on ouvre une nouvelle page
-G.logtime_page_pane = nil
+		G.logtime_page_pane = nil
 
-local tab, page_pane = window:mux_window():spawn_tab({
-domain = { DomainName = "local" },
-args = ctx.blocker_args(),
+		local tab, page_pane = window:mux_window():spawn_tab({
+			domain = { DomainName = "local" },
+			args = ctx.blocker_args(),
 		})
 		pcall(function()
 			tab:activate()

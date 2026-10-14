@@ -13,7 +13,14 @@ local function check(name, got, want)
 		passed = passed + 1
 	else
 		failed = failed + 1
-		print(string.format("ÉCHEC  %s\n         attendu : %s\n         obtenu  : %s", name, tostring(want), tostring(got)))
+		print(
+			string.format(
+				"ÉCHEC  %s\n         attendu : %s\n         obtenu  : %s",
+				name,
+				tostring(want),
+				tostring(got)
+			)
+		)
 	end
 end
 
@@ -38,7 +45,11 @@ check("Linux : sleep qui dure 24 h, sans écho", lin[3], "stty -echo 2>/dev/null
 local mac = platform.blocker_args("macos")
 check("macOS : comme Linux", mac[3], lin[3])
 check("système absent : comme Linux", platform.blocker_args(nil)[3], lin[3])
-check("deux appels donnent deux tables indépendantes", platform.blocker_args("windows") ~= platform.blocker_args("windows"), true)
+check(
+	"deux appels donnent deux tables indépendantes",
+	platform.blocker_args("windows") ~= platform.blocker_args("windows"),
+	true
+)
 
 local leaked = {}
 for k in pairs(_G) do

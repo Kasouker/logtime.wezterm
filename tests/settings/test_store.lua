@@ -24,7 +24,12 @@ local real_open = io.open
 local corrupt_tmp_reads = false -- simule un disque qui rend un autre contenu que celui écrit dans le fichier temporaire
 io.open = function(path, mode)
 	if corrupt_tmp_reads and path:sub(-4) == ".tmp" and not (mode and (mode:find("w") or mode:find("a"))) then
-		return { read = function() return "contenu corrompu" end, close = function() end }
+		return {
+			read = function()
+				return "contenu corrompu"
+			end,
+			close = function() end,
+		}
 	end
 	if mode and (mode:find("w") or mode:find("a") or mode:find("%+")) then
 		local inside = false
@@ -46,7 +51,14 @@ local function check(name, got, want)
 		passed = passed + 1
 	else
 		failed = failed + 1
-		print(string.format("ÉCHEC  %s\n         attendu : %s\n         obtenu  : %s", name, tostring(want), tostring(got)))
+		print(
+			string.format(
+				"ÉCHEC  %s\n         attendu : %s\n         obtenu  : %s",
+				name,
+				tostring(want),
+				tostring(got)
+			)
+		)
 	end
 end
 local function write(path, text)
@@ -116,11 +128,26 @@ check("parse : objet vide", next(settings) == nil and #problems == 0, true)
 settings, problems = store.parse('{"max_months": "6"}')
 check("parse : un nombre écrit en texte est refusé", settings.max_months == nil and #problems == 1, true)
 settings, problems = store.parse('{"b_inconnu": 1, "a_inconnu": 2}')
-check("parse : les problèmes sont dans l'ordre alphabétique", problems[1]:find("a_inconnu", 1, true) ~= nil and problems[2]:find("b_inconnu", 1, true) ~= nil, true)
-for name, text in pairs({ liste_vide = "[]", liste = "[1, 2]", nombre = "12", texte = '"abc"', booleen = "true", null = "null" }) do
+check(
+	"parse : les problèmes sont dans l'ordre alphabétique",
+	problems[1]:find("a_inconnu", 1, true) ~= nil and problems[2]:find("b_inconnu", 1, true) ~= nil,
+	true
+)
+for name, text in pairs({
+	liste_vide = "[]",
+	liste = "[1, 2]",
+	nombre = "12",
+	texte = '"abc"',
+	booleen = "true",
+	null = "null",
+}) do
 	local value, err = store.parse(text)
 	check("parse : « " .. name .. " » n'est pas un objet : refusé", value, nil)
-	check("parse : « " .. name .. " » : message sur les accolades", type(err) == "string" and err:find("objet", 1, true) ~= nil, true)
+	check(
+		"parse : « " .. name .. " » : message sur les accolades",
+		type(err) == "string" and err:find("objet", 1, true) ~= nil,
+		true
+	)
 end
 local value, err = store.parse("{ pas du json")
 check("parse : texte illisible refusé", value, nil)
@@ -134,17 +161,45 @@ check("parse : le message dit qu'il est vide", err:find("vide", 1, true) ~= nil,
 -- ============================================================
 check("encode : aucun réglage", store.encode({}), "{}\n")
 check("encode : un réglage", store.encode({ max_months = 6 }), '{\n  "max_months": 6\n}\n')
-check("encode : plusieurs, dans l'ordre du schéma (pas alphabétique)", store.encode({ gradient_color = "#3366CC", lang = "en", max_months = 6 }), '{\n  "lang": "en",\n  "max_months": 6,\n  "gradient_color": "#3366CC"\n}\n')
-check("encode : booléens", store.encode({ center = false, gradient = true }), '{\n  "center": false,\n  "gradient": true\n}\n')
+check(
+	"encode : plusieurs, dans l'ordre du schéma (pas alphabétique)",
+	store.encode({ gradient_color = "#3366CC", lang = "en", max_months = 6 }),
+	'{\n  "lang": "en",\n  "max_months": 6,\n  "gradient_color": "#3366CC"\n}\n'
+)
+check(
+	"encode : booléens",
+	store.encode({ center = false, gradient = true }),
+	'{\n  "center": false,\n  "gradient": true\n}\n'
+)
 check("encode : décimal", store.encode({ gradient_light = 0.8 }), '{\n  "gradient_light": 0.8\n}\n')
-check("encode : un décimal entier s'écrit sans point", store.encode({ gradient_hours = 24.0 }), '{\n  "gradient_hours": 24\n}\n')
-check("encode : une couleur en minuscules est normalisée", store.encode({ gradient_color = "#3366cc" }), '{\n  "gradient_color": "#3366CC"\n}\n')
-check("encode : un réglage inconnu n'est pas écrit", store.encode({ zzz = 1, max_months = 6 }), '{\n  "max_months": 6\n}\n')
+check(
+	"encode : un décimal entier s'écrit sans point",
+	store.encode({ gradient_hours = 24.0 }),
+	'{\n  "gradient_hours": 24\n}\n'
+)
+check(
+	"encode : une couleur en minuscules est normalisée",
+	store.encode({ gradient_color = "#3366cc" }),
+	'{\n  "gradient_color": "#3366CC"\n}\n'
+)
+check(
+	"encode : un réglage inconnu n'est pas écrit",
+	store.encode({ zzz = 1, max_months = 6 }),
+	'{\n  "max_months": 6\n}\n'
+)
 check("encode : un réglage absent (nil) n'est pas écrit", store.encode({ goal_hours = nil }), "{}\n")
 local text, why = store.encode({ max_months = 100 })
 check("encode : une valeur incorrecte est refusée", text, nil)
-check("encode : avec la raison", why:find("max_months", 1, true) ~= nil and why:find("compris entre", 1, true) ~= nil, true)
-check("encode : 0,1 + 0,2 s'écrit proprement", store.encode({ gradient_light = 0.1 + 0.2 }), '{\n  "gradient_light": 0.3\n}\n')
+check(
+	"encode : avec la raison",
+	why:find("max_months", 1, true) ~= nil and why:find("compris entre", 1, true) ~= nil,
+	true
+)
+check(
+	"encode : 0,1 + 0,2 s'écrit proprement",
+	store.encode({ gradient_light = 0.1 + 0.2 }),
+	'{\n  "gradient_light": 0.3\n}\n'
+)
 
 -- aller-retour : ce qu'on écrit se relit à l'identique, sur 500 combinaisons
 local seed = 31337
@@ -176,7 +231,11 @@ for _ = 1, 500 do
 	local back = store.parse(encoded)
 	for key, value in pairs(combo) do
 		local expected = schema.validate(key, value) and select(2, schema.validate(key, value))
-		if back == nil or math.abs((tonumber(back[key]) or 0) - (tonumber(expected) or 0)) > 1e-9 and type(expected) == "number" or (type(expected) ~= "number" and back[key] ~= expected) then
+		if
+			back == nil
+			or math.abs((tonumber(back[key]) or 0) - (tonumber(expected) or 0)) > 1e-9 and type(expected) == "number"
+			or (type(expected) ~= "number" and back[key] ~= expected)
+		then
 			roundtrip_ok = false
 		end
 	end
@@ -240,7 +299,11 @@ corrupt_tmp_reads = true
 saved, save_err = store.save(path, { max_months = 2 })
 corrupt_tmp_reads = false
 check("save : écriture corrompue : échec", saved, false)
-check("save : écriture corrompue : la raison parle de la vérification", save_err:find("vérification", 1, true) ~= nil, true)
+check(
+	"save : écriture corrompue : la raison parle de la vérification",
+	save_err:find("vérification", 1, true) ~= nil,
+	true
+)
 check("save : écriture corrompue : le fichier d'origine est intact", read(path), intact)
 check("save : écriture corrompue : le fichier temporaire est retiré", read(path .. ".tmp"), nil)
 
@@ -269,7 +332,11 @@ write(path2, "{ ceci n'est pas du json")
 loaded, state, issues, from_backup = store.load(path2)
 check("load : fichier illisible", state, "corrupt")
 check("load : illisible sans copie : réglages vides", next(loaded), nil)
-check("load : illisible : le problème le dit", issues[1]:find("illisible", 1, true) ~= nil and issues[1]:find("valeurs par défaut", 1, true) ~= nil, true)
+check(
+	"load : illisible : le problème le dit",
+	issues[1]:find("illisible", 1, true) ~= nil and issues[1]:find("valeurs par défaut", 1, true) ~= nil,
+	true
+)
 check("load : illisible sans copie : pas depuis la copie", from_backup, false)
 write(path2, "")
 loaded, state = store.load(path2)
@@ -299,15 +366,19 @@ check("save sur un fichier illisible : réussi", saved, true)
 check("save sur un fichier illisible : le nouveau fichier est bon", read(path3), '{\n  "max_months": 5\n}\n')
 local quarantined = find_prefix(dir3, ".logtime_settings.json.corrupt-")
 check("save sur un fichier illisible : l'ancien est mis de côté", quarantined ~= nil, true)
-check("save sur un fichier illisible : son contenu est intact", read(dir3 .. "/" .. tostring(quarantined)), "contenu illisible précieux")
+check(
+	"save sur un fichier illisible : son contenu est intact",
+	read(dir3 .. "/" .. tostring(quarantined)),
+	"contenu illisible précieux"
+)
 check("save sur un fichier illisible : pas de copie .bak d'un fichier illisible", read(path3 .. ".bak"), nil)
 write(path3, "encore illisible")
 store.save(path3, { max_months = 6 })
 local count_quarantined = 0
 for _, name in ipairs(list_files(dir3)) do
-if name:find(".corrupt-", 1, true) then
-count_quarantined = count_quarantined + 1
-end
+	if name:find(".corrupt-", 1, true) then
+		count_quarantined = count_quarantined + 1
+	end
 end
 check("save : un second fichier illisible ne remplace pas le premier (noms uniques)", count_quarantined, 2)
 
@@ -315,10 +386,14 @@ check("save : un second fichier illisible ne remplace pas le premier (noms uniqu
 saved, save_err = store.save(dir .. "/nexiste/pas/.logtime_settings.json", { max_months = 6 })
 check("save : dossier inexistant : échec sans plantage", saved, false)
 check("save : dossier inexistant : une raison", type(save_err) == "string" and #save_err > 5, true)
-check("save : dossier inexistant : aucun fichier temporaire créé", read(dir .. "/nexiste/pas/.logtime_settings.json.tmp"), nil)
+check(
+	"save : dossier inexistant : aucun fichier temporaire créé",
+	read(dir .. "/nexiste/pas/.logtime_settings.json.tmp"),
+	nil
+)
 
 -- un fichier avec une marque BOM (enregistré par un éditeur de texte Windows)
-write(path, "\239\187\191{\"max_months\": 2}")
+write(path, '\239\187\191{"max_months": 2}')
 loaded, state = store.load(path)
 check("load : un fichier avec BOM est lu", state == "ok" and loaded.max_months == 2, true)
 
@@ -331,44 +406,104 @@ check("options : table vide", #store.check_options({}, EXTRA), 0)
 local messages = store.check_options("max_months = 6", EXTRA)
 check("options : un texte à la place d'une table", #messages, 1)
 check("options : le message parle de table", messages[1]:find("table", 1, true) ~= nil, true)
-check("options : le message donne un exemple", messages[1]:find("apply_to_config(config, { max_months = 6 })", 1, true) ~= nil, true)
+check(
+	"options : le message donne un exemple",
+	messages[1]:find("apply_to_config(config, { max_months = 6 })", 1, true) ~= nil,
+	true
+)
 check("options : le message dit le type reçu", messages[1]:find("string", 1, true) ~= nil, true)
 check("options : un nombre à la place d'une table", #store.check_options(12, EXTRA), 1)
 check("options : un booléen à la place d'une table", #store.check_options(true, EXTRA), 1)
 check("options : une fonction à la place d'une table", #store.check_options(function() end, EXTRA), 1)
-check("options : toutes valides", #store.check_options({ lang = "en", max_months = 6, gradient_color = "#3366CC", open_key = "F3", goal_hours = 3 }, EXTRA), 0)
+check(
+	"options : toutes valides",
+	#store.check_options(
+		{ lang = "en", max_months = 6, gradient_color = "#3366CC", open_key = "F3", goal_hours = 3 },
+		EXTRA
+	),
+	0
+)
 messages = store.check_options({ gradiant = true }, EXTRA)
 check("options : une faute de frappe est signalée", #messages, 1)
-check("options : avec la suggestion « gradient »", messages[1]:find("tu voulais dire « gradient » ?", 1, true) ~= nil, true)
+check(
+	"options : avec la suggestion « gradient »",
+	messages[1]:find("tu voulais dire « gradient » ?", 1, true) ~= nil,
+	true
+)
 check("options : le nom fautif est cité", messages[1]:find("« gradiant »", 1, true) ~= nil, true)
 messages = store.check_options({ gradient_colour = "#3366CC" }, EXTRA)
-check("options : gradient_colour suggère gradient_color", messages[1]:find("« gradient_color » ?", 1, true) ~= nil, true)
+check(
+	"options : gradient_colour suggère gradient_color",
+	messages[1]:find("« gradient_color » ?", 1, true) ~= nil,
+	true
+)
 messages = store.check_options({ maxmonths = 6 }, EXTRA)
 check("options : maxmonths suggère max_months", messages[1]:find("« max_months » ?", 1, true) ~= nil, true)
 messages = store.check_options({ centre = true }, EXTRA)
 check("options : centre suggère center", messages[1]:find("« center » ?", 1, true) ~= nil, true)
 messages = store.check_options({ open_ke = "F3" }, EXTRA)
-check("options : une faute sur une option hors schéma suggère aussi (open_key)", messages[1]:find("« open_key » ?", 1, true) ~= nil, true)
+check(
+	"options : une faute sur une option hors schéma suggère aussi (open_key)",
+	messages[1]:find("« open_key » ?", 1, true) ~= nil,
+	true
+)
 messages = store.check_options({ gradient_hour = 12 }, EXTRA)
-check("options : gradient_hour suggère le plus proche (gradient_hours)", messages[1]:find("« gradient_hours » ?", 1, true) ~= nil, true)
+check(
+	"options : gradient_hour suggère le plus proche (gradient_hours)",
+	messages[1]:find("« gradient_hours » ?", 1, true) ~= nil,
+	true
+)
 messages = store.check_options({ zzzzzzzzzz = 1 }, EXTRA)
-check("options : un nom très différent : signalé sans suggestion", #messages == 1 and messages[1]:find("tu voulais dire", 1, true) == nil, true)
-check("options : une option hors schéma mais déclarée est acceptée", #store.check_options({ data_file = "/tmp/x", cell_color = function() end }, EXTRA), 0)
-check("options : sans liste d'options supplémentaires, open_key est inconnue", #store.check_options({ open_key = "F3" }), 1)
+check(
+	"options : un nom très différent : signalé sans suggestion",
+	#messages == 1 and messages[1]:find("tu voulais dire", 1, true) == nil,
+	true
+)
+check(
+	"options : une option hors schéma mais déclarée est acceptée",
+	#store.check_options({ data_file = "/tmp/x", cell_color = function() end }, EXTRA),
+	0
+)
+check(
+	"options : sans liste d'options supplémentaires, open_key est inconnue",
+	#store.check_options({ open_key = "F3" }),
+	1
+)
 messages = store.check_options({ max_months = 100 }, EXTRA)
 check("options : une valeur hors limites est signalée", #messages, 1)
-check("options : le message cite le nom et les bornes", messages[1]:find("« max_months »", 1, true) ~= nil and messages[1]:find("compris entre 1 et 12", 1, true) ~= nil, true)
+check(
+	"options : le message cite le nom et les bornes",
+	messages[1]:find("« max_months »", 1, true) ~= nil and messages[1]:find("compris entre 1 et 12", 1, true) ~= nil,
+	true
+)
 messages = store.check_options({ lang = "de", center = "oui" }, EXTRA)
 check("options : deux valeurs incorrectes : deux messages", #messages, 2)
 messages = store.check_options({ "gradient" }, EXTRA)
-check("options : une liste à la place de réglages nommés", #messages == 1 and messages[1]:find("sans nom", 1, true) ~= nil, true)
+check(
+	"options : une liste à la place de réglages nommés",
+	#messages == 1 and messages[1]:find("sans nom", 1, true) ~= nil,
+	true
+)
 messages = store.check_options({ zeta = 1, alpha = 2 }, EXTRA)
-check("options : les messages sont dans l'ordre alphabétique", messages[1]:find("alpha", 1, true) ~= nil and messages[2]:find("zeta", 1, true) ~= nil, true)
+check(
+	"options : les messages sont dans l'ordre alphabétique",
+	messages[1]:find("alpha", 1, true) ~= nil and messages[2]:find("zeta", 1, true) ~= nil,
+	true
+)
 local crashed = false
-for _, weird in ipairs({ { [true] = 1 }, { [1.5] = 1 }, { [{}] = 1 }, setmetatable({}, { __index = function() error("boum") end }) }) do
-if not pcall(store.check_options, weird, EXTRA) then
-crashed = true
-end
+for _, weird in ipairs({
+	{ [true] = 1 },
+	{ [1.5] = 1 },
+	{ [{}] = 1 },
+	setmetatable({}, {
+		__index = function()
+			error("boum")
+		end,
+	}),
+}) do
+	if not pcall(store.check_options, weird, EXTRA) then
+		crashed = true
+	end
 end
 check("options : des tables bizarres ne font pas planter", crashed, false)
 
@@ -377,13 +512,13 @@ check("options : des tables bizarres ne font pas planter", crashed, false)
 -- ============================================================
 check("aucune écriture hors des dossiers temporaires", #outside, 0)
 for _, d in ipairs(homes) do
-os.execute("rm -rf '" .. d .. "'")
+	os.execute("rm -rf '" .. d .. "'")
 end
 local leaked = {}
 for k in pairs(_G) do
-if not globals_before[k] then
-leaked[#leaked + 1] = k
-end
+	if not globals_before[k] then
+		leaked[#leaked + 1] = k
+	end
 end
 check("aucune variable globale ajoutée", table.concat(leaked, ","), "")
 

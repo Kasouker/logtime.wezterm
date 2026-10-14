@@ -23,8 +23,16 @@ function M.build(wezterm, bindings, is_page, prefix)
 		local key, run = binding.key, binding.run
 		local event = (prefix or "logtime-page") .. "-" .. key
 		local handler = safe.wrap(wezterm, "page", function(window, pane)
-local on_page = is_page(pane)
-safe.trace(wezterm, string.format("logtime (page) : touche %s, panneau %s, est la page : %s", key, tostring(pane:pane_id()), tostring(on_page)))
+			local on_page = is_page(pane)
+			safe.trace(
+				wezterm,
+				string.format(
+					"logtime (page) : touche %s, panneau %s, est la page : %s",
+					key,
+					tostring(pane:pane_id()),
+					tostring(on_page)
+				)
+			)
 			if not on_page then
 				window:perform_action(act.PopKeyTable, pane)
 				window:perform_action(act.SendKey({ key = key }), pane)
@@ -33,12 +41,12 @@ safe.trace(wezterm, string.format("logtime (page) : touche %s, panneau %s, est l
 			run(window, pane)
 		end, true)
 		wezterm.on(event, function(window, pane)
-handler(window, pane)
-return false -- si la même touche est enregistrée deux fois (config appliquée deux fois), la seconde n'est pas appelée
-end)
-out[#out + 1] = { key = key, action = act.EmitEvent(event) }
-end
-return out
+			handler(window, pane)
+			return false -- si la même touche est enregistrée deux fois (config appliquée deux fois), la seconde n'est pas appelée
+		end)
+		out[#out + 1] = { key = key, action = act.EmitEvent(event) }
+	end
+	return out
 end
 
 -- Active les touches de la page (elles restent actives jusqu'à leur retrait).

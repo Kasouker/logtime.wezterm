@@ -5,7 +5,7 @@ local M = {}
 -- Clé de la journée d'un instant (secondes epoch) : "2026-10-12", en heure locale.
 -- `offset` décale le moment où la journée change. Avec -3600, la journée change à 01:00 au lieu de minuit.
 function M.key(t, offset)
-return os.date("%Y-%m-%d", t + (offset or 0))
+	return os.date("%Y-%m-%d", t + (offset or 0))
 end
 
 -- Ajoute l'intervalle [from, to] (secondes epoch) aux journées concernées, en le coupant à chaque minuit.

@@ -14,19 +14,26 @@ function M.apply(config, wezterm, opts)
 	config.keys = config.keys or {}
 	for _, binding in ipairs(config.keys) do
 		if binding.key == opts.open_key and (binding.mods == nil or binding.mods == "") then
-			wezterm.log_error("logtime : la touche " .. opts.open_key .. " est déjà utilisée dans ta configuration ; vérifie qu'elle ne fait pas autre chose")
+			wezterm.log_error(
+				"logtime : la touche "
+					.. opts.open_key
+					.. " est déjà utilisée dans ta configuration ; vérifie qu'elle ne fait pas autre chose"
+			)
 			break
 		end
 	end
 
 	local open = safe.wrap(wezterm, "ouverture", function(window, pane)
-opts.page.open(window, pane)
-end, true)
+		opts.page.open(window, pane)
+	end, true)
 	wezterm.on(opts.open_event or M.OPEN_EVENT, function(window, pane)
-open(window, pane)
-return false -- si la config est appliquée deux fois, la page ne s'ouvre qu'une fois
-end)
-	table.insert(config.keys, { key = opts.open_key, action = wezterm.action.EmitEvent(opts.open_event or M.OPEN_EVENT) })
+		open(window, pane)
+		return false -- si la config est appliquée deux fois, la page ne s'ouvre qu'une fois
+	end)
+	table.insert(
+		config.keys,
+		{ key = opts.open_key, action = wezterm.action.EmitEvent(opts.open_event or M.OPEN_EVENT) }
+	)
 
 	config.key_tables = config.key_tables or {}
 	config.key_tables[opts.table_name] = opts.page.key_table()
