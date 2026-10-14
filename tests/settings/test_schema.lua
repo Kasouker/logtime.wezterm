@@ -46,7 +46,7 @@ local function rejects(name, key, value)
 end
 
 -- ---- la liste
-check("douze réglages", #schema.keys(), 12)
+check("treize réglages", #schema.keys(), 13)
 check("le premier est lang", schema.keys()[1], "lang")
 check("gradient_color est connu", schema.is_known("gradient_color"), true)
 check("un nom inconnu n'est pas connu", schema.is_known("gradiant"), false)

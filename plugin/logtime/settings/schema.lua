@@ -18,6 +18,7 @@ M.DEFINITIONS = {
 	{ key = "gradient_dark", kind = "number", min = 0, max = 1, default = 0.3 },
 	{ key = "gradient_hours", kind = "number", min = 1, max = 48, default = 24 },
 	{ key = "gradient_curve", kind = "number", min = 0.1, max = 3, default = 0.5 },
+	{ key = "theme_colors", kind = "boolean", default = nil },
 }
 
 local BY_KEY = {}

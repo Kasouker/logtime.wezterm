@@ -86,6 +86,7 @@ local calendar_page = load_module("pages/calendar_page")
 local keys = load_module("config/keys")
 local settings = load_module("settings/store")
 local settings_page = load_module("pages/settings_page")
+local theme = load_module("color/theme")
 
 -- Options provisoires : elles iront dans config/defaults.lua à une étape suivante.
 local cfg = {
@@ -405,6 +406,22 @@ local settings_view = settings_page.create({
 		return platform.blocker_args(platform.os_name(wezterm.target_triple))
 	end,
 	store = settings,
+	palette = function()
+		if cfg.theme_colors == true then
+			local colors, reason = theme.extract(config, wezterm)
+			if colors then
+				return { kind = "theme", colors = colors }
+			end
+			return { kind = "classic", unavailable = reason }
+		end
+		return { kind = "classic" }
+	end,
+	consent = function()
+		return cfg.theme_colors
+	end,
+	settings_key = function()
+		return cfg.settings_key
+	end,
 	settings_path = settings_path,
 	apply = function(changes)
 		for key, value in pairs(changes) do
@@ -416,6 +433,9 @@ local settings_view = settings_page.create({
 	end,
 })
 keys.apply(config, wezterm, { page = settings_view, open_key = cfg.settings_key, table_name = settings_page.TABLE_NAME, open_event = "logtime-settings-open" })
+wezterm.on("window-config-reloaded", function(window, pane)
+	pcall(settings_view.on_config_loaded, window, pane)
+end)
 end)
 if not ok then
 wezterm.log_error("logtime : apply_to_config a échoué : " .. tostring(err))

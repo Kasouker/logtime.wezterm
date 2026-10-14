@@ -27,6 +27,13 @@ return {
 	settings_too_small = "Fenêtre trop petite",
 	settings_too_small_hint = "Il faut au moins %d colonnes sur %d lignes.",
 	palette = { "Rouge", "Orange", "Or", "Jaune", "Citron", "Vert", "Émeraude", "Turquoise", "Cyan", "Ciel", "Bleu", "Indigo", "Violet", "Magenta", "Rose", "Gris" },
+	consent_ask = "Couleurs de ton thème ?   y : oui   n : non",
+	consent_yes = "Couleurs de ton thème : oui   (n : palette classique)",
+	consent_no = "Palette classique   (y : couleurs de ton thème)",
+	consent_unavailable = "Thème introuvable : palette classique (n : arrêter)",
+	settings_consent_saved = "✓ Réponse enregistrée.",
+	consent_toast = "Veux-tu utiliser les couleurs de ton thème ? Ouvre %s puis appuie sur y (oui) ou n (non).",
+	palette_theme = { "Noir", "Rouge", "Vert", "Jaune", "Bleu", "Magenta", "Cyan", "Blanc", "Gris", "Rouge vif", "Vert vif", "Jaune vif", "Bleu vif", "Magenta vif", "Cyan vif", "Blanc vif" },
     too_small = "Fenêtre trop petite",
     too_small_hint = "Agrandis-la : il faut au moins %d colonnes sur %d lignes.",
 }

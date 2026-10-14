@@ -27,6 +27,13 @@ return {
 	settings_too_small = "Window too small",
 	settings_too_small_hint = "At least %d columns by %d rows are needed.",
 	palette = { "Red", "Orange", "Gold", "Yellow", "Lime", "Green", "Emerald", "Teal", "Cyan", "Sky", "Blue", "Indigo", "Violet", "Magenta", "Pink", "Gray" },
+	consent_ask = "Use your theme's colors?   y: yes   n: no",
+	consent_yes = "Theme colors: on   (n: classic palette)",
+	consent_no = "Classic palette   (y: use your theme colors)",
+	consent_unavailable = "Theme not found: classic palette (n: stop)",
+	settings_consent_saved = "✓ Answer saved.",
+	consent_toast = "Use your theme's colors? Open %s then press y (yes) or n (no).",
+	palette_theme = { "Black", "Red", "Green", "Yellow", "Blue", "Magenta", "Cyan", "White", "Gray", "Lt Red", "Lt Green", "Lt Yellow", "Lt Blue", "Lt Magenta", "Lt Cyan", "Lt White" },
     too_small = "Window too small",
     too_small_hint = "Please enlarge it: at least %d columns by %d rows are needed.",
 }

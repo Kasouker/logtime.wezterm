@@ -194,7 +194,7 @@ check("F4 et F2 sont ajoutées", (function()
 	end
 	return keys.F2 == true and keys.F4 == true
 end)(), true)
-check("la table de touches de la personnalisation a douze touches", #config.key_tables.logtime_settings, 12)
+check("la table de touches de la personnalisation a quatorze touches (dont y et n)", #config.key_tables.logtime_settings, 14)
 check("celle du calendrier est intacte (huit touches)", #config.key_tables.logtime_page, 8)
 check("un gestionnaire pour l'ouverture de la personnalisation", #e.w.events["logtime-settings-open"], 1)
 check("un gestionnaire pour la touche Entrée", #e.w.events["logtime-settings-Enter"], 1)

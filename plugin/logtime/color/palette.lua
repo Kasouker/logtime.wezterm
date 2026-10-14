@@ -39,12 +39,13 @@ end
 M.normalize = normalize
 
 -- Le numéro de cette couleur dans la palette (nil si elle n'y est pas). Majuscules, minuscules et # facultatif sont acceptés.
-function M.index_of(hex)
+-- colors : une autre liste de couleurs (la palette du thème) ; la palette classique par défaut.
+function M.index_of(hex, colors)
 	local wanted = normalize(hex)
 	if not wanted then
 		return nil
 	end
-	for i, color in ipairs(M.COLORS) do
+	for i, color in ipairs(colors or M.COLORS) do
 		if color == wanted then
 			return i
 		end
@@ -52,23 +53,41 @@ function M.index_of(hex)
 	return nil
 end
 
--- Le numéro de la couleur de la palette la plus proche (par la teinte ; un gris va au gris). nil si ce n'est pas une couleur.
-function M.nearest(hex)
+-- Le numéro de la couleur la plus proche dans la palette, ou nil si ce n'est pas une couleur.
+-- Un gris (peu saturé) va au gris le plus proche en luminosité ; une couleur va à la teinte la plus proche. Avec la palette
+-- classique, le gris est la couleur 16. colors : une autre liste de couleurs (la palette du thème).
+function M.nearest(hex, colors)
 local wanted = normalize(hex)
 if not wanted then
 return nil
 end
-local hue, saturation = gradient.hex_to_hsl(wanted)
-if saturation < 0.12 then
-return M.COUNT
+colors = colors or M.COLORS
+local hue, saturation, lightness = gradient.hex_to_hsl(wanted)
+local gray = saturation < 0.12
+local pool = {}
+for i, color in ipairs(colors) do
+local h, s, l = gradient.hex_to_hsl(color)
+if (s < 0.12) == gray then
+pool[#pool + 1] = { index = i, hue = h, lightness = l }
+end
+end
+if #pool == 0 then
+for i, color in ipairs(colors) do
+local h, _, l = gradient.hex_to_hsl(color)
+pool[#pool + 1] = { index = i, hue = h, lightness = l }
+end
 end
 local best, best_distance
-for i = 1, M.COUNT - 1 do
-local candidate = gradient.hex_to_hsl(M.COLORS[i])
-local d = math.abs(hue - candidate)
+for _, candidate in ipairs(pool) do
+local d
+if gray then
+d = math.abs(lightness - candidate.lightness)
+else
+d = math.abs(hue - candidate.hue)
 d = math.min(d, 360 - d)
+end
 if best_distance == nil or d < best_distance then
-best, best_distance = i, d
+best, best_distance = candidate.index, d
 end
 end
 return best
