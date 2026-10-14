@@ -45,8 +45,9 @@ local function visible_len(s)
 	return utf8.len(plain) or #plain
 end
 
--- Les traits et leur couleur, ou nil sans encadrés.
-local function border_of(cfg)
+-- Les traits et leur couleur (code ANSI), ou nil sans encadrés. Aussi utilisé par la page de personnalisation : les
+-- mêmes traits partout.
+function M.border_of(cfg)
 	if not borders_on(cfg) then
 		return nil
 	end
@@ -166,7 +167,7 @@ local function header_line(cfg, labels)
 		table.insert(names, 1, names[7])
 		names[8] = nil
 	end
-	local b, color = border_of(cfg)
+	local b, color = M.border_of(cfg)
 	if b then
 		-- dans le cadre du mois : chaque nom au-dessus de l'intérieur de sa case
 		local cells = {}
@@ -273,7 +274,7 @@ local function week_lines(days, year, month, today_key, cfg)
 	local goal_secs = stats.has_goal(cfg.goal_hours) and cfg.goal_hours * 3600 or nil
 	local count_days = dates.days_in_month(year, month)
 	local day = 1 - dates.offset(year, month, cfg.week_starts_on)
-	local b, color = border_of(cfg)
+	local b, color = M.border_of(cfg)
 	local v = b and (color .. b.v .. convert.RESET) or nil
 	if b then
 		out[#out + 1] = rule(b.l, b.t, b.r, b, color)
@@ -347,7 +348,7 @@ function M.render_month(days, year, month, today_key, cfg, labels)
 	end
 
 	local s = stats.month_stats(days, year, month, cfg.goal_hours)
-	local b, color = border_of(cfg)
+	local b, color = M.border_of(cfg)
 	-- Avec les encadrés, le mois et ses statistiques sont dans un cadre ; la légende des couleurs reste dehors. Le titre perd
 	-- alors « Logtime : » (il dépasserait du cadre ; la ligne d'aide au-dessus le dit déjà).
 	local function text(s_)
@@ -398,7 +399,7 @@ title = "\27[1m" .. title .. convert.RESET
 end
 title = title .. "   " .. totals_text(s, labels)
 local validated = validated_text(days, year, month, cfg, s, labels)
-local b, color = border_of(cfg)
+local b, color = M.border_of(cfg)
 if b then
 	-- Le mois dans son cadre : le haut, le titre, l'en-tête, la grille des cases, des lignes vides (dans le cadre) pour que
 	-- tous les mois aient la même hauteur, la ligne des validés, le bas.

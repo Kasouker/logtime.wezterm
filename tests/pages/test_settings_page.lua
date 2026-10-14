@@ -716,14 +716,14 @@ check("trois réglages : toujours 23 lignes", #four, 23)
 check("ligne 7 : le nombre de mois", four_plain[7], "  Mois affichés au maximum      ◀ 6 ▶")
 check("ligne 8 : la place du mois choisi (traduite)", four_plain[8], "  Place du mois choisi          ◀ au début ▶")
 check("ligne 9 : le début de la semaine, choisi (▸)", four_plain[9], "▸ Début de la semaine           ◀ dimanche ▶")
-check("ligne 10 : les encadrés, « non » par défaut", four_plain[10], "  Encadrés des cases            ◀ non ▶")
+check("ligne 10 : les encadrés, « non » par défaut", four_plain[10], "  Encadrés                      ◀ non ▶")
 check("ligne 11 : le style du trait, avec un aperçu", four_plain[11], "  Style du trait                ◀ arrondi ╭─╮ ▶")
 check("le centrage n'apparaît pas dans la page", table.concat(four_plain, "\n"):find("centr", 1, true), nil)
 check("ligne 12 : la couleur du trait, grise par défaut, avec un aperçu", four_plain[12], "  Couleur du trait              ◀ Gris ╭─╮ ▶")
 check("ligne 14 : l'explication du réglage choisi (le 3e)", four_plain[14], "  " .. fr.settings_hints.week_starts_on)
 local boxed = render({ tab = 2, row = 4, values = { borders = false, border_style = "heavy" }, message = 0 })
-check("encadrés « non » reste « non » (false n'est pas remplacé par la valeur par défaut)", strip(boxed[10]), "▸ Encadrés des cases            ◀ non ▶")
-check("encadrés « oui »", strip(render({ tab = 2, row = 1, values = { borders = true }, message = 0 })[10]), "  Encadrés des cases            ◀ oui ▶")
+check("encadrés « non » reste « non » (false n'est pas remplacé par la valeur par défaut)", strip(boxed[10]), "▸ Encadrés                      ◀ non ▶")
+check("encadrés « oui »", strip(render({ tab = 2, row = 1, values = { borders = true }, message = 0 })[10]), "  Encadrés                      ◀ oui ▶")
 check("style épais : son aperçu", strip(boxed[11]), "  Style du trait                ◀ épais ┏━┓ ▶")
 check("anglais : le style double", strip(render({ tab = 2, row = 1, values = { border_style = "double" }, message = 0 }, en)[11]), "  Border style                  ◀ double ╔═╗ ▶")
 local four_en = render({ tab = 2, row = 1, values = { months_anchor = "last", week_starts_on = "monday" }, message = 0 }, en)
@@ -777,7 +777,7 @@ press(e, "h", e.pane)
 press(e, "d", e.pane)
 check("d sur le début de la semaine : lundi (la valeur par défaut), rien de plus n'est écrit", read(e.path), '{\n  "week_starts_on": "monday"\n}\n')
 press(e, "j", e.pane)
-check("↓ : les encadrés", setting_line(e, "Encadrés des cases"):find("▸", 1, true) ~= nil, true)
+check("↓ : les encadrés", setting_line(e, "Encadrés  "):find("▸", 1, true) ~= nil, true)
 press(e, "l", e.pane)
 check("→ sur les encadrés : « oui » est enregistré", read(e.path), '{\n  "week_starts_on": "monday",\n  "borders": true\n}\n')
 check("→ sur les encadrés : appliqué tout de suite", e.cfg.borders, true)
@@ -944,6 +944,53 @@ check("aucune ligne de l'onglet Calendrier ne dépasse 57 colonnes, même avec l
 	end
 	return true
 end)(), true)
+
+-- ---- la page dans un cadre (avec les encadrés : les mêmes traits que le calendrier)
+local rounded = { tl = "╭", tr = "╮", bl = "╰", br = "╯", h = "─", v = "│", l = "├", r = "┤" }
+local framed_lines, framed_width = settings_page.frame({ "  titre", "  a", "" }, 10, rounded, "")
+check("frame : la largeur + 2", framed_width, 12)
+check("frame : le haut, le titre, la jonction, le reste, le bas", strip(table.concat(framed_lines, "|")), "╭──────────╮|│  titre   │|├──────────┤|│  a       │|│          │|╰──────────╯")
+check("frame : la largeur visible, sans les codes de couleur", strip(settings_page.frame({ "\27[1mab\27[0m" }, 4, rounded, "")[2]), "│ab  │")
+e = open({})
+e.cfg.borders = true
+e.page.on_resize(e.window, e.pane)
+local fl = shown_lines(e.pane)
+local first, last
+for i, line in ipairs(fl) do
+	if line:find("╭", 1, true) then first = first or i end
+	if line:find("╰", 1, true) then last = i end
+end
+check("encadrés : la page est dans un cadre de 26 lignes (23 + haut + jonction + bas)", last - first + 1, 26)
+check("encadrés : la barre d'onglets juste sous le haut", fl[first + 1]:find("│  Personnalisation  [Couleurs]", 1, true) ~= nil, true)
+check("encadrés : la jonction sous la barre d'onglets", fl[first + 2]:find("├─", 1, true) ~= nil, true)
+check("encadrés : chaque ligne du cadre fait 59 colonnes, la grille de couleurs comprise", (function()
+	local left = #fl[first]:match("^( *)")
+	for i = first, last do
+		if utf8.len(fl[i]) - left ~= 59 then
+			return i .. " : " .. (utf8.len(fl[i]) - left)
+		end
+	end
+	return true
+end)(), true)
+check("encadrés : la page a besoin de 59 x 26", select(3, e.page.build_lines({ cols = 59, rows = 26 })), true)
+check("encadrés : 58 colonnes, trop étroit", select(3, e.page.build_lines({ cols = 58, rows = 40 })), false)
+check("encadrés : 25 lignes, trop bas", select(3, e.page.build_lines({ cols = 120, rows = 25 })), false)
+check("encadrés : le message dit 59 x 26", strip(e.page.build_lines({ cols = 58, rows = 40 })[2]), "Il faut au moins 59 colonnes sur 26 lignes.")
+e.cfg.border_style = "double"
+e.cfg.border_color = "#3366CC"
+e.page.on_resize(e.window, e.pane)
+check("encadrés : le style et la couleur du calendrier", frame_of(e.pane):find(convert.fg("#3366CC") .. "╔", 1, true) ~= nil, true)
+press(e, "Tab", e.pane)
+for _ = 1, 3 do
+	press(e, "j", e.pane)
+end
+press(e, "h", e.pane)
+-- (on cherche un long trait : la ligne « Style du trait » montre aussi un petit aperçu « ╔═╗ »)
+check("encadrés « non » depuis la page : le cadre disparaît tout de suite", frame_of(e.pane):find("╔══════", 1, true), nil)
+press(e, "l", e.pane)
+check("encadrés « oui » depuis la page : le cadre revient tout de suite", frame_of(e.pane):find("╔══════", 1, true) ~= nil, true)
+e = open({})
+check("sans encadrés : pas de cadre autour de la page", frame_of(e.pane):find("╭", 1, true), nil)
 
 -- rouvrir la page : on revient à l'onglet Couleurs
 e = open({})

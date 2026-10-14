@@ -250,6 +250,25 @@ local function render_list(state, labels)
 	return lines, M.GRID_WIDTH
 end
 
+-- La page dans un cadre (les mêmes traits que le calendrier) : le haut, la barre d'onglets, une jonction « ├─┤ », le
+-- reste de la page, le bas. Chaque ligne est complétée jusqu'à width (sa largeur visible, sans les codes de couleur).
+-- Renvoie les lignes et la nouvelle largeur (width + 2).
+function M.frame(lines, width, b, color)
+	local function edge(left, right)
+		return color .. left .. string.rep(b.h, width) .. right .. convert.RESET
+	end
+	local v = color .. b.v .. convert.RESET
+	local out = { edge(b.tl, b.tr) }
+	for i, line in ipairs(lines) do
+		out[#out + 1] = v .. line .. string.rep(" ", math.max(0, width - layout.visible_width(line))) .. v
+		if i == 1 then
+			out[#out + 1] = edge(b.l, b.r)
+		end
+	end
+	out[#out + 1] = edge(b.bl, b.br)
+	return out, width + 2
+end
+
 -- Le texte de la page, sous forme de lignes. Toujours le même nombre de lignes (les lignes facultatives restent vides),
 -- pour que la page ne saute pas quand un message apparaît.
 --   state.tab = l'onglet affiché (M.TAB.COLORS par défaut) ; pour l'onglet Calendrier, voir render_calendar.
@@ -452,9 +471,14 @@ colors = active.colors,
 names = (active.kind == "theme" and labels.palette_theme) or labels.palette,
 consent_line = consent_line,
 }, labels)
-if dims and ((tonumber(dims.cols) or 0) < M.GRID_WIDTH or (tonumber(dims.rows) or 0) < #lines) then
+-- avec les encadrés : la page dans un cadre, avec les traits du calendrier
+local b, color = assemble.border_of(ctx.cfg())
+if b then
+	lines, width = M.frame(lines, width, b, color)
+end
+if dims and ((tonumber(dims.cols) or 0) < width or (tonumber(dims.rows) or 0) < #lines) then
 local title = labels.settings_too_small
-local hint = string.format(labels.settings_too_small_hint, M.GRID_WIDTH, #lines)
+local hint = string.format(labels.settings_too_small_hint, width, #lines)
 return { title, hint }, math.max(layout.visible_width(title), layout.visible_width(hint)), false
 end
 return lines, width, true
