@@ -24,6 +24,8 @@ return {
 	streak_unit = "j",
 	today = "* = aujourd'hui",
 	year_total = "Total de l'année",
+	idle_today = "Aujourd'hui : %s inactif sur %s (%d %%)",
+	idle_year = "Inactif : %s (%d %%)",
 	months_short = { "Jan", "Fév", "Mar", "Avr", "Mai", "Juin", "Juil", "Aoû", "Sep", "Oct", "Nov", "Déc" },
 	goal_toast = "🎉 Objectif du jour atteint : %s ! 🎉",
 	validated_weeks = "Semaines validées",

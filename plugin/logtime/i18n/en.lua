@@ -24,6 +24,8 @@ return {
 	streak_unit = "d",
 	today = "* = today",
 	year_total = "Year total",
+	idle_today = "Today: %s idle out of %s (%d%%)",
+	idle_year = "Idle: %s (%d%%)",
 	months_short = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" },
 	goal_toast = "🎉 Daily goal reached: %s! 🎉",
 	validated_weeks = "Validated weeks",

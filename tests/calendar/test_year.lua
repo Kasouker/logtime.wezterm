@@ -123,6 +123,40 @@ check("un jour sans travail : le gris foncé", raw:find(convert.fg(year.EMPTY_CO
 check("ligne 12 : moyenne et meilleur jour", p[12], "  Moyenne par jour actif : 3h45   Meilleur jour : 12 Mars (9h30)")
 check("sans objectif : pas de ligne « validées »", table.concat(p, "\n"):find("validé", 1, true), nil)
 
+-- ---- le temps inactif
+local idle_days = {
+	["2026-03-12"] = 3600, -- 1 h sur 9h30
+	["2026-10-13"] = 99999, -- plus que le temps du jour (0h30) : seulement 0h30
+	["2025-12-29"] = 3600, -- l'année d'avant : ne compte pas
+}
+local ip = plain((year.render(days, 2026, "2026-10-13", cfg, fr, idle_days)))
+check(
+	"inactif : 1h30 sur 15h00 = 10 %",
+	ip[12],
+	"  Moyenne par jour actif : 3h45   Meilleur jour : 12 Mars (9h30)   Inactif : 1h30 (10 %)"
+)
+check("inactif : year_stats", year.year_stats(days, 2026, cfg, idle_days).idle, 5400)
+check(
+	"inactif : sans temps inactif connu, 0h00",
+	plain((year.render(days, 2026, "x", cfg, fr, {})))[12]:match("Inactif.*$"),
+	"Inactif : 0h00 (0 %)"
+)
+check(
+	"inactif : année vide, pas de ligne inactif",
+	plain((year.render({}, 2026, "x", cfg, fr, idle_days)))[12]:find("Inactif", 1, true),
+	nil
+)
+check(
+	"inactif : anglais",
+	plain((year.render(days, 2026, "x", cfg, en, idle_days)))[12]:match("Idle.*$"),
+	"Idle: 1h30 (10%)"
+)
+check(
+	"inactif : la ligne tient dans la largeur",
+	utf8.len(ip[12]) <= select(2, year.render(days, 2026, "x", cfg, fr, idle_days)),
+	true
+)
+
 -- ---- les statistiques de l'année
 local s = year.year_stats(days, 2026, cfg)
 check(

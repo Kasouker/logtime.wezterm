@@ -22,8 +22,19 @@ local T0 = real_time({ year = 2026, month = 10, day = 13, hour = 12 })
 -- toute écriture doit rester dans le dossier personnel temporaire
 local homes = {}
 local outside = {}
+local writes = {} -- le nombre d'ouvertures en écriture, par nom de fichier (sans le dossier)
+local open_fails = {} -- io.open plante pour les fichiers dont le nom contient l'un de ces textes
 local real_open = io.open
 io.open = function(path, mode)
+	for _, part in ipairs(open_fails) do
+		if tostring(path):find(part, 1, true) then
+			error("test : lecture impossible")
+		end
+	end
+	if mode and mode:find("w") then
+		local name = tostring(path):match("[^/\\]+$")
+		writes[name] = (writes[name] or 0) + 1
+	end
 	if mode and (mode:find("w") or mode:find("a") or mode:find("%+")) then
 		local inside = false
 		for _, home in ipairs(homes) do
@@ -897,6 +908,170 @@ local function scenarios()
 		win.right:find("✓", 1, true) ~= nil,
 		true
 	)
+	cleanup(e)
+
+	-- ============================================================
+	-- le temps inactif : rien ne bouge dans le terminal pendant 5 min
+	-- ============================================================
+	-- un panneau qui reste le même : on décide nous-mêmes quand son texte change
+	local function screen_pane(env)
+		local pane = env.w.new_pane()
+		pane.text = "$ "
+		function pane:get_title()
+			return "zsh"
+		end
+		function pane:get_cursor_position()
+			return { x = #self.text, y = 0 }
+		end
+		function pane:get_lines_as_text()
+			return self.text
+		end
+		return pane
+	end
+	-- de from à to (secondes après T0), une mise à jour par seconde ; active : le texte change à chaque seconde
+	local function live(env, win_, pane, from, to, active)
+		for s = from, to do
+			clock.now = T0 + s
+			if active then
+				pane.text = "$ ligne " .. s
+			end
+			for _, handler in ipairs(env.w.events["update-status"] or {}) do
+				handler(win_, pane)
+			end
+		end
+	end
+	clock.now = T0
+	e = new_env({ file = false })
+	config = e.M.apply_to_config({})
+	win = e.window()
+	local screen = screen_pane(e)
+	open_binding(config, "F2")(win, screen)
+	local idle_page = e.w.spawned[#e.w.spawned].pane
+	check("inactif : rien de compté aujourd'hui, pas de ligne", last_text(idle_page):find("inactif", 1, true), nil)
+	live(e, win, screen, 0, 600, true) -- 10 min de travail
+	writes[".logtime_idle.json.tmp"] = 0
+	live(e, win, screen, 601, 4200, false) -- 1 h sans rien toucher
+	check(
+		"inactif : le fichier est écrit au plus toutes les 10 s (pas à chaque seconde)",
+		writes[".logtime_idle.json.tmp"] <= 3600 / 10,
+		true
+	)
+	live(e, win, screen, 4201, 4260, true) -- reprise
+	check("inactif : le compteur garde tout (1h11)", e.M.today_seconds(), 4260)
+	-- la pause d'une heure, plus la seconde de la reprise (comptée avant de voir que l'écran a changé)
+	check(
+		"inactif : la pause est notée dans .logtime_idle.json",
+		read(e.home .. "/.logtime_idle.json"),
+		'{"2026-10-13":3601}'
+	)
+	-- (sauvegardé toutes les 10 s : les dernières secondes sont encore en mémoire)
+	check(
+		"inactif : .logtime.json garde son format (sans l'inactif)",
+		read(e.home .. "/.logtime.json"):match('^{"2026%-10%-13":%d+}$') ~= nil,
+		true
+	)
+	check("inactif : aucune erreur", #e.w.logs.error, 0)
+	open_binding(config, "F2")(win, screen)
+	check(
+		"inactif : dans le calendrier, au bout de la légende",
+		last_text(idle_page):find("* = aujourd'hui     Aujourd'hui : 1h00 inactif sur 1h11 (85 %)", 1, true) ~= nil,
+		true
+	)
+	idle_page.dims = { viewport_rows = 40, cols = 80 }
+	page_binding(config, "r")(win, idle_page)
+	check(
+		"inactif : fenêtre trop étroite pour la ligne : pas affiché",
+		last_text(idle_page):find("inactif", 1, true),
+		nil
+	)
+	check("inactif : mais le calendrier, si", last_text(idle_page):find("Octobre 2026", 1, true) ~= nil, true)
+	idle_page.dims = { viewport_rows = 50, cols = 200 }
+	page_binding(config, "r")(win, idle_page)
+	check(
+		"inactif : plusieurs mois, au bout de la légende commune",
+		last_text(idle_page):find("Aujourd'hui : 1h00 inactif sur 1h11 (85 %)", 1, true) ~= nil,
+		true
+	)
+	page_binding(config, "a")(win, idle_page)
+	check(
+		"inactif : la vue de l'année, dans les statistiques",
+		last_text(idle_page):find("Inactif : 1h00 (85 %)", 1, true) ~= nil,
+		true
+	)
+	check(
+		"inactif : la vue de l'année, au bout de la légende",
+		last_text(idle_page):find("Aujourd'hui : 1h00 inactif", 1, true) ~= nil,
+		true
+	)
+	-- WezTerm rouvert : le fichier est relu, et la suite s'y ajoute
+	local home = e.home
+	homes[#homes + 1] = home
+	e = new_env({ file = false })
+	os.execute("rm -rf '" .. e.home .. "'")
+	e.home, e.w.home_dir = home, home
+	e.M.apply_to_config({})
+	screen = screen_pane(e)
+	live(e, win, screen, 4300, 4300, true)
+	live(e, win, screen, 4301, 4700, false) -- 6 min 40 sans rien toucher
+	check(
+		"inactif, WezTerm rouvert : l'ancien inactif est gardé, le nouveau s'y ajoute",
+		read(home .. "/.logtime_idle.json"),
+		'{"2026-10-13":4001}'
+	)
+	cleanup(e)
+	-- un fichier d'inactif abîmé : mis de côté, jamais pris pour du vide en silence
+	clock.now = T0
+	e = new_env({ file = false })
+	write(e.home .. "/.logtime_idle.json", "pas du json")
+	e.M.apply_to_config({})
+	screen = screen_pane(e)
+	live(e, win, screen, 0, 400, false)
+	check("inactif, fichier abîmé : signalé une seule fois dans les journaux", #e.w.logs.error, 1)
+	check(
+		"inactif, fichier abîmé : mis de côté",
+		io.popen("ls -a '" .. e.home .. "'"):read("*a"):find(".logtime_idle.json.corrupt-", 1, true) ~= nil,
+		true
+	)
+	check("inactif, fichier abîmé : un nouveau fichier", read(e.home .. "/.logtime_idle.json"), '{"2026-10-13":400}')
+	cleanup(e)
+	-- le fichier ne se lit pas tout de suite : le temps inactif attend en mémoire, puis s'ajoute au fichier
+	clock.now = T0
+	e = new_env({ file = false })
+	write(e.home .. "/.logtime_idle.json", '{"2026-10-12":7200,"2026-10-13":50}')
+	e.M.apply_to_config({})
+	screen = screen_pane(e)
+	open_fails[1] = "logtime_idle"
+	live(e, win, screen, 0, 400, false)
+	open_fails[1] = nil
+	live(e, win, screen, 401, 421, false) -- sauvegardé à 401, 411 et 421
+	check(
+		"inactif, lu en retard : la mémoire (421 s) l'emporte sur le fichier (50 s), les autres jours sont gardés",
+		read(e.home .. "/.logtime_idle.json"),
+		'{"2026-10-12":7200,"2026-10-13":421}'
+	)
+	cleanup(e)
+	-- un fichier abîmé qu'on ne peut pas mettre de côté : jamais écrasé, signalé une seule fois
+	clock.now = T0
+	e = new_env({ file = false })
+	write(e.home .. "/.logtime_idle.json", "pas du json")
+	e.M.apply_to_config({})
+	local real_rename = os.rename
+	os.rename = function(from, to)
+		if tostring(from):find("logtime_idle", 1, true) then
+			return nil, "refusé"
+		end
+		return real_rename(from, to)
+	end
+	screen = screen_pane(e)
+	live(e, win, screen, 0, 400, false)
+	os.rename = real_rename
+	check(
+		"inactif, impossible à mettre de côté : pas écrasé",
+		read(e.home .. "/.logtime_idle.json"),
+		"pas du json"
+	)
+	check("inactif, impossible à mettre de côté : une seule erreur", #e.w.logs.error, 1)
+	check("inactif, impossible à mettre de côté : le compteur compte quand même", e.M.today_seconds(), 400)
 	cleanup(e)
 end
 

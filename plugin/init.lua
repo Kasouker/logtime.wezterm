@@ -79,6 +79,7 @@ end
 
 local day = load_module("core/day")
 local counter = load_module("core/counter")
+local idle = load_module("core/idle")
 local status = load_module("status/status")
 local auto = load_module("status/auto")
 local storage = load_module("storage/days")
@@ -97,6 +98,8 @@ local cfg = {
 	day_offset = 0, -- 0 : la journée change à minuit
 	save_every = 10, -- sauvegarde dans le fichier toutes les 10 secondes (s'il y a du nouveau)
 	data_file = nil, -- nil : <dossier personnel>/.logtime.json
+	idle_after = 300, -- rien ne bouge dans le terminal pendant 5 min : ce temps est noté comme inactif (il compte quand même)
+	idle_file = nil, -- nil : <dossier personnel>/.logtime_idle.json (le temps inactif par jour)
 	week_starts_on = "monday", -- ou "sunday"
 	goal_hours = nil, -- nombre d'heures par jour qui comptent pour « objectif atteint » (nil : pas d'objectif)
 	lang = "fr", -- "fr" ou "en"
@@ -112,6 +115,8 @@ local EXTRA_OPTIONS = {
 	"day_offset",
 	"save_every",
 	"data_file",
+	"idle_after",
+	"idle_file",
 	"settings_file",
 	"settings_key",
 	"open_key",
@@ -308,6 +313,133 @@ local function ensure_synced(now)
 end
 
 -- ------------------------------------------------------------
+-- Le temps inactif (core/idle.lua), dans son propre fichier, au même format : { "2026-10-12": secondes }
+-- ------------------------------------------------------------
+--   logtime_idle_json      : le temps inactif par jour, en texte
+--   logtime_idle_ready     : le fichier a été lu et fusionné dans cette session
+--   logtime_idle_broken    : le fichier est illisible et n'a pas pu être mis de côté : on ne l'écrit pas
+--   logtime_idle_dirty, logtime_idle_saved, logtime_idle_save_failed : la sauvegarde
+--   logtime_last_activity  : la dernière fois que quelque chose a bougé dans un terminal
+--   logtime_idle_marked    : la dernière activité dont l'inactivité est déjà notée
+local function idle_path()
+	return cfg.idle_file or (wezterm.home_dir .. sep .. ".logtime_idle.json")
+end
+
+local idle_mem = nil
+
+-- Le temps inactif par jour. Le fichier est lu une fois par session et fusionné (la plus grande des deux valeurs) ;
+-- un fichier illisible est mis de côté. Si la lecture plante, on réessaiera (et on n'écrit rien d'ici là).
+local function get_idle()
+	if not idle_mem then
+		local text = G.logtime_idle_json
+		idle_mem = (type(text) == "string" and storage.decode(text)) or {}
+	end
+	if not G.logtime_idle_ready and not G.logtime_idle_broken then
+		local ok, from_file, state, err = pcall(storage.load, idle_path())
+		if ok then
+			if state == "corrupt" then
+				local moved_ok, moved = pcall(storage.quarantine, idle_path())
+				if not (moved_ok and moved) then
+					G.logtime_idle_broken = true -- surtout ne pas l'écraser
+					wezterm.log_error(
+						"logtime : le fichier du temps inactif est illisible ("
+							.. tostring(err)
+							.. ") et n'a pas pu être mis de côté : le temps inactif n'est pas sauvegardé"
+					)
+					return idle_mem
+				end
+				wezterm.log_error(
+					"logtime : le fichier du temps inactif était illisible ("
+						.. tostring(err)
+						.. ") : mis de côté dans "
+						.. moved
+				)
+				from_file = {}
+			end
+			for key, secs in pairs(from_file) do
+				if (idle_mem[key] or 0) < secs then
+					idle_mem[key] = secs
+				end
+			end
+			G.logtime_idle_json = storage.encode(idle_mem)
+			G.logtime_idle_ready = true
+		end
+	end
+	return idle_mem
+end
+
+-- Du temps vient d'être compté, de `from` à `to` : la part inactive va aussi dans le temps inactif.
+local function note_idle(from, to)
+	local last_activity = num(G.logtime_last_activity)
+	local start = idle.span(last_activity, num(G.logtime_idle_marked), from, to, cfg.idle_after)
+	if not start then
+		return
+	end
+	G.logtime_idle_marked = last_activity
+	local idle_days = get_idle()
+	day.add_interval(idle_days, start, to, cfg.day_offset)
+	G.logtime_idle_json = storage.encode(idle_days)
+	G.logtime_idle_dirty = true
+end
+
+local function maybe_save_idle(now)
+	if not G.logtime_idle_dirty or not G.logtime_idle_ready then
+		return
+	end
+	local last_save = num(G.logtime_idle_saved)
+	if last_save and last_save <= now and now - last_save < cfg.save_every then
+		return
+	end
+	local ok, saved, err = pcall(storage.save, idle_path(), get_idle())
+	G.logtime_idle_saved = now
+	if ok and saved then
+		G.logtime_idle_dirty = false
+		G.logtime_idle_save_failed = false
+	elseif not G.logtime_idle_save_failed then
+		G.logtime_idle_save_failed = true
+		wezterm.log_error("logtime : sauvegarde du temps inactif impossible : " .. tostring(ok and err or saved))
+	end
+end
+
+-- L'empreinte de ce qu'on voit dans un panneau : si elle change, il y a de l'activité. Chaque morceau est lu à part
+-- (une information illisible ne gêne pas les autres).
+local function pane_fingerprint(pane)
+	local parts = {}
+	local function add(read)
+		local ok, value = pcall(read)
+		parts[#parts + 1] = ok and tostring(value) or "?"
+	end
+	add(function()
+		return pane:pane_id()
+	end)
+	add(function()
+		return pane:get_title()
+	end)
+	add(function()
+		local c = pane:get_cursor_position()
+		return c.x .. "," .. c.y
+	end)
+	add(function()
+		return pane:get_lines_as_text()
+	end)
+	return table.concat(parts, "\n")
+end
+
+-- La dernière empreinte de chaque fenêtre (elle se perd au rechargement de la config : ça compte comme une activité).
+local fingerprints = {}
+
+-- À chaque mise à jour : quelque chose a-t-il bougé dans le panneau actif de cette fenêtre ?
+local function note_activity(window, pane)
+	local ok, id = pcall(function()
+		return window:window_id()
+	end)
+	local key = ok and tostring(id) or "?"
+	local current = pane_fingerprint(pane)
+	G.logtime_last_activity = idle.note(fingerprints[key], current, num(G.logtime_last_activity), os.time())
+	fingerprints[key] = current
+end
+
+-- ------------------------------------------------------------
 -- Le comptage
 -- ------------------------------------------------------------
 local function compute()
@@ -319,9 +451,11 @@ local function compute()
 	local last = num(G.logtime_last)
 	local state = { budget = num(G.logtime_budget, 0), calm = num(G.logtime_calm, 0) }
 
-	if counter.advance(days, last, now, cfg, state) then
+	local added, counted = counter.advance(days, last, now, cfg, state)
+	if added then
 		remember(days)
 		G.logtime_dirty = true
+		note_idle(last, last + counted)
 	end
 	G.logtime_budget = state.budget
 	G.logtime_calm = state.calm
@@ -333,6 +467,7 @@ local function compute()
 	if G.logtime_storage_ready then
 		maybe_save(now, days)
 	end
+	maybe_save_idle(now)
 	return days[day.key(now, cfg.day_offset)] or 0
 end
 
@@ -431,7 +566,8 @@ local function maybe_announce(window, reached)
 end
 
 local function on_update_status(window, pane, tabline_url)
-	local text, reached = status_text()
+	local text, reached = status_text() -- d'abord compter (avec la dernière activité connue), puis regarder l'activité
+	note_activity(window, pane)
 	update_tabline_style(reached)
 	maybe_announce(window, reached)
 	local now = os.time()
@@ -510,6 +646,7 @@ function M.apply_to_config(config, opts, ...)
 			G = G,
 			num = num,
 			days = days_for_page,
+			idle_days = get_idle,
 			today_key = function()
 				return day.key(os.time(), cfg.day_offset)
 			end,

@@ -6,6 +6,7 @@ local assemble = load("calendar/assemble")
 local dates = load("calendar/dates")
 local stats = load("calendar/stats")
 local convert = load("color/convert")
+local idle = load("core/idle")
 
 local M = {}
 
@@ -46,15 +47,17 @@ local function visible_len(s)
 	return utf8.len(plain) or #plain
 end
 
--- Les statistiques de l'année : total, jours actifs, meilleur jour, jours et semaines validés (avec un objectif).
-function M.year_stats(days, year, cfg)
+-- Les statistiques de l'année : total, jours actifs, meilleur jour, jours et semaines validés (avec un objectif), et
+-- le temps inactif (idle_days facultatif : { ["2026-10-12"] = secondes }, jamais plus que le temps du jour).
+function M.year_stats(days, year, cfg, idle_days)
 	local offset = dates.offset(year, 1, cfg.week_starts_on)
 	local goal_secs = stats.has_goal(cfg.goal_hours) and cfg.goal_hours * 3600 or nil
-	local s = { total = 0, active = 0, best_secs = 0, goal_days = 0, weeks = 0, validated_weeks = 0 }
+	local s = { total = 0, active = 0, best_secs = 0, goal_days = 0, weeks = 0, validated_weeks = 0, idle = 0 }
 	for i = 1, days_in_year(year) do
 		local key = dates.key_any(year, 1, i)
 		local secs = math.floor(math.max(0, days[key] or 0))
 		s.total = s.total + secs
+		s.idle = s.idle + idle.share(secs, idle_days and idle_days[key])
 		if secs > 0 then
 			s.active = s.active + 1
 		end
@@ -89,12 +92,13 @@ end
 
 -- Dessine l'année. cfg : les réglages du calendrier, avec le dégradé (gradient.apply_to). Renvoie les lignes et la
 -- largeur (celle qu'on centre). Avec les encadrés : l'année dans un cadre, le titre sur le haut, les validés sur le bas.
-function M.render(days, year, today_key, cfg, labels)
+-- idle_days (facultatif) : le temps inactif par jour, ajouté aux statistiques (« Inactif : 42h10 (8 %) »).
+function M.render(days, year, today_key, cfg, labels, idle_days)
 	local offset = dates.offset(year, 1, cfg.week_starts_on)
 	local columns = M.columns(year, cfg.week_starts_on)
 	local width = content_width(year, cfg)
 	local count = days_in_year(year)
-	local s = M.year_stats(days, year, cfg)
+	local s = M.year_stats(days, year, cfg, idle_days)
 
 	-- la ligne des mois : chaque nom au-dessus de la semaine de son 1er jour
 	local header = {}
@@ -148,6 +152,10 @@ function M.render(days, year, today_key, cfg, labels)
 			labels.months[tonumber(m)],
 			stats.hm(s.best_secs)
 		)
+	end
+	if idle_days and s.total > 0 then
+		local _, percent = idle.share(s.total, s.idle)
+		line[#line + 1] = string.format(labels.idle_year, stats.hm(s.idle), percent)
 	end
 	content[#content + 1] = table.concat(line, "   ")
 	local title =

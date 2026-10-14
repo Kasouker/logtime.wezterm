@@ -7,6 +7,8 @@ local screen = load("ui/screen")
 local keytable = load("ui/keytable")
 local safe = load("ui/safe")
 local gradient = load("color/gradient")
+local stats = load("calendar/stats")
+local idle = load("core/idle")
 
 local M = {}
 
@@ -18,6 +20,7 @@ M.VIEW = { MONTHS = 1, YEAR = 2 }
 --   G             wezterm.GLOBAL
 --   num(v)        convertit une valeur lue dans GLOBAL en vrai nombre (nil si elle est absente)
 --   days()        les heures par jour (table { ["2026-10-12"] = secondes })
+--   idle_days()   le temps inactif par jour, même forme (facultatif)
 --   today_key()   la date du jour ("2026-10-12")
 --   cfg()         les réglages (week_starts_on, goal_hours, day_offset, max_months, months_anchor, center, gradient...)
 --   labels()      les textes dans la langue choisie
@@ -62,6 +65,20 @@ function M.create(ctx)
 		return nil
 	end
 
+	-- Après la légende : « Aujourd'hui : 1h30 inactif sur 10h04 (15 %) » (rien si rien n'est compté aujourd'hui).
+	local function idle_today(labels)
+		if not ctx.idle_days then
+			return ""
+		end
+		local today = ctx.today_key()
+		local total = ctx.days()[today] or 0
+		if total <= 0 then
+			return ""
+		end
+		local secs, percent = idle.share(total, ctx.idle_days()[today])
+		return "     " .. string.format(labels.idle_today, stats.hm(secs), stats.hm(total), percent)
+	end
+
 	local function current_view()
 		return num(G.logtime_page_view) == M.VIEW.YEAR and M.VIEW.YEAR or M.VIEW.MONTHS
 	end
@@ -70,8 +87,14 @@ function M.create(ctx)
 	-- dans la fenêtre : le message « fenêtre trop petite », avec la taille nécessaire.
 	local function build_year_text(dims, labels, cfg, year)
 		local help = "  " .. labels.title .. "   " .. labels.year_help
-		local lines, width = year_view.render(ctx.days(), year, ctx.today_key(), cfg, labels)
-		local text = help .. "\n\n" .. table.concat(lines, "\n") .. "\n\n" .. assemble.legend(cfg, labels)
+		local idle_days = ctx.idle_days and ctx.idle_days() or nil
+		local lines, width = year_view.render(ctx.days(), year, ctx.today_key(), cfg, labels, idle_days)
+		local text = help
+			.. "\n\n"
+			.. table.concat(lines, "\n")
+			.. "\n\n"
+			.. assemble.legend(cfg, labels)
+			.. idle_today(labels)
 		local needed = #lines + 4
 		width = math.max(width, layout.visible_width(help))
 		if dims and ((tonumber(dims.cols) or 0) < width or (tonumber(dims.rows) or 0) < needed) then
@@ -106,6 +129,12 @@ function M.create(ctx)
 					return title .. "\n" .. hint, 0, math.max(layout.visible_width(title), layout.visible_width(hint))
 				end
 			end
+			-- l'inactif au bout de la légende (la dernière ligne), seulement s'il tient dans la fenêtre
+			local with_idle = text .. idle_today(labels)
+			local last_line = with_idle:match("([^\n]*)$")
+			if not dims or layout.visible_width(last_line) <= (tonumber(dims.cols) or 0) then
+				text = with_idle
+			end
 			return text, 1, block_width
 		end
 		local days, today = ctx.days(), ctx.today_key()
@@ -116,7 +145,11 @@ function M.create(ctx)
 		end
 		local body = layout.arrange(blocks, plan.columns, layout.GAP)
 		local width = plan.columns * block_width + (plan.columns - 1) * layout.GAP
-		return help .. "\n\n" .. table.concat(body, "\n") .. "\n\n" .. assemble.legend(cfg, labels), plan.count, width
+		return help .. "\n\n" .. table.concat(body, "\n") .. "\n\n" .. assemble.legend(cfg, labels) .. idle_today(
+			labels
+		),
+			plan.count,
+			width
 	end
 
 	-- Le texte, centré dans la fenêtre (réglage center = false pour le garder en haut à gauche).

@@ -5,7 +5,7 @@ local day = load("core/day")
 local M = {}
 
 -- Fait avancer le compteur entre l'instant précédent (`last`) et maintenant (`now`).
--- Renvoie true si du temps a été ajouté.
+-- Renvoie true si du temps a été ajouté, et combien (le temps ajouté va de `last` à `last` + ce nombre).
 --
 --   - un écart normal (<= cfg.normal_gap secondes) est compté en entier ;
 --   - un écart plus long (veille, hibernation, blocage) est compté dans la limite d'un BUDGET DE VEILLE :
@@ -47,7 +47,7 @@ function M.advance(days, last, now, cfg, state)
 		return false
 	end
 	day.add_interval(days, last, last + counted, cfg.day_offset)
-	return true
+	return true, counted
 end
 
 return M
