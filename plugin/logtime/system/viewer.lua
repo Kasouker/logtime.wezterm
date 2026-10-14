@@ -1,1 +1,0 @@
--- plugin/logtime/system/viewer.lua : affichage simple sans navigation

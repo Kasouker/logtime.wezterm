@@ -1,1 +1,0 @@
--- plugin/logtime/storage/settings.lua : lecture et écriture des choix de personnalisation

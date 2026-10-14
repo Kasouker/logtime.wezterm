@@ -1,1 +1,0 @@
--- plugin/logtime/calendar/months.lua : nombre de mois affichés selon la taille de la fenêtre

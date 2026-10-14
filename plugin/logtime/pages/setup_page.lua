@@ -1,1 +1,0 @@
--- plugin/logtime/pages/setup_page.lua : page de personnalisation : tableau de couleurs numéroté, haut et bas

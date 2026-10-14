@@ -1,1 +1,0 @@
--- plugin/logtime/config/validate.lua : contrôle des valeurs
