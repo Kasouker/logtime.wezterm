@@ -206,14 +206,14 @@ local days = { ["2026-10-10"] = 15231, ["2026-10-11"] = 1900, ["2026-10-12"] = 3
 local blk = assemble.month_block(days, 2026, 10, "2026-10-12", {}, fr, false)
 check("month_block : la largeur annoncée", blk.width, assemble.WIDTH)
 check("month_block : la hauteur est toujours la même", #blk.lines, assemble.HEIGHT)
-check("month_block : le titre n'a pas le préfixe du plugin", strip(blk.lines[1]), "  Octobre 2026")
+check("month_block : le titre, sans le préfixe du plugin, suivi du total et des jours actifs", strip(blk.lines[1]), "  Octobre 2026   Total du mois : 5h45 / Jours actifs : 3")
 check("month_block : pas de gras si le mois n'est pas le choisi", blk.lines[1]:find("\27[1m", 1, true), nil)
 check("month_block : l'en-tête est celui du dessin", strip(blk.lines[2]):match("^%s*(%a+)"), "Lun")
-check("month_block : la dernière ligne résume le mois", strip(blk.lines[#blk.lines]), "  Total du mois : 5h45   Jours actifs : 3")
+check("month_block sans objectif : la dernière ligne est vide (rien à valider)", strip(blk.lines[#blk.lines]), "")
 local selected = assemble.month_block(days, 2026, 10, "2026-10-12", {}, fr, true)
-check("month_block : le mois choisi a son titre en gras", selected.lines[1], "\27[1m  Octobre 2026\27[0m")
+check("month_block : le mois choisi a son titre en gras (seulement le nom du mois)", selected.lines[1]:find("\27[1m  Octobre 2026\27[0m   Total", 1, true), 1)
 check("month_block : en gras, le reste est identique", table.concat(selected.lines, "\n", 2), table.concat(blk.lines, "\n", 2))
-check("month_block : anglais", strip(assemble.month_block(days, 2026, 10, "x", {}, en, false).lines[#blk.lines]), "  Month total : 5h45   Active days : 3")
+check("month_block : anglais", strip(assemble.month_block(days, 2026, 10, "x", {}, en, false).lines[1]), "  October 2026   Month total : 5h45 / Active days : 3")
 check("month_block : semaine du dimanche", strip(assemble.month_block(days, 2026, 10, "x", { week_starts_on = "sunday" }, fr, false).lines[2]):match("^%s*(%a+)"), "Dim")
 local full = {}
 for line in (strip(assemble.render_month(days, 2026, 10, "2026-10-12", {}, fr)) .. "\n"):gmatch("(.-)\n") do

@@ -197,7 +197,7 @@ local days = { ["2026-10-10"] = 15231, ["2026-10-11"] = 1900, ["2026-10-12"] = 3
 local text = render(days, 2026, 10, "2026-10-12")
 local lines = lines_of(strip(text))
 check("première ligne vide", lines[1], "")
-check("titre", lines[2], "  Logtime : Octobre 2026")
+check("titre, avec le total et les jours actifs", lines[2], "  Logtime : Octobre 2026   Total du mois : 5h45 / Jours actifs : 3")
 check("en-tête : commence par Lun", lines[4]:match("^%s*(%a+)"), "Lun")
 check("en-tête : sept jours dans l'ordre", table.concat({ lines[4]:match("(%a+)%s+(%a+)%s+(%a+)%s+(%a+)%s+(%a+)%s+(%a+)%s+(%a+)") }, ","), "Lun,Mar,Mer,Jeu,Ven,Sam,Dim")
 check("largeur de l'en-tête", width(lines[4]), assemble.WIDTH)
@@ -270,11 +270,11 @@ check("alignement : l'en-tête et toutes les semaines ont la même largeur, tous
 -- ============================================================
 -- calendar/assemble.lua : les statistiques et la légende
 -- ============================================================
-check("statistiques : première ligne", lines[#lines - 2], "  Total du mois : 5h45   Jours actifs : 3   Moyenne par jour actif : 1h55")
+check("statistiques : première ligne (le total est monté dans le titre)", lines[#lines - 2], "  Moyenne par jour actif : 1h55")
 check("statistiques : deuxième ligne", lines[#lines - 1], "  Meilleur jour : 10 (4h13)   Série en cours : 3 j")
 check("légende : niveaux par défaut", lines[#lines], "  ██ <1h   ██ 1-3h   ██ 3-6h   ██ 6h+     * = aujourd'hui")
 local with_goal = lines_of(strip(render(days, 2026, 10, "2026-10-12", { goal_hours = 3 })))
-check("objectif : atteint 1 jour sur 3", with_goal[#with_goal - 1], "  Meilleur jour : 10 (4h13)   Série en cours : 3 j   Objectif atteint : 1 j")
+check("objectif : 1 jour validé sur 31, aucune semaine", with_goal[#with_goal - 1], "  Semaines validées : 0/5 / Jours validés : 1/31")
 local goal_zero = lines_of(strip(render(days, 2026, 10, "2026-10-12", { goal_hours = 0 })))
 check("objectif 0 (« aucun ») : pas de ligne Objectif", goal_zero[#goal_zero - 1], "  Meilleur jour : 10 (4h13)   Série en cours : 3 j")
 check("has_goal : 0 n'est pas un objectif", stats.has_goal(0), false)
@@ -308,7 +308,7 @@ local function struck_weeks(text)
 end
 check("un seul jour rayé dans le mois", struck_days(goal_raw), 1)
 check("un seul ✓ de jour dans le mois", select(2, goal_raw:gsub("✓ %d+h", "")), 1)
-check("avec un objectif, la ligne fait 65 + 8 (la colonne de la semaine), ✓ et rayé compris", utf8.len(plain_line), 73)
+check("avec un objectif, la ligne garde ses 65 colonnes, ✓ et rayé compris", utf8.len(plain_line), 65)
 check("sans objectif, la ligne fait toujours 65", utf8.len(strip(durations_line(render(days, 2026, 10, "2026-10-12", {}), " 10 "))), 65)
 check("objectif atteint pile (3h00 = 3h) : ✓", strip(render({ ["2026-10-05"] = 10800 }, 2026, 10, "2026-10-12", { goal_hours = 3 })):find("✓ 3h00", 1, true) ~= nil, true)
 check("objectif 2h59 pour 3h : rayé", render({ ["2026-10-05"] = 10799 }, 2026, 10, "2026-10-12", { goal_hours = 3 }):find("\27[9m2h59", 1, true) ~= nil, true)
@@ -320,55 +320,81 @@ check("objectif « aucun » (0) : ni ✓ ni rayé", zero_goal:find("✓", 1, tru
 check("mois sans rien : ni jour ni semaine rayés (comme un jour vide, une semaine sans travail n'est pas ratée)", render({}, 2026, 10, "2026-10-12", { goal_hours = 3 }):find("\27[9m", 1, true), nil)
 local past_month = render({ ["2026-09-01"] = 60, ["2026-09-30"] = 60 }, 2026, 9, "2026-10-12", { goal_hours = 3 })
 check("mois passé entier : tous les jours pas atteints sont rayés", struck_days(past_month), 2)
-check("mois passé entier : seules les 2 semaines travaillées sont rayées", struck_weeks(past_month), 2)
+check("mois passé entier : les semaines ne sont jamais rayées (plus de colonne)", struck_weeks(past_month), 0)
 
--- ---- la colonne de la semaine
--- le 10 (samedi) : 4h13, le 11 : 0h31, le 12 (aujourd'hui, lundi) : 1h00 ; objectif 3 h
--- les 8 derniers CARACTÈRES (le ✓ fait trois octets : couper par octets le casserait)
-local function week_cell(text, day_pattern)
-	local line = strip(durations_line(text, day_pattern))
-	return usub(line, utf8.len(line) - 7, utf8.len(line))
-end
-check("en-tête : « Semaine » au-dessus de la colonne", strip(lines_of(goal_raw)[4]):sub(-8), "Semaine ")
-check("sans objectif : pas de colonne dans l'en-tête", strip(lines_of(render(days, 2026, 10, "2026-10-12", {}))[4]):find("Semaine", 1, true), nil)
-check("semaine du 5 au 11 : 1 jour réussi sur 5, finie et travaillée : rayée", durations_line(goal_raw, " 10 "):find("\27[9m1/5\27[29m", 1, true) ~= nil, true)
-check("semaine du 12 (en cours) : 0/5, pas rayée (elle peut encore réussir)", week_cell(goal_raw, "%*12 "), "  0/5   ")
+-- ---- les semaines validées (en bas du mois)
+-- une semaine est validée si l'objectif est atteint goal_days jours sur ses 7 jours
 local five = {}
 for d = 5, 9 do
 	five[string.format("2026-10-%02d", d)] = 4 * 3600
 end
-check("5 jours réussis sur 5 : « ✓ 5/5 »", week_cell(render(five, 2026, 10, "2026-10-20", { goal_hours = 3 }), " 9 "), " ✓ 5/5  ")
-check("goal_days = 3 : la même semaine est « ✓ 5/3 »", week_cell(render(five, 2026, 10, "2026-10-20", { goal_hours = 3, goal_days = 3 }), " 9 "), " ✓ 5/3  ")
-check("semaine en cours déjà réussie : ✓ sans attendre la fin", week_cell(render(five, 2026, 10, "2026-10-09", { goal_hours = 3 }), " 9 "), " ✓ 5/5  ")
--- une semaine à cheval sur deux mois compte ses 7 jours, ceux du mois voisin compris
-local across = { ["2026-09-28"] = 4 * 3600, ["2026-09-29"] = 4 * 3600, ["2026-09-30"] = 4 * 3600, ["2026-10-01"] = 4 * 3600, ["2026-10-02"] = 4 * 3600 }
-check("semaine du 28 sept. au 4 oct., vue en octobre : les jours de septembre comptent (✓ 5/5)", week_cell(render(across, 2026, 10, "2026-10-20", { goal_hours = 3 }), "  1 "), " ✓ 5/5  ")
-check("la même semaine, vue en septembre : même résultat", week_cell(render(across, 2026, 9, "2026-10-20", { goal_hours = 3 }), " 28 "), " ✓ 5/5  ")
-check("semaine du dimanche : les 7 jours suivent le début de la semaine", week_cell(render(five, 2026, 10, "2026-10-20", { goal_hours = 3, week_starts_on = "sunday" }), " 9 "), " ✓ 5/5  ")
+local function vw(data, y, m, cfg)
+	return table.concat({ assemble.validated_weeks(data, y, m, cfg) }, "/")
+end
+check("validated_weeks : sans objectif, rien", assemble.validated_weeks(five, 2026, 10, {}), nil)
+check("validated_weeks : objectif 0 (aucun), rien", assemble.validated_weeks(five, 2026, 10, { goal_hours = 0 }), nil)
+check("octobre 2026 (lundi) : 5 semaines affichées, 1 validée (5 jours sur 5)", vw(five, 2026, 10, { goal_hours = 3 }), "1/5")
+check("4 jours sur 5 : pas validée", vw({ ["2026-10-05"] = 4 * 3600, ["2026-10-06"] = 4 * 3600, ["2026-10-07"] = 4 * 3600, ["2026-10-08"] = 4 * 3600 }, 2026, 10, { goal_hours = 3 }), "0/5")
+check("goal_days = 3 : 5 jours suffisent largement", vw(five, 2026, 10, { goal_hours = 3, goal_days = 3 }), "1/5")
+check("goal_days = 6 : 5 jours ne suffisent pas", vw(five, 2026, 10, { goal_hours = 3, goal_days = 6 }), "0/5")
+check("objectif 5 h : des jours de 4 h ne comptent pas", vw(five, 2026, 10, { goal_hours = 5 }), "0/5")
 local with_sunday = { ["2026-10-05"] = 4 * 3600, ["2026-10-06"] = 4 * 3600, ["2026-10-07"] = 4 * 3600, ["2026-10-08"] = 4 * 3600, ["2026-10-11"] = 4 * 3600 }
-check("le 7e jour de la semaine (dimanche 11) compte aussi : ✓ 5/5", week_cell(render(with_sunday, 2026, 10, "2026-10-20", { goal_hours = 3 }), " 9 "), " ✓ 5/5  ")
+check("le 7e jour de la semaine (dimanche 11) compte aussi", vw(with_sunday, 2026, 10, { goal_hours = 3 }), "1/5")
+local across = { ["2026-09-28"] = 4 * 3600, ["2026-09-29"] = 4 * 3600, ["2026-09-30"] = 4 * 3600, ["2026-10-01"] = 4 * 3600, ["2026-10-02"] = 4 * 3600 }
+check("semaine du 28 sept. au 4 oct., en octobre : les jours de septembre comptent", vw(across, 2026, 10, { goal_hours = 3 }), "1/5")
+check("la même semaine, en septembre : validée aussi", vw(across, 2026, 9, { goal_hours = 3 }), "1/5")
+check("semaine du dimanche : novembre 2026 (commence un dimanche) a 5 semaines", vw({}, 2026, 11, { goal_hours = 3, week_starts_on = "sunday" }), "0/5")
+check("semaine du lundi : novembre 2026 a 6 semaines", vw({}, 2026, 11, { goal_hours = 3 }), "0/6")
+check("février 2021 (commence un lundi, 28 jours) : 4 semaines", vw({}, 2021, 2, { goal_hours = 3 }), "0/4")
+
+-- les lignes : total et jours actifs en haut, semaines et jours validés en bas
+local wk = lines_of(strip(render(five, 2026, 10, "2026-10-20", { goal_hours = 3 })))
+check("mois seul : le titre avec le total et les jours actifs", wk[2], "  Logtime : Octobre 2026   Total du mois : 20h00 / Jours actifs : 5")
+check("mois seul : semaines et jours validés (jours sur le nombre de jours du mois)", wk[#wk - 1], "  Semaines validées : 1/5 / Jours validés : 5/31")
+check("mois seul sans objectif : pas de ligne « validées »", strip(render(five, 2026, 10, "2026-10-20", {})):find("validé", 1, true), nil)
+local blk_goal = assemble.month_block(five, 2026, 9, "2026-10-20", { goal_hours = 3 }, fr, false)
+check("plusieurs mois : septembre, 30 jours, 0 jour validé (les jours d'octobre ne comptent pas pour les jours)", strip(blk_goal.lines[#blk_goal.lines]), "  Semaines validées : 0/5 / Jours validés : 0/30")
+local blk_oct = assemble.month_block(five, 2026, 10, "2026-10-20", { goal_hours = 3 }, en, true)
+check("plusieurs mois, anglais : la ligne du bas", strip(blk_oct.lines[#blk_oct.lines]), "  Validated weeks : 1/5 / Validated days : 5/31")
+check("plusieurs mois : toujours 21 lignes", #blk_oct.lines, 21)
+check("plusieurs mois : le titre le plus long tient dans 65 colonnes", (function()
+	local long = {}
+	for d = 1, 30 do
+		long[string.format("2026-09-%02d", d)] = 86399
+	end
+	for _, labels in ipairs({ fr, en }) do
+		local b = assemble.month_block(long, 2026, 9, "2026-10-20", { goal_hours = 3 }, labels, true)
+		for _, line in ipairs(b.lines) do
+			if utf8.len(strip(line)) > 65 then
+				return strip(line)
+			end
+		end
+	end
+	return true
+end)(), true)
 check("dates.key_any : le 0 octobre est le 30 septembre", dates.key_any(2026, 10, 0), "2026-09-30")
 check("dates.key_any : le 32 décembre est le 1er janvier", dates.key_any(2026, 12, 32), "2027-01-01")
 check("dates.key_any : un jour normal", dates.key_any(2026, 10, 12), "2026-10-12")
 check("dates.key_any : au changement d'heure (25 octobre 2026)", dates.key_any(2026, 10, 25), "2026-10-25")
-check("month_block avec un objectif : largeur 73", assemble.month_block(days, 2026, 10, "2026-10-12", { goal_hours = 3 }, fr, false).width, 73)
 check("month_block sans objectif : largeur 65", assemble.month_block(days, 2026, 10, "2026-10-12", {}, fr, false).width, 65)
+check("month_block avec un objectif : largeur 65 aussi", assemble.month_block(days, 2026, 10, "2026-10-12", { goal_hours = 3 }, fr, false).width, 65)
 check("assemble.width : objectif 0 (aucun) = 65", assemble.width({ goal_hours = 0 }), 65)
 check("mois à venir : rien n'est rayé", render({ ["2026-11-01"] = 60 }, 2026, 11, "2026-10-12", { goal_hours = 3 }):find("\27[9m", 1, true), nil)
 local block = assemble.month_block(days, 2026, 10, "2026-10-12", { goal_hours = 3 }, fr, false)
 local block_text = table.concat(block.lines, "\n")
 check("plusieurs mois (month_block) : ✓ et rayé aussi", block_text:find("✓ 4h13", 1, true) ~= nil and block_text:find("\27[9m0h31", 1, true) ~= nil, true)
 local empty = lines_of(strip(render({}, 2026, 10, "2026-10-12")))
-check("mois vide : totaux à zéro", empty[#empty - 2], "  Total du mois : 0h00   Jours actifs : 0   Moyenne par jour actif : 0h00")
+check("mois vide : totaux à zéro (dans le titre)", empty[2], "  Logtime : Octobre 2026   Total du mois : 0h00 / Jours actifs : 0")
+check("mois vide : moyenne à zéro", empty[#empty - 2], "  Moyenne par jour actif : 0h00")
 check("mois vide : pas de meilleur jour, série à zéro", empty[#empty - 1], "  Série en cours : 0 j")
 local custom_thresholds = lines_of(strip(render({}, 2026, 10, "x", { thresholds = { 2, 4, 8 } })))
 check("légende : seuils personnalisés", custom_thresholds[#custom_thresholds], "  ██ <2h   ██ 2-4h   ██ 4-8h   ██ 8h+     * = aujourd'hui")
 
 -- anglais
 local english = lines_of(strip(render(days, 2026, 10, "2026-10-12", {}, en)))
-check("anglais : titre", english[2], "  Logtime : October 2026")
+check("anglais : titre", english[2], "  Logtime : October 2026   Month total : 5h45 / Active days : 3")
 check("anglais : en-tête", english[4]:match("^%s*(%a+)"), "Mon")
-check("anglais : statistiques", english[#english - 2], "  Month total : 5h45   Active days : 3   Average per active day : 1h55")
+check("anglais : statistiques", english[#english - 2], "  Average per active day : 1h55")
 check("anglais : série", english[#english - 1], "  Best day : 10 (4h13)   Current streak : 3 d")
 check("anglais : légende", english[#english]:match("%* = today$"), "* = today")
 

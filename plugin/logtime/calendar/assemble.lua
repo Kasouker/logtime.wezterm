@@ -9,12 +9,11 @@ local M = {}
 
 -- Largeur visible d'une ligne de semaine : 2 espaces + 7 colonnes de 9 caractères
 M.WIDTH = 65
--- Avec un objectif, une colonne de plus à droite : le résultat de la semaine (« ✓ 4/5 »).
-M.WEEK_COLUMN = 8
 
--- La largeur d'un mois avec ces réglages : 65, ou 73 avec un objectif (la colonne de la semaine).
+-- La largeur d'un mois avec ces réglages. Toujours 65 pour l'instant ; les encadrés la changeront (la page du calendrier
+-- et layout.plan s'en servent déjà).
 function M.width(cfg)
-	return M.WIDTH + (stats.has_goal((cfg or {}).goal_hours) and M.WEEK_COLUMN or 0)
+	return M.WIDTH
 end
 
 -- Hauteur d'un mois en bloc (month_block) : titre, en-tête, 6 semaines de 3 lignes, totaux. Les mois de 4 ou 5 semaines
@@ -105,9 +104,6 @@ local function header_line(cfg, labels)
 	for i = 1, 7 do
 		header[#header + 1] = center(names[i], 9)
 	end
-	if stats.has_goal(cfg.goal_hours) then
-		header[#header + 1] = center(labels.week_column or "", M.WEEK_COLUMN)
-	end
 	return table.concat(header)
 end
 
@@ -139,47 +135,60 @@ local function duration_text(secs, key, today_key, goal_secs)
 	return center(text, 8)
 end
 
--- Le résultat d'une semaine (colonne de droite), centré sur M.WEEK_COLUMN : le nombre de jours où l'objectif est
--- atteint sur les 7 jours de la semaine (ceux des mois voisins compris), sur goal_days.
---   assez de jours        : « ✓ 4/5 » (même si la semaine n'est pas finie) ;
---   pas assez, semaine finie (son dernier jour est passé), avec du travail : « 2/5 » rayé ;
---   semaine sans aucun travail (vacances, avant l'installation du plugin) : « 0/5 », jamais rayé (comme un jour vide) ;
---   pas assez, semaine en cours ou à venir : « 1/5 » (elle peut encore réussir).
-local function week_result(days, year, month, first_day, today_key, goal_secs, goal_days)
-	local reached, worked = 0, false
-	local last_key
+-- Une semaine est validée si l'objectif est atteint au moins goal_days jours sur ses 7 jours (ceux des mois voisins
+-- compris : la semaine du 28 septembre au 4 octobre compte aussi ses jours de septembre).
+local function week_validated(days, year, month, first_day, goal_secs, goal_days)
+	local reached = 0
 	for d = first_day, first_day + 6 do
-		last_key = dates.key_any(year, month, d)
-		local secs = math.floor(math.max(0, days[last_key] or 0))
-		if secs > 0 then
-			worked = true
-		end
-		if secs >= goal_secs then
+		if math.floor(math.max(0, days[dates.key_any(year, month, d)] or 0)) >= goal_secs then
 			reached = reached + 1
 		end
 	end
-	local text = string.format("%d/%d", reached, goal_days)
-	if reached >= goal_days then
-		return center(M.GOAL_MARK .. " " .. text, M.WEEK_COLUMN)
-	end
-	if worked and today_key and last_key < today_key then
-		local padded = center(text, M.WEEK_COLUMN)
-		local left = padded:match("^( *)")
-		return left .. STRIKE .. text .. NO_STRIKE .. string.rep(" ", M.WEEK_COLUMN - #left - #text)
-	end
-	return center(text, M.WEEK_COLUMN)
+	return reached >= goal_days
 end
 
--- Les semaines : trois lignes par semaine (les numéros, les durées, une ligne vide). Avec un objectif, le résultat de
--- la semaine est au bout de la ligne des durées.
+-- Les semaines validées d'un mois : combien, sur combien de semaines affichées (4 à 6). Sans objectif : nil.
+function M.validated_weeks(days, year, month, cfg)
+	cfg = with_defaults(cfg)
+	if not stats.has_goal(cfg.goal_hours) then
+		return nil
+	end
+	local goal_secs = cfg.goal_hours * 3600
+	local goal_days = math.floor(tonumber(cfg.goal_days) or M.DEFAULTS.goal_days)
+	local count_days = dates.days_in_month(year, month)
+	local validated, total = 0, 0
+	local day = 1 - dates.offset(year, month, cfg.week_starts_on)
+	while day <= count_days do
+		total = total + 1
+		if week_validated(days, year, month, day, goal_secs, goal_days) then
+			validated = validated + 1
+		end
+		day = day + 7
+	end
+	return validated, total
+end
+
+-- En haut, à côté du titre : « Total du mois : 42h10 / Jours actifs : 12 ».
+local function totals_text(s, labels)
+	return string.format("%s : %s / %s : %d", labels.total, stats.hm(s.total), labels.active, s.active)
+end
+
+-- En bas : « Semaines validées : 3/5 / Jours validés : 12/30 » (sur le nombre de jours du mois). Sans objectif : nil.
+local function validated_text(days, year, month, cfg, s, labels)
+	local weeks, total_weeks = M.validated_weeks(days, year, month, cfg)
+	if not weeks then
+		return nil
+	end
+	return string.format("%s : %d/%d / %s : %d/%d", labels.validated_weeks, weeks, total_weeks, labels.validated_days, s.goal_days, dates.days_in_month(year, month))
+end
+
+-- Les semaines : trois lignes par semaine (les numéros, les durées, une ligne vide)
 local function week_lines(days, year, month, today_key, cfg)
 	local out = {}
 	local goal_secs = stats.has_goal(cfg.goal_hours) and cfg.goal_hours * 3600 or nil
-	local goal_days = math.floor(tonumber(cfg.goal_days) or M.DEFAULTS.goal_days)
 	local count_days = dates.days_in_month(year, month)
 	local day = 1 - dates.offset(year, month, cfg.week_starts_on)
 	while day <= count_days do
-		local first_day = day
 		local l1, l2 = { "  " }, { "  " }
 		for _ = 1, 7 do
 			if day < 1 or day > count_days then
@@ -194,10 +203,6 @@ local function week_lines(days, year, month, today_key, cfg)
 				l2[#l2 + 1] = st .. duration_text(secs, key, today_key, goal_secs) .. convert.RESET .. " "
 			end
 			day = day + 1
-		end
-		if goal_secs then
-			l1[#l1 + 1] = string.rep(" ", M.WEEK_COLUMN)
-			l2[#l2 + 1] = week_result(days, year, month, first_day, today_key, goal_secs, goal_days)
 		end
 		out[#out + 1] = table.concat(l1)
 		out[#out + 1] = table.concat(l2)
@@ -245,39 +250,43 @@ function M.render_month(days, year, month, today_key, cfg, labels)
 		lines[#lines + 1] = s
 	end
 
+	local s = stats.month_stats(days, year, month, cfg.goal_hours)
 	add("")
-	add(string.format("  %s : %s %d", labels.title, labels.months[month], year))
+	add(string.format("  %s : %s %d   %s", labels.title, labels.months[month], year, totals_text(s, labels)))
 	add("")
 	add(header_line(cfg, labels))
 	for _, line in ipairs(week_lines(days, year, month, today_key, cfg)) do
 		add(line)
 	end
 
-	-- Statistiques
-	local s = stats.month_stats(days, year, month, cfg.goal_hours)
-	add(string.format("  %s : %s   %s : %d   %s : %s", labels.total, stats.hm(s.total), labels.active, s.active, labels.average, stats.hm(s.average)))
+	-- Statistiques (le total et les jours actifs sont en haut, à côté du titre)
+	add(string.format("  %s : %s", labels.average, stats.hm(s.average)))
 	local line = {}
 	if s.best_day then
 		line[#line + 1] = string.format("%s : %d (%s)", labels.best, s.best_day, stats.hm(s.best_secs))
 	end
 	line[#line + 1] = string.format("%s : %d %s", labels.streak, stats.streak(days, today_key), labels.streak_unit)
-	if stats.has_goal(cfg.goal_hours) then
-		line[#line + 1] = string.format("%s : %d %s", labels.goal, s.goal_days, labels.goal_unit)
-	end
 	add("  " .. table.concat(line, "   "))
+	local validated = validated_text(days, year, month, cfg, s, labels)
+	if validated then
+		add("  " .. validated)
+	end
 
 	add(legend_line(cfg, labels))
 	return table.concat(lines, "\n")
 end
 
--- Un mois en bloc compact, pour en afficher plusieurs côte à côte : le titre, l'en-tête, les semaines et une ligne de totaux.
+-- Un mois en bloc compact, pour en afficher plusieurs côte à côte : le titre avec le total et les jours actifs, l'en-tête,
+-- les semaines, et en bas les semaines et jours validés (ligne vide sans objectif).
 -- selected : le titre est alors en gras. Renvoie { lines = { ... }, width = M.width(cfg) }.
 function M.month_block(days, year, month, today_key, cfg, labels, selected)
 cfg = with_defaults(cfg)
+local s = stats.month_stats(days, year, month, cfg.goal_hours)
 local title = string.format("  %s %d", labels.months[month], year)
 if selected then
 title = "\27[1m" .. title .. convert.RESET
 end
+title = title .. "   " .. totals_text(s, labels)
 local lines = { title, header_line(cfg, labels) }
 for _, line in ipairs(week_lines(days, year, month, today_key, cfg)) do
 lines[#lines + 1] = line
@@ -285,8 +294,8 @@ end
 while #lines < M.HEIGHT - 1 do
 lines[#lines + 1] = ""
 end
-local s = stats.month_stats(days, year, month, cfg.goal_hours)
-lines[#lines + 1] = string.format("  %s : %s   %s : %d", labels.total, stats.hm(s.total), labels.active, s.active)
+local validated = validated_text(days, year, month, cfg, s, labels)
+lines[#lines + 1] = validated and ("  " .. validated) or ""
 return { lines = lines, width = M.width(cfg) }
 end
 
