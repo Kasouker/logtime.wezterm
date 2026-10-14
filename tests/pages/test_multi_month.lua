@@ -232,6 +232,18 @@ text, count, goal_width = new_page(w, { goal_hours = 3 }).build_text({ cols = 14
 check("objectif : la largeur à centrer est 2 x 65 + 3 = 133", goal_width, 133)
 text, count = new_page(w, { goal_hours = 0 }).build_text({ cols = 140, rows = 60 })
 check("objectif « aucun » (0) : pas de ligne « validées »", count == 4 and strip(text):find("validées", 1, true) == nil, true)
+-- les encadrés : un mois fait 66 x 22
+text, count = new_page(w, { borders = true }).build_text({ cols = 135, rows = 60 })
+check("encadrés : 135 colonnes = 66 + 3 + 66, 4 mois (2 x 2)", count, 4)
+text, count = new_page(w, { borders = true }).build_text({ cols = 134, rows = 60 })
+check("encadrés : 134 colonnes, une de trop peu : 2 mois (1 x 2)", count, 2)
+check("encadrés : 134 colonnes sans encadrés : 4 mois", select(2, new_page(w, {}).build_text({ cols = 134, rows = 60 })), 4)
+text, count = new_page(w, { borders = true }).build_text({ cols = 135, rows = 49 })
+check("encadrés : 49 lignes = 4 + 22 + 1 + 22 : 2 rangées de mois", count, 4)
+text, count = new_page(w, { borders = true }).build_text({ cols = 135, rows = 48 })
+check("encadrés : 48 lignes : une seule rangée", count, 2)
+local _, _, boxed_width = new_page(w, { borders = true }).build_text({ cols = 135, rows = 60 })
+check("encadrés : la largeur à centrer est 66 + 3 + 66 = 135", boxed_width, 135)
 
 -- ============================================================
 -- la page ouverte : navigation, redimensionnement (multiplier, diviser)

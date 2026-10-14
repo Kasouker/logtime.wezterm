@@ -21,21 +21,23 @@ end
 -- Combien de mois afficher, et sur combien de colonnes, dans une fenêtre de cols x rows.
 -- Jamais plus que ce qui tient en entier (un mois n'est jamais coupé), jamais moins de un.
 -- La forme est la plus carrée possible, avec le moins de cases vides : 4 mois = 2 x 2 plutôt que 4 x 1.
--- block_width (facultatif) : la largeur d'un mois (M.BLOCK_WIDTH par défaut ; plus large avec un objectif).
+-- block_width, block_height (facultatifs) : la taille d'un mois (M.BLOCK_WIDTH et M.BLOCK_HEIGHT par défaut ; plus grande
+-- avec les encadrés).
 -- Renvoie { count, columns, rows }.
-function M.plan(cols, rows, max_months, block_width)
+function M.plan(cols, rows, max_months, block_width, block_height)
 local width = tonumber(block_width) or M.BLOCK_WIDTH
+local height = tonumber(block_height) or M.BLOCK_HEIGHT
 local max = math.floor(tonumber(max_months) or M.MAX_MONTHS)
 max = math.max(1, math.min(max, 12))
 cols = tonumber(cols) or 0
 rows = tonumber(rows) or 0
 -- Si même un seul mois ne tient pas en entier dans la fenêtre, on n'en affiche qu'un (le mois seul, avec ses totaux) :
 -- aligner plusieurs mois coupés ne servirait à rien.
-if cols < width or rows < M.RESERVED_ROWS + M.BLOCK_HEIGHT then
+if cols < width or rows < M.RESERVED_ROWS + height then
 return { count = 1, columns = 1, rows = 1 }
 end
 local fit_cols = math.max(1, math.floor((cols + M.GAP) / (width + M.GAP)))
-local fit_rows = math.max(1, math.floor((rows - M.RESERVED_ROWS + 1) / (M.BLOCK_HEIGHT + 1)))
+local fit_rows = math.max(1, math.floor((rows - M.RESERVED_ROWS + 1) / (height + 1)))
 local count = math.min(max, fit_cols * fit_rows)
 
 local best

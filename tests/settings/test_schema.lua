@@ -46,7 +46,7 @@ local function rejects(name, key, value)
 end
 
 -- ---- la liste
-check("quatorze réglages", #schema.keys(), 14)
+check("seize réglages", #schema.keys(), 16)
 check("le premier est lang", schema.keys()[1], "lang")
 check("gradient_color est connu", schema.is_known("gradient_color"), true)
 check("un nom inconnu n'est pas connu", schema.is_known("gradiant"), false)
@@ -159,13 +159,18 @@ for key, value in pairs(defaults) do
 end
 check("toutes les valeurs par défaut sont acceptées par le schéma", all_valid, true)
 check("goal_hours n'a pas de valeur par défaut", defaults.goal_hours, nil)
-check("douze valeurs par défaut", (function()
+check("quatorze valeurs par défaut", (function()
 	local n = 0
 	for _ in pairs(defaults) do
 		n = n + 1
 	end
 	return n
-end)(), 12)
+end)(), 14)
+check("borders : non par défaut", defaults.borders, false)
+check("border_style : arrondi par défaut", defaults.border_style, "rounded")
+accepts("border_style double", "border_style", "double", "double")
+rejects("border_style inconnu", "border_style", "pointillé")
+rejects("borders en texte", "borders", "oui")
 
 -- ---- « aucun » (none) et goal_days
 accepts("goal_hours 0 : aucun objectif (la valeur none)", "goal_hours", 0, 0)

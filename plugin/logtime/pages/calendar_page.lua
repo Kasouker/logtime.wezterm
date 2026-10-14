@@ -86,10 +86,10 @@ curve = cfg.gradient_curve,
 		local labels, cfg = ctx.labels(), with_gradient(ctx.cfg())
 		local year, month = selected_month()
 		local help = "  " .. labels.title .. "   " .. labels.page_help
-		local block_width = assemble.width(cfg) -- plus large avec un objectif (la colonne de la semaine)
+		local block_width, block_height = assemble.width(cfg), assemble.height(cfg) -- plus grand avec les encadrés
 		local plan = { count = 1 }
 		if dims then
-			plan = layout.plan(dims.cols, dims.rows, cfg.max_months, block_width)
+			plan = layout.plan(dims.cols, dims.rows, cfg.max_months, block_width, block_height)
 		end
 		if plan.count <= 1 then
 			local text = help .. "\n" .. assemble.render_month(ctx.days(), year, month, ctx.today_key(), cfg, labels)

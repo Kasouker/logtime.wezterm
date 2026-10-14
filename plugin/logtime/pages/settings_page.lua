@@ -33,7 +33,7 @@ M.TAB_COUNT = 3
 
 -- Les réglages de l'onglet Calendrier, dans l'ordre d'affichage (leurs limites viennent de settings/schema.lua).
 -- Pas de réglage du centrage : le calendrier est toujours centré (center = false reste possible dans wezterm.lua).
-M.CALENDAR_SETTINGS = { "max_months", "months_anchor", "week_starts_on" }
+M.CALENDAR_SETTINGS = { "max_months", "months_anchor", "week_starts_on", "borders", "border_style" }
 -- Les réglages de l'onglet Général.
 M.GENERAL_SETTINGS = { "lang", "goal_hours", "goal_days" }
 

@@ -372,6 +372,46 @@ check("plusieurs mois : le titre le plus long tient dans 65 colonnes", (function
 	end
 	return true
 end)(), true)
+-- ---- les encadrés : une grille (les cases partagent leurs traits)
+local grid_cfg = { borders = true }
+local boxed = lines_of(strip(render(days, 2026, 10, "2026-10-12", grid_cfg)))
+-- octobre 2026 : 5 semaines ; lignes : vide, titre, vide, en-tête, trait du haut, puis 3 lignes par semaine
+check("grille : le trait du haut, sous l'en-tête", boxed[5], "  ╭────────┬────────┬────────┬────────┬────────┬────────┬────────╮")
+check("grille : l'en-tête au-dessus de l'intérieur des cases", boxed[4], "     Lun      Mar      Mer      Jeu      Ven      Sam      Dim   ")
+check("grille : la 1re semaine, numéros", boxed[6], "  │        │        │        │  1     │  2     │  3     │  4     │")
+check("grille : la 1re semaine, durées", boxed[7], "  │        │        │        │   ·    │   ·    │   ·    │   ·    │")
+check("grille : un trait entre deux semaines", boxed[8], "  ├────────┼────────┼────────┼────────┼────────┼────────┼────────┤")
+check("grille : le trait du bas après la dernière semaine (et un seul)", boxed[5 + 5 * 3], "  ╰────────┴────────┴────────┴────────┴────────┴────────┴────────╯")
+check("grille : un seul trait du bas", select(2, table.concat(boxed, "\n"):gsub("╰", "")), 1)
+check("grille : la 2e semaine, avec la durée du 10", boxed[10]:find("│ 4h13   │", 1, true) ~= nil or boxed[10]:find("│  4h13  │", 1, true) ~= nil, true)
+check("grille : toutes les lignes de semaine font 66 colonnes, pour les 4 styles", (function()
+	for style in pairs(assemble.BORDER_STYLES) do
+		local ls = lines_of(strip(render(days, 2026, 10, "2026-10-12", { borders = true, border_style = style, goal_hours = 3 })))
+		for i = 5, 5 + 5 * 3 do
+			if utf8.len(ls[i]) ~= 66 then
+				return style .. " ligne " .. i .. " : " .. utf8.len(ls[i])
+			end
+		end
+	end
+	return true
+end)(), true)
+check("grille double : ses coins", lines_of(strip(render(days, 2026, 10, "2026-10-12", { borders = true, border_style = "double" })))[5]:sub(1, 5), "  ╔")
+check("grille épaisse : ses croisements", lines_of(strip(render(days, 2026, 10, "2026-10-12", { borders = true, border_style = "heavy" })))[8]:find("╋", 1, true) ~= nil, true)
+check("grille : style inconnu, l'arrondi", lines_of(strip(render(days, 2026, 10, "2026-10-12", { borders = true, border_style = "zzz" })))[5]:sub(1, 5), "  ╭")
+check("grille : les traits sont dans leur couleur (gris)", render(days, 2026, 10, "2026-10-12", grid_cfg):find(convert.fg(assemble.BORDER_COLOR) .. "╭", 1, true) ~= nil, true)
+local grid_goal = render(days, 2026, 10, "2026-10-12", { borders = true, goal_hours = 3 })
+check("grille : ✓ et rayé toujours là", strip(grid_goal):find("✓ 4h13", 1, true) ~= nil and grid_goal:find("\27[9m0h31", 1, true) ~= nil, true)
+check("grille : novembre 2026 (6 semaines), le trait du bas en dernière ligne de semaine", lines_of(strip(render({}, 2026, 11, "x", grid_cfg)))[5 + 6 * 3]:sub(1, 5), "  ╰")
+check("grille : le mois seul a une ligne de plus que sans encadrés", #lines_of(render(days, 2026, 10, "2026-10-12", grid_cfg)), #lines_of(render(days, 2026, 10, "2026-10-12", {})) + 1)
+local grid_block = assemble.month_block(days, 2026, 10, "2026-10-12", { borders = true, goal_hours = 3 }, fr, false)
+check("grille, plusieurs mois : 22 lignes", #grid_block.lines, 22)
+check("grille, plusieurs mois : largeur 66", grid_block.width, 66)
+check("grille, plusieurs mois : la ligne du bas reste la dernière", strip(grid_block.lines[22]), "  Semaines validées : 0/5 / Jours validés : 1/31")
+check("grille, février 2021 (4 semaines) : 22 lignes aussi", #assemble.month_block({}, 2021, 2, "x", grid_cfg, fr, false).lines, 22)
+check("assemble.width / height : sans encadrés", assemble.width({}) .. "x" .. assemble.height({}), "65x21")
+check("assemble.width / height : avec", assemble.width(grid_cfg) .. "x" .. assemble.height(grid_cfg), "66x22")
+check("sans encadrés : aucune ligne de trait", render(days, 2026, 10, "2026-10-12", {}):find("─", 1, true), nil)
+
 check("dates.key_any : le 0 octobre est le 30 septembre", dates.key_any(2026, 10, 0), "2026-09-30")
 check("dates.key_any : le 32 décembre est le 1er janvier", dates.key_any(2026, 12, 32), "2027-01-01")
 check("dates.key_any : un jour normal", dates.key_any(2026, 10, 12), "2026-10-12")

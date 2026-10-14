@@ -10,10 +10,31 @@ local M = {}
 -- Largeur visible d'une ligne de semaine : 2 espaces + 7 colonnes de 9 caractères
 M.WIDTH = 65
 
--- La largeur d'un mois avec ces réglages. Toujours 65 pour l'instant ; les encadrés la changeront (la page du calendrier
--- et layout.plan s'en servent déjà).
+-- Les traits des encadrés (une grille : les cases partagent leurs traits), selon le style choisi.
+--   tl tr bl br : les coins ; h v : les traits ; t b : les jonctions du haut et du bas ; l r : de gauche et de droite ;
+--   x : les croisements.
+M.BORDER_STYLES = {
+	rounded = { tl = "╭", tr = "╮", bl = "╰", br = "╯", h = "─", v = "│", t = "┬", b = "┴", l = "├", r = "┤", x = "┼" },
+	single = { tl = "┌", tr = "┐", bl = "└", br = "┘", h = "─", v = "│", t = "┬", b = "┴", l = "├", r = "┤", x = "┼" },
+	double = { tl = "╔", tr = "╗", bl = "╚", br = "╝", h = "═", v = "║", t = "╦", b = "╩", l = "╠", r = "╣", x = "╬" },
+	heavy = { tl = "┏", tr = "┓", bl = "┗", br = "┛", h = "━", v = "┃", t = "┳", b = "┻", l = "┣", r = "┫", x = "╋" },
+}
+M.BORDER_COLOR = "#8B8E99" -- le gris des jours vides (la couleur sera réglable à l'étape suivante)
+
+local function borders_on(cfg)
+	return (cfg or {}).borders == true
+end
+
+-- La largeur d'un mois avec ces réglages : 65, ou 66 avec les encadrés (le trait vertical prend la place de l'espace
+-- entre deux cases ; il faut seulement une colonne de plus pour le trait de droite).
 function M.width(cfg)
-	return M.WIDTH
+	return M.WIDTH + (borders_on(cfg) and 1 or 0)
+end
+
+-- La hauteur d'un mois en bloc : 21, ou 22 avec les encadrés (le trait horizontal prend la place de la ligne vide entre
+-- deux semaines ; il faut seulement une ligne de plus pour le trait du haut).
+function M.height(cfg)
+	return M.HEIGHT + (borders_on(cfg) and 1 or 0)
 end
 
 -- Hauteur d'un mois en bloc (month_block) : titre, en-tête, 6 semaines de 3 lignes, totaux. Les mois de 4 ou 5 semaines
@@ -26,6 +47,8 @@ M.DEFAULTS = {
 week_starts_on = "monday",
 goal_hours = nil,
 goal_days = 5, -- jours où l'objectif est atteint qui font une semaine réussie
+borders = false, -- encadrés des cases (une grille)
+border_style = "rounded", -- "rounded", "single", "double" ou "heavy" (voir M.BORDER_STYLES)
 heat = { "#2E3644", "#5A5240", "#8C7A4A", "#C9AB6B" },
 thresholds = { 1, 3, 6 },
 cell_color = nil,
@@ -102,7 +125,7 @@ local function header_line(cfg, labels)
 	end
 	local header = { "  " }
 	for i = 1, 7 do
-		header[#header + 1] = center(names[i], 9)
+		header[#header + 1] = center(names[i], 9) -- avec les encadrés aussi : un nom de 3 lettres reste centré dans la case
 	end
 	return table.concat(header)
 end
@@ -182,31 +205,50 @@ local function validated_text(days, year, month, cfg, s, labels)
 	return string.format("%s : %d/%d / %s : %d/%d", labels.validated_weeks, weeks, total_weeks, labels.validated_days, s.goal_days, dates.days_in_month(year, month))
 end
 
--- Les semaines : trois lignes par semaine (les numéros, les durées, une ligne vide)
+-- Une ligne de traits de la grille : left .. (8 traits .. join) x 6 .. 8 traits .. right, dans la couleur des traits.
+local function rule(left, join, right, b)
+	local h8 = string.rep(b.h, 8)
+	return "  " .. convert.fg(M.BORDER_COLOR) .. left .. string.rep(h8 .. join, 6) .. h8 .. right .. convert.RESET
+end
+
+-- Les semaines : trois lignes par semaine (les numéros, les durées, une ligne vide).
+-- Avec les encadrés : un trait en haut, puis par semaine les numéros, les durées et un trait (celui du bas après la
+-- dernière semaine) ; les cases sont séparées par un trait vertical au lieu d'un espace.
 local function week_lines(days, year, month, today_key, cfg)
 	local out = {}
 	local goal_secs = stats.has_goal(cfg.goal_hours) and cfg.goal_hours * 3600 or nil
 	local count_days = dates.days_in_month(year, month)
 	local day = 1 - dates.offset(year, month, cfg.week_starts_on)
+	local b = borders_on(cfg) and (M.BORDER_STYLES[cfg.border_style] or M.BORDER_STYLES.rounded) or nil
+	local v = b and (convert.fg(M.BORDER_COLOR) .. b.v .. convert.RESET) or nil
+	if b then
+		out[#out + 1] = rule(b.tl, b.t, b.tr, b)
+	end
 	while day <= count_days do
-		local l1, l2 = { "  " }, { "  " }
+		local l1, l2 = {}, {}
 		for _ = 1, 7 do
 			if day < 1 or day > count_days then
-				l1[#l1 + 1] = string.rep(" ", 9)
-				l2[#l2 + 1] = string.rep(" ", 9)
+				l1[#l1 + 1] = string.rep(" ", 8)
+				l2[#l2 + 1] = string.rep(" ", 8)
 			else
 				local key = dates.key(year, month, day)
 				local secs = math.floor(math.max(0, days[key] or 0))
 				local st = style(secs, cfg)
 				local mark = (key == today_key) and "*" or " "
-				l1[#l1 + 1] = st .. mark .. string.format("%2d", day) .. string.rep(" ", 5) .. convert.RESET .. " "
-				l2[#l2 + 1] = st .. duration_text(secs, key, today_key, goal_secs) .. convert.RESET .. " "
+				l1[#l1 + 1] = st .. mark .. string.format("%2d", day) .. string.rep(" ", 5) .. convert.RESET
+				l2[#l2 + 1] = st .. duration_text(secs, key, today_key, goal_secs) .. convert.RESET
 			end
 			day = day + 1
 		end
-		out[#out + 1] = table.concat(l1)
-		out[#out + 1] = table.concat(l2)
-		out[#out + 1] = ""
+		if b then
+			out[#out + 1] = "  " .. v .. table.concat(l1, v) .. v
+			out[#out + 1] = "  " .. v .. table.concat(l2, v) .. v
+			out[#out + 1] = (day > count_days) and rule(b.bl, b.b, b.br, b) or rule(b.l, b.x, b.r, b)
+		else
+			out[#out + 1] = "  " .. table.concat(l1, " ") .. " "
+			out[#out + 1] = "  " .. table.concat(l2, " ") .. " "
+			out[#out + 1] = ""
+		end
 	end
 	return out
 end
@@ -291,7 +333,7 @@ local lines = { title, header_line(cfg, labels) }
 for _, line in ipairs(week_lines(days, year, month, today_key, cfg)) do
 lines[#lines + 1] = line
 end
-while #lines < M.HEIGHT - 1 do
+while #lines < M.height(cfg) - 1 do
 lines[#lines + 1] = ""
 end
 local validated = validated_text(days, year, month, cfg, s, labels)
