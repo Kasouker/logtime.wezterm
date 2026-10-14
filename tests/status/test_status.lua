@@ -33,5 +33,23 @@ check("15231 s (4h13 du 10 octobre)", status.hms(15231), "04:13:51")
 check("text : horloge puis durée", status.text(3725), utf8.char(0xF017) .. " 01:02:05")
 check("text : commence par l'icône", status.text(0):sub(1, #utf8.char(0xF017)), utf8.char(0xF017))
 
+-- ---- l'objectif dans la barre
+local clock = utf8.char(0xF017) .. " "
+check("goal_short : 7 h", status.goal_short(7), "7h")
+check("goal_short : 7 h 30", status.goal_short(7.5), "7h30")
+check("goal_short : 30 min", status.goal_short(0.5), "0h30")
+check("goal_short : 24 h", status.goal_short(24), "24h")
+check("sans objectif : comme avant", status.text(3725, nil), clock .. "01:02:05")
+check("objectif 0 (aucun) : comme avant", status.text(3725, 0), clock .. "01:02:05")
+check("objectif pas atteint : la durée, puis l'objectif", status.text(18750, 7), clock .. "05:12:30 / 7h")
+check("objectif pas atteint, 7h30", status.text(18750, 7.5), clock .. "05:12:30 / 7h30")
+check("objectif atteint pile : ✓", status.text(25200, 7), clock .. "✓ 07:00:00")
+check("objectif dépassé : ✓", status.text(25390, 7), clock .. "✓ 07:03:10")
+check("une seconde avant l'objectif : pas encore", status.text(25199, 7), clock .. "06:59:59 / 7h")
+check("reached : oui", status.reached(25200, 7), true)
+check("reached : pas encore", status.reached(25199, 7), false)
+check("reached : sans objectif", status.reached(99999, nil), false)
+check("reached : objectif 0", status.reached(99999, 0), false)
+
 print(string.format("\n%d vérifications réussies, %d échecs", passed, failed))
 os.exit(failed == 0 and 0 or 1)

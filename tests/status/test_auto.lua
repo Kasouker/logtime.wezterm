@@ -110,6 +110,26 @@ check(
 	true
 )
 
+-- plusieurs éléments ajoutés ensemble (le style, le compteur, puis la remise des couleurs de tabline)
+local style = {}
+local group = { style, component, "ResetAttributes" }
+local with_group = { sections = { tabline_x = { "texte" } } }
+check("ensure_component, plusieurs éléments : ajoutés", auto.ensure_component(with_group, group), true)
+check(
+	"ensure_component, plusieurs éléments : dans l'ordre, au début, avant ce qui y était",
+	with_group.sections.tabline_x[1] == style
+		and with_group.sections.tabline_x[2] == component
+		and with_group.sections.tabline_x[3] == "ResetAttributes"
+		and with_group.sections.tabline_x[4] == "texte",
+	true
+)
+check(
+	"ensure_component, plusieurs éléments : une seconde fois, rien",
+	auto.ensure_component(with_group, group),
+	false
+)
+check("ensure_component, plusieurs éléments : toujours 4 éléments", #with_group.sections.tabline_x, 4)
+
 local leaked = {}
 for k in pairs(_G) do
 	if not globals_before[k] then

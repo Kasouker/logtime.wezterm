@@ -50,12 +50,17 @@ function M.find_tabline(plugins)
 	return nil
 end
 
--- Ajoute le compteur (component, une fonction) au début d'une section de la configuration de tabline.wez, s'il n'y est
--- pas déjà. opts : la table renvoyée par tabline.get_config() (tabline la relit à chaque mise à jour).
+-- Ajoute le compteur au début d'une section de la configuration de tabline.wez, s'il n'y est pas déjà.
+--   opts  : la table renvoyée par tabline.get_config() (tabline la relit à chaque mise à jour) ;
+--   items : une fonction (le compteur), ou une liste d'éléments ajoutés ensemble, dans l'ordre (par exemple un style,
+--           le compteur, puis "ResetAttributes") ; le premier élément sert à savoir s'ils y sont déjà.
 -- Renvoie true si le compteur vient d'être ajouté.
-function M.ensure_component(opts, component, section)
+function M.ensure_component(opts, items, section)
 	if type(opts) ~= "table" then
 		return false
+	end
+	if type(items) ~= "table" then
+		items = { items }
 	end
 	opts.sections = opts.sections or {}
 	section = section or M.TABLINE_SECTION
@@ -65,11 +70,13 @@ function M.ensure_component(opts, component, section)
 		opts.sections[section] = list
 	end
 	for _, item in ipairs(list) do
-		if item == component then
+		if item == items[1] then
 			return false
 		end
 	end
-	table.insert(list, 1, component)
+	for i, item in ipairs(items) do
+		table.insert(list, i, item)
+	end
 	return true
 end
 

@@ -359,11 +359,20 @@ local function status_text()
 	if G.logtime_error_message ~= nil then
 		G.logtime_error_message = nil
 	end
-	local text = status.text(result)
+	local text = status.text(result, cfg.goal_hours)
 	if G.logtime_save_failed then
 		text = text .. " ⚠"
 	end
-	return text
+	return text, status.reached(result, cfg.goal_hours)
+end
+
+-- La couleur du compteur une fois l'objectif du jour atteint : la couleur du dégradé (réglable dans F4).
+local function reached_color()
+	local color = cfg.gradient_color
+	if type(color) == "string" and color:match("^#%x%x%x%x%x%x$") then
+		return color
+	end
+	return "#C9AB6B"
 end
 
 -- Pour ceux qui affichent le compteur eux-mêmes dans leur barre (inutile sinon : le plugin l'affiche tout seul).
@@ -371,18 +380,34 @@ end
 -- affiche déjà le compteur, et ne l'ajoute pas une seconde fois.
 function M.tick(window)
 	G.logtime_external_tick = os.time()
-	return status_text()
+	return (status_text())
 end
 
 -- Le compteur que le plugin ajoute lui-même à la barre de tabline.wez (il ne compte pas comme un appel venu d'ailleurs).
+-- tabline n'accepte que du texte brut d'une fonction : la couleur vient d'un élément de style placé juste avant
+-- (tabline_style, mis à jour à chaque seconde), et "ResetAttributes" remet ensuite les couleurs de tabline.
 local function tabline_component(window)
-	return status_text()
+	return (status_text())
+end
+local tabline_style = { Attribute = { Intensity = "Normal" } }
+local tabline_items = { tabline_style, tabline_component, "ResetAttributes" }
+
+-- Le style du compteur dans tabline : la couleur du dégradé si l'objectif est atteint, sinon rien de spécial.
+local function update_tabline_style(reached)
+	tabline_style.Foreground = nil
+	tabline_style.Attribute = nil
+	if reached then
+		tabline_style.Foreground = { Color = reached_color() }
+	else
+		tabline_style.Attribute = { Intensity = "Normal" }
+	end
 end
 
 -- À chaque mise à jour de WezTerm (update-status) : compter, puis afficher le compteur là où il faut (status/auto.lua).
 -- Ne renvoie jamais false : ça empêcherait les autres (tabline.wez…) de dessiner leur barre.
 local function on_update_status(window, pane, tabline_url)
-	local text = status_text()
+	local text, reached = status_text()
+	update_tabline_style(reached)
 	local now = os.time()
 	if not num(G.logtime_status_started) then
 		G.logtime_status_started = now -- le premier passage depuis le démarrage de WezTerm (survit aux rechargements)
@@ -395,11 +420,16 @@ local function on_update_status(window, pane, tabline_url)
 		has_tabline = tabline_url ~= nil,
 	})
 	if mode == "right" then
+		if reached then
+			local ok, formatted =
+				pcall(wezterm.format, { { Foreground = { Color = reached_color() } }, { Text = text } })
+			text = ok and formatted or text
+		end
 		window:set_right_status(text)
 	elseif mode == "tabline" then
 		local ok, tabline = pcall(wezterm.plugin.require, tabline_url)
 		if ok and type(tabline) == "table" and type(tabline.get_config) == "function" then
-			if auto.ensure_component(tabline.get_config(), tabline_component) then
+			if auto.ensure_component(tabline.get_config(), tabline_items) then
 				wezterm.log_info("logtime : compteur ajouté à la barre de tabline.wez")
 			end
 		end

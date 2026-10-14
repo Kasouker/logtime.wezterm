@@ -230,6 +230,18 @@ local function new_env(opts)
 		w.panes[pane.id] = pane
 		return pane
 	end
+	-- wezterm.format : une trace lisible de la couleur demandée, par exemple "[#C9AB6B]texte"
+	w.format = function(items)
+		local out = {}
+		for _, item in ipairs(items) do
+			if item.Foreground then
+				out[#out + 1] = "[" .. item.Foreground.Color .. "]"
+			elseif item.Text then
+				out[#out + 1] = item.Text
+			end
+		end
+		return table.concat(out)
+	end
 	-- les plugins installés (wezterm.plugin.list) et tabline.wez (wezterm.plugin.require), pour le compteur automatique
 	w.plugin = {
 		list = function()
@@ -621,37 +633,46 @@ local function scenarios()
 	check("tabline : jamais dans la barre de droite (c'est celle de tabline)", win.right, nil)
 	clock.now = T0 + 3
 	update(e, win)
-	check("tabline : après 3 s, le compteur est ajouté à tabline_x", #tl.opts.sections.tabline_x, 1)
+	check(
+		"tabline : après 3 s, le compteur est ajouté à tabline_x (son style, lui, puis la remise des couleurs)",
+		#tl.opts.sections.tabline_x,
+		3
+	)
+	check(
+		"tabline : la remise des couleurs de tabline après le compteur",
+		tl.opts.sections.tabline_x[3],
+		"ResetAttributes"
+	)
 	check(
 		"tabline : ajouté une fois, c'est noté dans les journaux",
 		#e.w.logs.info >= 1 and e.w.logs.info[#e.w.logs.info]:find("tabline", 1, true) ~= nil,
 		true
 	)
-	local shown = tl.opts.sections.tabline_x[1](win)
+	local shown = tl.opts.sections.tabline_x[2](win)
 	check("tabline : le compteur ajouté affiche le temps", type(shown) == "string" and shown:find(HMS) ~= nil, true)
 	clock.now = T0 + 4
 	update(e, win)
 	update(e, win)
-	check("tabline : toujours un seul compteur ajouté", #tl.opts.sections.tabline_x, 1)
+	check("tabline : toujours un seul compteur ajouté", #tl.opts.sections.tabline_x, 3)
 	check("tabline : les autres sections ne bougent pas", #tl.opts.sections.tabline_y, 1)
 	clock.now = T0 + 20
 	update(e, win)
 	check(
 		"tabline : le compteur ajouté ne compte pas comme un tick() venu d'ailleurs (il reste)",
 		#tl.opts.sections.tabline_x,
-		1
+		3
 	)
 	check("tabline : toujours rien dans la barre de droite", win.right, nil)
 	-- WezTerm réévalue la config (en ouvrant un onglet…) : tabline repart d'une liste neuve, sans le compteur.
 	-- Le compteur affiché par tabline juste avant ne doit pas passer pour un tick() venu d'ailleurs : sinon il
 	-- disparaîtrait 3 s à chaque nouvel onglet.
-	tl.opts.sections.tabline_x[1](win) -- tabline vient d'afficher le compteur ajouté
+	tl.opts.sections.tabline_x[2](win) -- tabline vient d'afficher le compteur ajouté
 	tl.opts.sections.tabline_x = {} -- la config est réévaluée
 	update(e, win)
 	check(
 		"tabline, config réévaluée : le compteur est remis tout de suite (pas 3 s sans compteur)",
 		#tl.opts.sections.tabline_x,
-		1
+		3
 	)
 	check("tabline : aucune erreur", #e.w.logs.error, 0)
 	cleanup(e)
@@ -691,6 +712,95 @@ local function scenarios()
 	win = e.window()
 	update(e, win)
 	check("liste des plugins illisible : le compteur à droite quand même", win.right ~= nil, true)
+	cleanup(e)
+
+	-- ============================================================
+	-- l'objectif dans le compteur : « / 7h » avant, « ✓ » et la couleur du dégradé une fois atteint
+	-- ============================================================
+	-- 2026-10-13 (T0) : 6h59m58s déjà comptées ; objectif 7 h
+	local almost = '{"2026-10-13":25198}'
+	clock.now = T0
+	e = new_env({ file = almost })
+	e.M.apply_to_config({}, { goal_hours = 7, gradient_color = "#3366CC" })
+	win = e.window()
+	update(e, win)
+	check("objectif pas atteint : « / 7h » après la durée", win.right:find("06:59:58 / 7h", 1, true) ~= nil, true)
+	check("objectif pas atteint : pas de couleur", win.right:find("[#", 1, true), nil)
+	clock.now = T0 + 1
+	update(e, win)
+	clock.now = T0 + 2
+	update(e, win)
+	check(
+		"objectif atteint : « ✓ » devant la durée, plus de « / 7h »",
+		win.right:find("✓ 07:00:00", 1, true) ~= nil and win.right:find("/ 7h", 1, true) == nil,
+		true
+	)
+	check("objectif atteint : dans la couleur du dégradé", win.right:find("[#3366CC]", 1, true) ~= nil, true)
+	check(
+		"tick() branché à la main : « ✓ » aussi (en texte)",
+		e.M.tick(win):find("✓ 07:00:0", 1, true) ~= nil,
+		true
+	)
+	cleanup(e)
+	-- sans couleur du dégradé valable : l'or
+	clock.now = T0
+	e = new_env({ file = '{"2026-10-13":30000}' })
+	e.M.apply_to_config({}, { goal_hours = 7 })
+	win = e.window()
+	update(e, win)
+	check("objectif atteint, couleur par défaut : l'or", win.right:find("[#C9AB6B]", 1, true) ~= nil, true)
+	cleanup(e)
+	-- sans objectif : comme avant
+	clock.now = T0
+	e = new_env({ file = '{"2026-10-13":30000}' })
+	e.M.apply_to_config({})
+	win = e.window()
+	update(e, win)
+	check(
+		"sans objectif : ni « / », ni « ✓ », ni couleur",
+		win.right:find("/", 1, true) == nil
+			and win.right:find("✓", 1, true) == nil
+			and win.right:find("[#", 1, true) == nil,
+		true
+	)
+	cleanup(e)
+	-- tabline : le style placé avant le compteur prend la couleur une fois l'objectif atteint
+	-- 6h59m50s déjà comptées : le compteur est ajouté à tabline 3 s après le démarrage, l'objectif est atteint 10 s après
+	clock.now = T0
+	tl = fake_tabline()
+	e = new_env({ file = '{"2026-10-13":25190}', plugins = { { url = TABLINE } }, tabline = tl })
+	e.M.apply_to_config({}, { goal_hours = 7, gradient_color = "#3366CC" })
+	win = e.window()
+	for s = 0, 3 do
+		clock.now = T0 + s
+		update(e, win)
+	end
+	local style = tl.opts.sections.tabline_x[1]
+	check(
+		"tabline, objectif pas encore atteint (6h59m53) : le style ne colore pas",
+		style.Foreground == nil and style.Attribute ~= nil,
+		true
+	)
+	check(
+		"tabline, objectif pas atteint : « / 7h » dans le compteur",
+		tl.opts.sections.tabline_x[2](win):find("/ 7h", 1, true) ~= nil,
+		true
+	)
+	for s = 4, 10 do
+		clock.now = T0 + s
+		update(e, win)
+	end
+	check(
+		"tabline, objectif atteint : le style prend la couleur du dégradé",
+		style.Foreground and style.Foreground.Color,
+		"#3366CC"
+	)
+	check("tabline, objectif atteint : plus d'Attribute en même temps", style.Attribute, nil)
+	check(
+		"tabline, objectif atteint : « ✓ » dans le compteur",
+		tl.opts.sections.tabline_x[2](win):find("✓ 07:00:0", 1, true) ~= nil,
+		true
+	)
 	cleanup(e)
 end
 
