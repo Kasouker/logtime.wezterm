@@ -36,7 +36,7 @@ local function check(name, got, want)
 end
 
 -- ---- path_of : l'adresse du dossier, comme WezTerm la donne
-check("Windows", activity.path_of("file:///C:/Users/gazou/Projet_Perso/"), "C:/Users/gazou/Projet_Perso")
+check("Windows", activity.path_of("file:///C:/Users/alex/Projects/"), "C:/Users/alex/Projects")
 check(
 	"WSL : la distribution est retirée",
 	activity.path_of("file://wsl.localhost/Ubuntu/home/max/42/"),
@@ -56,19 +56,19 @@ check("pas une adresse de fichier", activity.path_of("https://example.com/"), ni
 -- ---- project_of : les deux premiers dossiers sous le dossier personnel
 check(
 	"sous le dossier personnel : deux dossiers",
-	activity.project_of("C:/Users/gazou/Projet_Perso/logtime.wezterm/plugin"),
-	"Projet_Perso/logtime.wezterm"
+	activity.project_of("C:/Users/alex/Projects/logtime.wezterm/plugin"),
+	"Projects/logtime.wezterm"
 )
-check("un seul dossier", activity.project_of("C:/Users/gazou/Projet_Perso"), "Projet_Perso")
+check("un seul dossier", activity.project_of("C:/Users/alex/Projects"), "Projects")
 check("Linux", activity.project_of("/home/max/42/C05/ex02"), "42/C05")
 check("Mac", activity.project_of("/Users/max/dev/site/src"), "dev/site")
 check("root", activity.project_of("/root/projet"), "projet")
-check("Windows vu depuis WSL", activity.project_of("/mnt/c/Users/gazou/Projet_Perso/x"), "Projet_Perso/x")
-check("lettre de lecteur en minuscule, users en minuscule", activity.project_of("c:/users/gazou/a/b/c"), "a/b")
-check("le dossier personnel lui-même : rien", activity.project_of("C:/Users/gazou"), nil)
+check("Windows vu depuis WSL", activity.project_of("/mnt/c/Users/alex/Projects/x"), "Projects/x")
+check("lettre de lecteur en minuscule, users en minuscule", activity.project_of("c:/users/alex/a/b/c"), "a/b")
+check("le dossier personnel lui-même : rien", activity.project_of("C:/Users/alex"), nil)
 check("le dossier personnel (Linux) : rien", activity.project_of("/home/max"), nil)
 check("/homes n'est pas /home", activity.project_of("/homes/max/a"), "max/a")
-check("/home/maxime n'est pas /home/max suivi de « ime »", activity.project_of("/home/maxime/a"), "a")
+check("/home/alexandra n'est pas /home/alex suivi de « andra »", activity.project_of("/home/alexandra/a"), "a")
 check("hors du dossier personnel : les deux derniers", activity.project_of("/mnt/d/jeux/steam/common"), "steam/common")
 check("hors du dossier personnel, un seul", activity.project_of("/tmp"), "tmp")
 check("un lecteur Windows hors du dossier personnel", activity.project_of("D:/projets/site"), "projets/site")
@@ -97,10 +97,10 @@ check("pas de titre", activity.clean_title(nil), nil)
 -- ---- label
 check(
 	"le dossier d'abord",
-	activity.label("file:///C:/Users/gazou/Projet_Perso/logtime.wezterm/", "◑ Claude"),
-	"Projet_Perso/logtime.wezterm"
+	activity.label("file:///C:/Users/alex/Projects/logtime.wezterm/", "◑ Claude"),
+	"Projects/logtime.wezterm"
 )
-check("dossier personnel : le titre", activity.label("file:///C:/Users/gazou/", "wslhost.exe"), "wslhost")
+check("dossier personnel : le titre", activity.label("file:///C:/Users/alex/", "wslhost.exe"), "wslhost")
 check("ni dossier ni titre : inconnu", activity.label(nil, nil), activity.OTHER)
 check(
 	"un nom trop long est coupé",
@@ -161,16 +161,16 @@ check("top : sans reste, pas de ligne autres", #activity.top({ a = 1 }, 5), 1)
 
 -- ---- le fichier
 local sample =
-	{ ["2026-10-14"] = { ["Projet_Perso/logtime.wezterm"] = 8040.7, ['a "b" \\ c'] = 5 }, ["2026-10-13"] = { x = 1 } }
+	{ ["2026-10-14"] = { ["Projects/logtime.wezterm"] = 8040.7, ['a "b" \\ c'] = 5 }, ["2026-10-13"] = { x = 1 } }
 local text = projects_storage.encode(sample)
 check(
 	"encode : trié, secondes entières, textes protégés",
 	text,
-	'{"2026-10-13":{"x":1},"2026-10-14":{"Projet_Perso/logtime.wezterm":8040,"a \\"b\\" \\\\ c":5}}'
+	'{"2026-10-13":{"x":1},"2026-10-14":{"Projects/logtime.wezterm":8040,"a \\"b\\" \\\\ c":5}}'
 )
 local back = projects_storage.decode(text)
 check("decode : relu", back["2026-10-14"]['a "b" \\ c'], 5)
-check("decode : relu (2)", back["2026-10-14"]["Projet_Perso/logtime.wezterm"], 8040)
+check("decode : relu (2)", back["2026-10-14"]["Projects/logtime.wezterm"], 8040)
 check(
 	"encode : rien d'invalide (date, valeur négative, moins d'une seconde)",
 	projects_storage.encode({ x = { a = 5 }, ["2026-10-14"] = { a = -1, b = 0.5 } }),

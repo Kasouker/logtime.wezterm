@@ -171,7 +171,7 @@ check("français : le pourcentage garde son espace (85 %)", p_fr[4]:find("%d %%$
 -- ---- par projet
 local projects = {
 	["2026-10-14"] = {
-		["Projet_Perso/logtime.wezterm"] = 4 * 3600 + 600,
+		["Projects/logtime.wezterm"] = 4 * 3600 + 600,
 		["42/C05"] = 3 * 3600,
 		["un nom de projet beaucoup trop long pour la colonne"] = 1200,
 		logtime = 300,
@@ -186,7 +186,7 @@ check("projets : le titre", pp[7], "  Par projet (temps actif)")
 check(
 	"projets : le plus grand d'abord, sa part du total du jour (4h10 sur 10h04 = 41 %)",
 	pp[8],
-	"    Projet_Perso/logtime.wezterm    4h10   █████░░░░░░░   41 %"
+	"    Projects/logtime.wezterm        4h10   █████░░░░░░░   41 %"
 )
 check(
 	"projets : le suivant",

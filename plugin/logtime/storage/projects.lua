@@ -1,6 +1,6 @@
 -- plugin/logtime/storage/projects.lua : le format du fichier du temps par projet (.logtime_projects.json).
 -- Aucune dépendance à WezTerm : se teste avec un simple interpréteur Lua.
---   {"2026-10-14":{"Projet_Perso/logtime.wezterm":8040,"42/C05":3600}}
+--   {"2026-10-14":{"Projects/logtime.wezterm":8040,"42/C05":3600}}
 -- Un objet : une date, puis un objet (un nom de projet, puis un nombre de secondes). La lecture et l'écriture prudentes
 -- sont celles de storage/days.lua (load et save, avec ce format).
 local load = ...
