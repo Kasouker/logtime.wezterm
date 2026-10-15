@@ -247,7 +247,7 @@ local BLUE = convert.bg(gradient.make({ color = "#3366CC" }).color(15231))
 -- sans fichier : le comportement d'avant
 -- ============================================================
 local e = new_env(BIG)
-check("version : le fichier de réglages est dans cette version", e.M.version:find("reglages", 1, true) ~= nil, true)
+check("version : un numéro MAJEUR.MINEUR.CORRECTIF", e.M.version:match("^%d+%.%d+%.%d+$") ~= nil, true)
 local config = e.M.apply_to_config({})
 local frame, months = open_page(e, config)
 check("sans fichier ni option : 12 mois dans une grande fenêtre", months, 12)
