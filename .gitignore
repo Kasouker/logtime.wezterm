@@ -7,6 +7,8 @@
 
 .logtime_probe
 
+.logtime_focus
+
 *.bak
 
 *.tmp

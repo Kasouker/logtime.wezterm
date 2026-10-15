@@ -7,7 +7,7 @@ local wezterm = require("wezterm")
 local sep = package.config:sub(1, 1)
 
 local M = {}
-M.version = "1.0.2" -- MAJEUR.MINEUR.CORRECTIF : 1.0.1 une correction, 1.1.0 une nouveauté, 2.0.0 si la config des gens casse
+M.version = "1.0.3" -- MAJEUR.MINEUR.CORRECTIF : 1.0.1 une correction, 1.1.0 une nouveauté, 2.0.0 si la config des gens casse
 
 -- ------------------------------------------------------------
 -- Retrouver le dossier du plugin
@@ -241,6 +241,74 @@ local function num(v, default)
 	return default
 end
 
+-- ------------------------------------------------------------
+-- Plusieurs WezTerm ouverts en même temps (plusieurs processus, chacun son GLOBAL) écrivent les mêmes fichiers.
+-- ------------------------------------------------------------
+-- Chacun a un identifiant (gardé dans GLOBAL : il survit aux rechargements de la config, pas à la fermeture) :
+--   - son fichier temporaire porte cet identifiant : deux WezTerm ne s'écrasent jamais pendant une écriture ;
+--   - avant chaque sauvegarde, le fichier est relu et fusionné (la plus grande valeur) : aucun n'efface ce qu'un
+--     autre a compté ;
+--   - un seul attribue le temps aux projets et à l'inactif : le dernier qui a eu une fenêtre au premier plan (il
+--     écrit son identifiant dans .logtime_focus). Les autres comptent les heures, mais ne savent pas où tu travailles.
+--   logtime_process_token : l'identifiant de ce WezTerm
+--   logtime_focus_owner, logtime_focus_read_at : le WezTerm qui attribue (lu au plus toutes les FOCUS_READ_EVERY s)
+local FOCUS_READ_EVERY = 2
+
+local function process_token()
+	local token = G.logtime_process_token
+	if token == nil then
+		token = string.format("%x%06x", os.time(), math.random(0, 0xFFFFFF))
+		G.logtime_process_token = token
+	end
+	return tostring(token)
+end
+
+-- Le fichier temporaire de ce WezTerm pour `path`.
+local function tmp_of(path)
+	return path .. "." .. process_token() .. ".tmp"
+end
+
+local function focus_path()
+	return data_dir() .. sep .. ".logtime_focus"
+end
+
+-- Une fenêtre de ce WezTerm est au premier plan : il devient celui qui attribue (s'il ne l'était pas déjà). Le temps
+-- passé ailleurs n'est pas de l'inactivité de ce WezTerm : sa dernière activité repart de maintenant.
+local function claim_focus(now)
+	local me = process_token()
+	if G.logtime_focus_owner ~= nil and tostring(G.logtime_focus_owner) == me then
+		return
+	end
+	local f = io.open(focus_path(), "wb")
+	if f then
+		f:write(me)
+		f:close()
+	end
+	G.logtime_focus_owner = me
+	G.logtime_focus_read_at = now
+	G.logtime_last_activity = now
+	G.logtime_idle_marked = nil
+end
+
+-- Ce WezTerm attribue-t-il le temps aux projets et à l'inactif ? Oui s'il est le dernier au premier plan, ou si
+-- personne ne l'est encore (un seul WezTerm ouvert : comme avant).
+local function is_focus_owner(now)
+	local read_at = num(G.logtime_focus_read_at)
+	if not read_at or now - read_at >= FOCUS_READ_EVERY or now < read_at then
+		G.logtime_focus_read_at = now
+		local f = io.open(focus_path(), "rb")
+		if f then
+			local owner = (f:read("*a") or ""):match("^%s*(%x+)%s*$")
+			f:close()
+			if owner then
+				G.logtime_focus_owner = owner
+			end
+		end
+	end
+	local owner = G.logtime_focus_owner
+	return owner == nil or tostring(owner) == process_token()
+end
+
 -- L'ancienne version gardait une table dans GLOBAL : on la retire, elle ne sert plus.
 pcall(function()
 	G.logtime_days = nil
@@ -339,7 +407,22 @@ local function maybe_save(now, days)
 		G.logtime_backup_done = true
 	end
 
-	local ok, saved, err = pcall(storage.save, path, days)
+	-- Relire juste avant d'écrire : un autre WezTerm a pu sauvegarder entre-temps (on garde la plus grande valeur).
+	local read_ok, from_file, state = pcall(storage.load, path)
+	if read_ok and state == "corrupt" then
+		G.logtime_storage_ready = false -- jamais écrire par-dessus : relu (et mis de côté) au prochain passage
+		return
+	end
+	if read_ok and state == "ok" then
+		for key, secs in pairs(from_file) do
+			if (days[key] or 0) < secs then
+				days[key] = secs
+			end
+		end
+		remember(days)
+	end
+
+	local ok, saved, err = pcall(storage.save, path, days, nil, tmp_of(path))
 	G.logtime_saved = now
 	if ok and saved then
 		if G.logtime_save_failed then
@@ -379,8 +462,13 @@ end
 --   logtime_idle_marked   : la dernière activité dont l'inactivité est déjà notée
 --   logtime_label         : le projet de l'onglet affiché (le temps compté va à ce projet)
 --
+--   <préfixe>_base   : le contenu du fichier tel que CE WezTerm l'a lu ou écrit en dernier (en texte)
+--
 -- side_file(o) : o.prefix, o.what (pour les messages), o.path(), o.decode(texte), o.encode(table),
--- o.merge(mémoire, fichier) (garder la plus grande des deux valeurs : jamais compter deux fois).
+-- o.merge(mémoire, fichier, base) : reprendre du fichier ce qu'un autre WezTerm a changé (la plus grande des deux
+-- valeurs : jamais compter deux fois). Une valeur égale à `base` est la nôtre : on garde la mémoire, même plus petite
+-- (le temps inactif, noté après coup, est retiré du projet : la fusion ne doit pas l'y remettre). Sans `base`
+-- (la première lecture) : toujours la plus grande.
 local function side_file(o)
 	local mem = nil
 	local file = {}
@@ -421,8 +509,9 @@ local function side_file(o)
 					)
 					from_file = {}
 				end
-				o.merge(mem, from_file)
+				o.merge(mem, from_file, nil)
 				G[key("json")] = o.encode(mem)
+				G[key("base")] = o.encode(from_file)
 				G[key("ready")] = true
 			end
 		end
@@ -444,9 +533,22 @@ local function side_file(o)
 		if last_save and last_save <= now and now - last_save < cfg.save_every then
 			return
 		end
-		local ok, saved, err = pcall(storage.save, o.path(), file.get(), o.encode)
+		-- relire juste avant d'écrire : un autre WezTerm a pu sauvegarder entre-temps
+		local read_ok, from_file, state = pcall(storage.load, o.path(), o.decode)
+		if read_ok and state == "corrupt" then
+			G[key("ready")] = false -- jamais écrire par-dessus : relu (et mis de côté) au prochain passage
+			return
+		end
+		if read_ok and state == "ok" then
+			local base_text = G[key("base")]
+			o.merge(file.get(), from_file, type(base_text) == "string" and o.decode(base_text) or nil)
+			G[key("json")] = o.encode(file.get())
+		end
+		local text = o.encode(file.get())
+		local ok, saved, err = pcall(storage.save, o.path(), file.get(), o.encode, tmp_of(o.path()))
 		G[key("saved")] = now
 		if ok and saved then
+			G[key("base")] = text -- ce que le fichier contient maintenant, écrit par nous
 			if G[key("save_failed")] then
 				wezterm.log_info("logtime: " .. o.what .. " file saved again (the previous problem was temporary)")
 			end
@@ -468,9 +570,10 @@ local idle_file = side_file({
 	end,
 	decode = storage.decode,
 	encode = storage.encode,
-	merge = function(mem, from_file)
+	merge = function(mem, from_file, base)
 		for k, secs in pairs(from_file) do
-			if (mem[k] or 0) < secs then
+			local ours = base ~= nil and base[k] == secs -- inchangé depuis notre dernière lecture ou écriture
+			if not ours and (mem[k] or 0) < secs then
 				mem[k] = secs
 			end
 		end
@@ -486,12 +589,14 @@ local projects_file = side_file({
 	end,
 	decode = projects_storage.decode,
 	encode = projects_storage.encode,
-	merge = function(mem, from_file)
+	merge = function(mem, from_file, base)
 		for k, of_file_day in pairs(from_file) do
 			local of_day = mem[k] or {}
 			mem[k] = of_day
+			local base_day = base and base[k]
 			for label, secs in pairs(of_file_day) do
-				if (of_day[label] or 0) < secs then
+				local ours = base_day ~= nil and base_day[label] == secs
+				if not ours and (of_day[label] or 0) < secs then
 					of_day[label] = secs
 				end
 			end
@@ -509,6 +614,9 @@ end
 -- Du temps vient d'être compté, de `from` à `to` : il va au projet en cours, et sa part inactive va dans le temps
 -- inactif (et elle est retirée du projet : le temps par projet est du temps actif).
 local function note_counted(from, to)
+	if not is_focus_owner(to) then
+		return -- un autre WezTerm est au premier plan : c'est lui qui attribue ce temps
+	end
 	local label = current_label()
 	activity.add(get_projects(), label, from, to, cfg.day_offset)
 	local last_activity = num(G.logtime_last_activity)
@@ -584,6 +692,9 @@ local function note_activity(window, pane)
 	end)
 	if not ok_focus or focused then
 		G.logtime_label = pane_label(pane)
+	end
+	if ok_focus and focused == true then
+		claim_focus(os.time())
 	end
 end
 

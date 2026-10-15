@@ -120,13 +120,16 @@ Everything is stored in **`~/.local/share/logtime/`** (like WezTerm, which store
 | `.logtime_idle.json` | idle time per day |
 | `.logtime_projects.json` | active time per project and per day |
 | `.logtime_settings.json` | the settings chosen in `F4` |
+| `.logtime_focus` | which WezTerm was used last (when several are open at the same time) |
 | `*.bak`, `*.corrupt-*` | a backup copy; an unreadable file set aside (never overwritten) |
+
+**Several WezTerm open at the same time** (each one started separately) share these files safely: each writes through its own temporary file, re-reads the file just before saving (nothing another one counted is lost), and only the last one you used counts the idle time and the time per project.
 
 Why not directly in your home folder: WezTerm reloads its whole config whenever a file changes in the config's folder or one of its direct subfolders. With a config in `~/.wezterm.lua`, saving every 10 s would reload the config all the time.
 
 ## Troubleshooting
 
-Open the logs: `Ctrl+Shift+L` (debug overlay). On load you should see `logtime: version 1.0.2 loaded from ...`. The plugin writes its errors there, for example a misspelled option, a key already used in your config, or a save that failed.
+Open the logs: `Ctrl+Shift+L` (debug overlay). On load you should see `logtime: version 1.0.3 loaded from ...`. The plugin writes its errors there, for example a misspelled option, a key already used in your config, or a save that failed.
 
 - **No counter**: check `status` is not `false`. If you show your own status bar, call `logtime.tick(window)` in it.
 - **A setting is not saved** (`✗ Not saved: …` in the `F4` page): the reason is shown at the bottom of the page, and in full (with the file path) in the logs.

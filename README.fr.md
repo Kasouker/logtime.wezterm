@@ -121,13 +121,16 @@ Tout est rangé dans **`~/.local/share/logtime/`** (comme WezTerm, qui range ses
 | `.logtime_idle.json` | le temps inactif par jour |
 | `.logtime_projects.json` | le temps actif par projet et par jour |
 | `.logtime_settings.json` | les réglages choisis dans `F4` |
+| `.logtime_focus` | le WezTerm utilisé en dernier (quand plusieurs sont ouverts en même temps) |
 | `*.bak`, `*.corrupt-*` | une copie de secours ; un fichier illisible mis de côté (jamais écrasé) |
+
+**Plusieurs WezTerm ouverts en même temps** (lancés chacun de leur côté) partagent ces fichiers sans risque : chacun écrit par son propre fichier temporaire, relit le fichier juste avant de sauvegarder (rien de ce qu'un autre a compté n'est perdu), et seul le dernier utilisé compte le temps inactif et le temps par projet.
 
 Pourquoi pas directement dans le dossier personnel : WezTerm recharge toute sa config dès qu'un fichier change dans le dossier de la config ou dans l'un de ses sous-dossiers directs. Avec une config en `~/.wezterm.lua`, la sauvegarde toutes les 10 s rechargerait la config sans arrêt.
 
 ## En cas de problème
 
-Ouvre les journaux : `Ctrl+Shift+L` (fenêtre de débogage). Au chargement, tu dois lire `logtime: version 1.0.2 loaded from ...`. Le plugin y écrit ses erreurs, **toujours en anglais** (comme la plupart des programmes) : une option mal écrite, une touche déjà utilisée dans ta config, une sauvegarde qui a échoué…
+Ouvre les journaux : `Ctrl+Shift+L` (fenêtre de débogage). Au chargement, tu dois lire `logtime: version 1.0.3 loaded from ...`. Le plugin y écrit ses erreurs, **toujours en anglais** (comme la plupart des programmes) : une option mal écrite, une touche déjà utilisée dans ta config, une sauvegarde qui a échoué…
 
 - **Pas de compteur** : vérifie que `status` n'est pas à `false`. Si tu affiches ta propre barre, appelle `logtime.tick(window)` dedans.
 - **Un réglage n'est pas enregistré** (`✗ Pas enregistré : …` dans la page `F4`) : la raison est affichée en bas de la page, et en entier (avec le chemin du fichier) dans les journaux.

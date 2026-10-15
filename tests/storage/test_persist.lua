@@ -158,6 +158,15 @@ local function list(dir)
 	table.sort(names)
 	return names
 end
+-- Un fichier temporaire laissé dans le dossier (<fichier>.<identifiant du WezTerm>.tmp), ou nil.
+local function leftover_tmp(dir)
+	for _, n in ipairs(list(dir)) do
+		if n:match("%.tmp$") then
+			return n
+		end
+	end
+	return nil
+end
 local function has_prefix(dir, prefix)
 	for _, n in ipairs(list(dir)) do
 		if n:sub(1, #prefix) == prefix then
@@ -262,7 +271,7 @@ local function scenarios()
 	e.M.tick(nil)
 	check("sans fichier : entre deux sauvegardes, le fichier ne bouge pas", read(e.path), '{"2026-10-12":11}')
 	check("sans fichier : aucune erreur", #e.logs.error, 0)
-	check("sans fichier : pas de fichier temporaire laissé", has_prefix(e.data, FILE .. ".tmp"), nil)
+	check("sans fichier : pas de fichier temporaire laissé", leftover_tmp(e.data), nil)
 	cleanup(e)
 
 	-- ============================================================
@@ -426,7 +435,7 @@ local function scenarios()
 	check("fichier abîmé non déplaçable : le fichier n'est PAS écrasé", read(e.path), broken)
 	check(
 		"fichier abîmé non déplaçable : aucune écriture dans le fichier",
-		writes_matching("%.logtime%.json$") + writes_matching("%.logtime%.json%.tmp$"),
+		writes_matching("%.logtime%.json$") + writes_matching("%.logtime%.json%.%x+%.tmp$"),
 		0
 	)
 	check(
@@ -494,7 +503,7 @@ local function scenarios()
 
 	-- le fichier tout juste écrit ne peut pas être relu (ce qui est arrivé sous Windows : antivirus, indexation)
 	e = new_env()
-	blocked_reads = "%.logtime%.json%.tmp$"
+	blocked_reads = "%.logtime%.json%.%x+%.tmp$"
 	text = run(e, t0, 12)
 	blocked_reads = nil
 	check("relecture bloquée : la barre affiche un point d'alerte", text, ICON .. " 00:00:12 ⚠")
@@ -504,7 +513,7 @@ local function scenarios()
 		e.logs.error[1]:find("cannot read back: .*Permission denied") ~= nil,
 		true
 	)
-	check("relecture bloquée : aucun fichier temporaire laissé", has_prefix(e.data, FILE .. ".tmp"), nil)
+	check("relecture bloquée : aucun fichier temporaire laissé", leftover_tmp(e.data), nil)
 	text = run(e, t0 + 13, 12)
 	check("relecture bloquée : la tentative suivante réussit, l'alerte disparaît", text, ICON .. " 00:00:25")
 	check("relecture bloquée : rien n'est perdu", read(e.path), '{"2026-10-12":21}')
@@ -566,6 +575,26 @@ local function scenarios()
 		true
 	)
 	check("chemin par défaut : rien directement dans le dossier personnel", read(e.home .. "/.logtime.json"), nil)
+	cleanup(e)
+
+	-- le fichier d'heures devient illisible PENDANT que WezTerm tourne (un autre programme l'a abîmé) :
+	-- jamais écrasé, mis de côté, puis un nouveau fichier est écrit
+	e = new_env({ file = HISTORY })
+	run(e, t0, 12)
+	write(e.path, "abîmé en cours de route")
+	run(e, t0 + 13, 25)
+	local kept_hours = has_prefix(e.data, FILE .. ".corrupt-")
+	check("abîmé en cours de route : mis de côté", kept_hours ~= nil, true)
+	check(
+		"abîmé en cours de route : son contenu est conservé tel quel",
+		kept_hours and read(e.data .. "/" .. kept_hours),
+		"abîmé en cours de route"
+	)
+	check(
+		"abîmé en cours de route : un nouveau fichier, avec l'historique gardé en mémoire",
+		days_mod.decode(read(e.path) or "") ~= nil and days_mod.decode(read(e.path))["2026-10-10"],
+		15231
+	)
 	cleanup(e)
 
 	-- ============================================================

@@ -95,9 +95,11 @@ end
 -- Renvoie true, ou false et la raison. En cas d'échec, l'ancien fichier n'est pas touché
 -- (sauf dans le dernier recours Windows décrit plus bas, où le contenu reste dans le fichier .tmp).
 -- encode (facultatif) : un autre format de fichier (par défaut M.encode).
-function M.save(path, days, encode)
+-- tmp (facultatif) : le fichier temporaire (par défaut <fichier>.tmp). Chaque WezTerm ouvert donne le sien : deux
+-- WezTerm qui sauvegardent en même temps n'écrivent jamais dans le même fichier temporaire.
+function M.save(path, days, encode, tmp)
 	local text = (encode or M.encode)(days)
-	local tmp = path .. ".tmp"
+	tmp = tmp or (path .. ".tmp")
 
 	local f, err = io.open(tmp, "wb")
 	if not f then

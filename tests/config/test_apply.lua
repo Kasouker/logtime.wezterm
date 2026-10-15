@@ -157,14 +157,19 @@ local HISTORY = '{"2026-10-10":15231,"2026-10-11":1900}'
 
 -- ---- l'environnement : dossier personnel temporaire, fausse API WezTerm, plugin chargé
 local all_logs = {} -- tous les messages des journaux, pour le garde-fou de la fin
+-- opts.home : le dossier personnel d'un autre environnement (un 2e WezTerm ouvert en même temps : même dossier,
+-- mais son propre GLOBAL et sa propre fausse API).
 local function new_env(opts)
 	opts = opts or {}
-	local home = os.tmpname()
-	os.remove(home)
-	os.execute("mkdir -p '" .. home .. "'")
-	os.execute("mkdir -p '" .. home .. "/.local/share/logtime'") -- le dossier des fichiers du plugin
-	homes[#homes + 1] = home
-	if opts.file ~= false then
+	local home = opts.home
+	if not home then
+		home = os.tmpname()
+		os.remove(home)
+		os.execute("mkdir -p '" .. home .. "'")
+		os.execute("mkdir -p '" .. home .. "/.local/share/logtime'") -- le dossier des fichiers du plugin
+		homes[#homes + 1] = home
+	end
+	if opts.file ~= false and not opts.home then
 		write(home .. "/.local/share/logtime/.logtime.json", opts.file or HISTORY)
 	end
 	local w = {
@@ -1006,11 +1011,20 @@ local function scenarios()
 	local idle_page = e.w.spawned[#e.w.spawned].pane
 	check("inactif : rien de compté aujourd'hui, pas de ligne", last_text(idle_page):find("inactif", 1, true), nil)
 	live(e, win, screen, 0, 600, true) -- 10 min de travail
-	writes[".logtime_idle.json.tmp"] = 0
+	local function idle_tmp_writes() -- les écritures du fichier temporaire (.logtime_idle.json.<identifiant>.tmp)
+		local n = 0
+		for name, count in pairs(writes) do
+			if name:match("^%.logtime_idle%.json%.%x+%.tmp$") then
+				n = n + count
+			end
+		end
+		return n
+	end
+	local idle_writes_before = idle_tmp_writes()
 	live(e, win, screen, 601, 4200, false) -- 1 h sans rien toucher
 	check(
 		"inactif : le fichier est écrit au plus toutes les 10 s (pas à chaque seconde)",
-		writes[".logtime_idle.json.tmp"] <= 3600 / 10,
+		idle_tmp_writes() - idle_writes_before <= 3600 / 10 and idle_tmp_writes() - idle_writes_before > 0,
 		true
 	)
 	live(e, win, screen, 4201, 4260, true) -- reprise
@@ -1230,7 +1244,7 @@ local function scenarios()
 	e = new_env({ file = false })
 	e.M.apply_to_config({})
 	screen = screen_pane(e, "file:///C:/Users/max/a/b/")
-	open_fails[1] = ".logtime_projects.json.tmp"
+	open_fails[1] = ".logtime_projects.json." -- son fichier temporaire (.logtime_projects.json.<identifiant>.tmp)
 	live(e, win, screen, 0, 30, true)
 	open_fails[1] = nil
 	local function logged(list, text)
@@ -1255,6 +1269,194 @@ local function scenarios()
 		'{"2026-10-13":{"a/b":51}}'
 	)
 	cleanup(e)
+
+	-- ============================================================
+	-- deux WezTerm ouverts en même temps (deux processus : chacun son GLOBAL), le même dossier
+	-- ============================================================
+	clock.now = T0
+	local a = new_env({ file = false })
+	local config_a = a.M.apply_to_config({})
+	local win_a = a.window()
+	function win_a:is_focused()
+		return true
+	end
+	local pane_a = screen_pane(a, "file:///C:/Users/max/42/C05/", "zsh")
+	local b = new_env({ home = a.home })
+	b.M.apply_to_config({})
+	local win_b = b.window()
+	local b_focused = false
+	function win_b:is_focused()
+		return b_focused
+	end
+	local pane_b = screen_pane(b, "file:///C:/Users/max/autre/projet/", "zsh")
+	local function both(from, to, a_active, b_active)
+		for s_ = from, to do
+			clock.now = T0 + s_
+			if a_active then
+				pane_a.text = "$ a " .. s_
+			end
+			if b_active then
+				pane_b.text = "$ b " .. s_
+			end
+			for _, handler in ipairs(a.w.events["update-status"] or {}) do
+				handler(win_a, pane_a)
+			end
+			for _, handler in ipairs(b.w.events["update-status"] or {}) do
+				handler(win_b, pane_b)
+			end
+		end
+	end
+	local D = a.home .. "/.local/share/logtime/"
+	local function projects_now()
+		local text = read(D .. ".logtime_projects.json")
+		return text and module("storage/projects").decode(text)["2026-10-13"] or {}
+	end
+	-- 10 min : on travaille dans A (au premier plan) ; B est ouvert à côté, sans le focus, et rien n'y bouge
+	both(0, 600, true, false)
+	check("deux WezTerm : aucune erreur dans A", #a.w.logs.error, 0)
+	check("deux WezTerm : aucune erreur dans B (plus de « check after writing failed »)", #b.w.logs.error, 0)
+	check(
+		"deux WezTerm : les heures, une seule fois, pas le double (dernière sauvegarde à la seconde 591)",
+		read(D .. ".logtime.json"),
+		'{"2026-10-13":591}'
+	)
+	check(
+		"deux WezTerm : le projet de A reçoit le temps (sauvegardé à la seconde 591)",
+		projects_now()["42/C05"],
+		591
+	)
+	check("deux WezTerm : rien pour le projet de B (il n'a pas le focus)", projects_now()["autre/projet"], nil)
+	check(
+		"deux WezTerm : B ne compte pas d'inactif (il n'attribue rien : rien ne bougeait chez lui)",
+		read(D .. ".logtime_idle.json"),
+		nil
+	)
+	check(
+		"deux WezTerm : le fichier .logtime_focus désigne A",
+		read(D .. ".logtime_focus"),
+		tostring(a.w.GLOBAL.logtime_process_token)
+	)
+	check(
+		"deux WezTerm : chacun son identifiant (donc son fichier temporaire)",
+		tostring(a.w.GLOBAL.logtime_process_token) ~= tostring(b.w.GLOBAL.logtime_process_token),
+		true
+	)
+	-- on passe dans B : il prend la main ; les 10 min passées dans A ne sont pas de l'inactivité de B
+	function win_a:is_focused()
+		return false
+	end
+	b_focused = true
+	-- B a le focus, mais rien n'y bouge pendant 2 min (on lit l'écran : moins que les 5 min d'inactivité), puis on y
+	-- travaille. Sa dernière activité doit repartir de sa prise de main : sinon les 10 min passées dans A compteraient
+	-- comme de l'inactivité de B.
+	both(601, 720, false, false)
+	both(721, 900, false, true)
+	check(
+		"deux WezTerm : le fichier .logtime_focus désigne B",
+		read(D .. ".logtime_focus"),
+		tostring(b.w.GLOBAL.logtime_process_token)
+	)
+	check("deux WezTerm : B attribue maintenant à son projet", (projects_now()["autre/projet"] or 0) >= 290, true)
+	check(
+		"deux WezTerm : A n'ajoute plus rien à son projet (il garde ses 10 min)",
+		projects_now()["42/C05"] <= 602,
+		true
+	)
+	check(
+		"deux WezTerm : pas d'inactif compté pour les 10 min passées dans A (B repart de sa prise de main)",
+		read(D .. ".logtime_idle.json"),
+		nil
+	)
+	check(
+		"deux WezTerm : les heures continuent, une seule fois (sauvegardées à la seconde 891)",
+		read(D .. ".logtime.json"),
+		'{"2026-10-13":891}'
+	)
+	check("deux WezTerm : toujours aucune erreur", #a.w.logs.error + #b.w.logs.error, 0)
+	-- une pause dans B : l'inactif est noté (B est celui qui attribue), et retiré de son projet
+	both(901, 1800, false, false)
+	check("deux WezTerm : une pause dans B, notée en inactif", read(D .. ".logtime_idle.json") ~= nil, true)
+	check(
+		"deux WezTerm : l'inactif est retiré du projet de B (la fusion ne le remet pas)",
+		projects_now()["autre/projet"] < 600,
+		true
+	)
+	check("deux WezTerm : A ne compte jamais cette pause dans son projet", projects_now()["42/C05"] <= 602, true)
+	cleanup(a)
+
+	-- un WezTerm n'efface jamais ce qu'un autre a écrit : A sauvegarde un jour, B (lancé avant) ne l'efface pas
+	clock.now = T0
+	a = new_env({ file = false })
+	a.M.apply_to_config({})
+	b = new_env({ home = a.home })
+	b.M.apply_to_config({})
+	win_a, win_b = a.window(), b.window()
+	pane_a, pane_b = screen_pane(a), screen_pane(b)
+	for _, handler in ipairs(b.w.events["update-status"] or {}) do
+		handler(win_b, pane_b) -- B lit le fichier (vide) au démarrage
+	end
+	write(a.home .. "/.local/share/logtime/.logtime.json", '{"2026-10-10":5000}') -- A a sauvegardé entre-temps
+	for s_ = 1, 12 do
+		clock.now = T0 + s_
+		for _, handler in ipairs(b.w.events["update-status"] or {}) do
+			handler(win_b, pane_b)
+		end
+	end
+	check(
+		"deux WezTerm : B garde le jour sauvegardé par A (relu juste avant d'écrire)",
+		read(a.home .. "/.local/share/logtime/.logtime.json"),
+		'{"2026-10-10":5000,"2026-10-13":11}'
+	)
+	cleanup(a)
+
+	-- les projets aussi : B garde les projets qu'un autre WezTerm a sauvegardés entre-temps
+	clock.now = T0
+	b = new_env({ file = false })
+	b.M.apply_to_config({})
+	win_b = b.window()
+	pane_b = screen_pane(b, "file:///C:/Users/max/autre/projet/", "zsh")
+	local PF = b.home .. "/.local/share/logtime/.logtime_projects.json"
+	for s_ = 0, 1 do
+		clock.now = T0 + s_
+		pane_b.text = "$ " .. s_
+		for _, handler in ipairs(b.w.events["update-status"] or {}) do
+			handler(win_b, pane_b)
+		end
+	end
+	write(PF, '{"2026-10-12":{"hier":3600},"2026-10-13":{"ailleurs":50}}') -- un autre WezTerm a sauvegardé
+	for s_ = 2, 12 do
+		clock.now = T0 + s_
+		pane_b.text = "$ " .. s_
+		for _, handler in ipairs(b.w.events["update-status"] or {}) do
+			handler(win_b, pane_b)
+		end
+	end
+	check(
+		"deux WezTerm : B garde les projets sauvegardés par un autre (hier, et « ailleurs » aujourd'hui)",
+		read(PF),
+		'{"2026-10-12":{"hier":3600},"2026-10-13":{"ailleurs":50,"autre/projet":11}}'
+	)
+	-- le fichier de projets devient illisible pendant que WezTerm tourne : jamais écrasé, mis de côté, puis réécrit
+	write(PF, "abîmé par un autre programme")
+	for s_ = 13, 40 do
+		clock.now = T0 + s_
+		pane_b.text = "$ " .. s_
+		for _, handler in ipairs(b.w.events["update-status"] or {}) do
+			handler(win_b, pane_b)
+		end
+	end
+	local kept_projects = io.popen("ls -a '" .. b.home .. "/.local/share/logtime'"):read("*a")
+	check(
+		"fichier de projets abîmé en cours de route : mis de côté (jamais écrasé)",
+		kept_projects:find(".logtime_projects.json.corrupt-", 1, true) ~= nil,
+		true
+	)
+	check(
+		"fichier de projets abîmé en cours de route : un nouveau fichier lisible ensuite",
+		module("storage/projects").decode(read(PF) or "") ~= nil,
+		true
+	)
+	cleanup(b)
 
 	-- sans option lang : l'interface est en anglais (le plugin chargé tel quel, sans le lang = "fr" de ces tests)
 	clock.now = T0
