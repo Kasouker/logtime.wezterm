@@ -27,7 +27,7 @@ function M.build(wezterm, bindings, is_page, prefix)
 			safe.trace(
 				wezterm,
 				string.format(
-					"logtime (page) : touche %s, panneau %s, est la page : %s",
+					"logtime (page): key %s, pane %s, is the page: %s",
 					key,
 					tostring(pane:pane_id()),
 					tostring(on_page)
@@ -51,13 +51,13 @@ end
 
 -- Active les touches de la page (elles restent actives jusqu'à leur retrait).
 function M.activate(wezterm, window, pane, name)
-	safe.trace(wezterm, string.format("logtime : touches de la page « %s » activées", name))
+	safe.trace(wezterm, string.format('logtime: page keys "%s" enabled', name))
 	window:perform_action(wezterm.action.ActivateKeyTable({ name = name, one_shot = false }), pane)
 end
 
 -- Retire les touches de la page.
 function M.leave(wezterm, window, pane)
-	safe.trace(wezterm, "logtime : touches de la page retirées")
+	safe.trace(wezterm, "logtime: page keys removed")
 	window:perform_action(wezterm.action.PopKeyTable, pane)
 end
 

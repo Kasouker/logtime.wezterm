@@ -65,9 +65,9 @@ end
 local function quoted(list)
 	local parts = {}
 	for i, value in ipairs(list) do
-		parts[i] = "« " .. value .. " »"
+		parts[i] = '"' .. value .. '"'
 	end
-	return table.concat(parts, " ou ")
+	return table.concat(parts, " or ")
 end
 
 -- Vérifie une valeur. Renvoie true et la valeur normalisée (couleur en majuscules avec #, entier sans décimale),
@@ -75,7 +75,7 @@ end
 function M.validate(key, value)
 	local definition = BY_KEY[key]
 	if not definition then
-		return false, "réglage inconnu"
+		return false, "unknown setting"
 	end
 	local kind = definition.kind
 	if kind == "enum" then
@@ -84,30 +84,30 @@ function M.validate(key, value)
 				return true, value
 			end
 		end
-		return false, "doit être " .. quoted(definition.values)
+		return false, "must be " .. quoted(definition.values)
 	elseif kind == "boolean" then
 		if type(value) == "boolean" then
 			return true, value
 		end
-		return false, "doit être true ou false"
+		return false, "must be true or false"
 	elseif kind == "color" then
 		if type(value) == "string" and value:match("^#?%x%x%x%x%x%x$") then
 			return true, "#" .. value:gsub("^#", ""):upper()
 		end
-		return false, "doit être un code couleur comme « #C9AB6B »"
+		return false, 'must be a color code like "#C9AB6B"'
 	end
 	-- number ou integer
 	if type(value) ~= "number" or value ~= value or value == math.huge or value == -math.huge then
-		return false, "doit être un nombre"
+		return false, "must be a number"
 	end
 	if definition.none ~= nil and value == definition.none then
 		return true, math.tointeger(value) or value
 	end
 	if kind == "integer" and value ~= math.floor(value) then
-		return false, "doit être un nombre entier"
+		return false, "must be a whole number"
 	end
 	if value < definition.min or value > definition.max then
-		return false, string.format("doit être compris entre %g et %g", definition.min, definition.max)
+		return false, string.format("must be between %g and %g", definition.min, definition.max)
 	end
 	if kind == "integer" then
 		return true, math.tointeger(value)

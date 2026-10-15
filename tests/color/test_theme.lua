@@ -141,7 +141,7 @@ local short_ansi = copy(ANSI)
 short_ansi[8] = nil
 missing, reason = theme.extract({ colors = { ansi = short_ansi, brights = BRIGHTS } })
 check("une seule couleur ANSI manquante : refusé", missing, nil)
-check("la raison cite la couleur manquante (8)", reason:find("couleur 8", 1, true) ~= nil, true)
+check("la raison cite la couleur manquante (8)", reason:find("color 8", 1, true) ~= nil, true)
 local short_brights = copy(BRIGHTS)
 short_brights[3] = nil
 missing, reason = theme.extract({ colors = { ansi = ANSI, brights = short_brights } })
@@ -153,7 +153,7 @@ end
 gap[2] = "#GGGGGG"
 missing, reason = theme.extract({ colors = { ansi = ANSI, brights = gap } })
 check("une couleur invalide (lettres hors hexadécimal) : refusé", missing, nil)
-check("la raison cite la couleur 10", reason:find("couleur 10", 1, true) ~= nil, true)
+check("la raison cite la couleur 10", reason:find("color 10", 1, true) ~= nil, true)
 missing = theme.extract({
 	colors = { ansi = { "red", "green", "blue", "black", "white", "cyan", "magenta", "yellow" }, brights = BRIGHTS },
 })
@@ -173,7 +173,7 @@ check("configuration vide : la raison", type(reason) == "string" and #reason > 5
 -- ---- un thème qu'on ne sait pas lire
 missing, reason = theme.extract({ color_scheme = "Inconnu" }, fake_wezterm(SCHEMES))
 check("thème inconnu, sans config.colors : refusé", missing, nil)
-check("la raison cite le nom du thème", reason:find("« Inconnu »", 1, true) ~= nil, true)
+check("la raison cite le nom du thème", reason:find('"Inconnu"', 1, true) ~= nil, true)
 missing, reason = theme.extract({ color_scheme = "Fake" })
 check("thème intégré mais sans le module wezterm : refusé", missing, nil)
 colors = theme.extract({ color_scheme = "Inconnu", colors = { ansi = ANSI, brights = BRIGHTS } }, fake_wezterm(SCHEMES))
@@ -185,7 +185,7 @@ check(
 local no_brights = { Faible = { ansi = ANSI } }
 missing, reason = theme.extract({ color_scheme = "Faible" }, fake_wezterm(no_brights))
 check("thème sans couleurs vives : refusé", missing, nil)
-check("... avec la couleur manquante dans la raison", reason:find("couleur 9", 1, true) ~= nil, true)
+check("... avec la couleur manquante dans la raison", reason:find("color 9", 1, true) ~= nil, true)
 missing = theme.extract({ color_scheme = 42 })
 check("color_scheme qui n'est pas un texte : refusé sans plantage", missing, nil)
 missing = theme.extract({ color_scheme = "" })

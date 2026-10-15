@@ -599,10 +599,10 @@ function M.create(ctx)
 		safe.trace(
 			wezterm,
 			string.format(
-				"logtime : dessin de la page de personnalisation dans le panneau %s (choix %d, %s)",
+				"logtime: drawing the settings page in pane %s (choice %d, %s)",
 				tostring(pane:pane_id()),
 				selected_index(),
-				fits and "complète" or "fenêtre trop petite"
+				fits and "complete" or "window too small"
 			)
 		)
 		ui.draw(pane, table.concat(lines, "\n"), first)
@@ -649,10 +649,7 @@ function M.create(ctx)
 		G.logtime_settings_message = M.MESSAGE.NONE
 		G.logtime_settings_tab = M.TAB.COLORS
 		G.logtime_settings_row = 1
-		safe.trace(
-			wezterm,
-			"logtime : page de personnalisation ouverte dans le panneau " .. tostring(page_pane:pane_id())
-		)
+		safe.trace(wezterm, "logtime: settings page opened in pane " .. tostring(page_pane:pane_id()))
 
 		redraw(page_pane, true)
 		redraw_later(page_pane:pane_id(), { 0.4, 1.2 })
@@ -667,7 +664,7 @@ function M.create(ctx)
 		current[key] = value
 		local ok, err = ctx.store.save(path, current)
 		if not ok then
-			wezterm.log_error("logtime : enregistrement des réglages impossible : " .. tostring(err))
+			wezterm.log_error("logtime: cannot save the settings: " .. tostring(err))
 			G.logtime_settings_message = M.MESSAGE.FAILED
 			return false
 		end
@@ -683,7 +680,7 @@ function M.create(ctx)
 		end
 		if store_setting(key, value) then
 			G.logtime_settings_message = M.MESSAGE.SETTING_SAVED
-			safe.trace(wezterm, "logtime : réglage enregistré : " .. key .. " = " .. tostring(value))
+			safe.trace(wezterm, "logtime: setting saved: " .. key .. " = " .. tostring(value))
 			pcall(ctx.refresh_calendar, window, pane)
 		end
 		redraw(pane, false)
@@ -727,7 +724,7 @@ function M.create(ctx)
 	local function save(window, pane, color)
 		if store_setting("gradient_color", color) then
 			G.logtime_settings_message = M.MESSAGE.SAVED
-			safe.trace(wezterm, "logtime : couleur enregistrée : " .. color)
+			safe.trace(wezterm, "logtime: color saved: " .. color)
 			pcall(ctx.refresh_calendar, window, pane)
 		end
 		redraw(pane, false)
@@ -772,7 +769,7 @@ function M.create(ctx)
 			if store_setting("theme_colors", value) then
 				G.logtime_settings_index = initial_index()
 				G.logtime_settings_message = M.MESSAGE.CONSENT
-				safe.trace(wezterm, "logtime : couleurs du thème : " .. (value and "oui" or "non"))
+				safe.trace(wezterm, "logtime: theme colors: " .. (value and "yes" or "no"))
 			end
 			redraw(pane, false)
 		end
@@ -794,7 +791,7 @@ function M.create(ctx)
 				20000
 			)
 		end)
-		safe.trace(wezterm, "logtime : notification : question sur les couleurs du thème")
+		safe.trace(wezterm, "logtime: notification: theme colors question")
 	end
 
 	local function close(window, pane)

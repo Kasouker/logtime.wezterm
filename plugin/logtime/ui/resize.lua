@@ -6,7 +6,7 @@ local M = {}
 
 -- `on_resize(window, pane)` est appelée à chaque redimensionnement ; une erreur est signalée, jamais perdue.
 function M.install(wezterm, on_resize)
-	wezterm.on("window-resized", safe.wrap(wezterm, "redimensionnement", on_resize))
+	wezterm.on("window-resized", safe.wrap(wezterm, "resize", on_resize))
 end
 
 return M

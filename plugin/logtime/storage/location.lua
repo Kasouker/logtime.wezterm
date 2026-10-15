@@ -52,27 +52,27 @@ end
 local function copy(from, to)
 	local text = read(from)
 	if not text then
-		return false, "lecture impossible"
+		return false, "cannot read"
 	end
 	local tmp = to .. ".tmp"
 	local f, err = io.open(tmp, "wb")
 	if not f then
-		return false, "écriture impossible : " .. tostring(err)
+		return false, "cannot write: " .. tostring(err)
 	end
 	local written, write_err = f:write(text)
 	local closed, close_err = f:close()
 	if not written or not closed then
 		os.remove(tmp)
-		return false, "écriture incomplète : " .. tostring(write_err or close_err)
+		return false, "incomplete write: " .. tostring(write_err or close_err)
 	end
 	if read(tmp) ~= text then
 		os.remove(tmp)
-		return false, "la vérification après écriture a échoué"
+		return false, "check after writing failed"
 	end
 	local renamed, rename_err = os.rename(tmp, to)
 	if not renamed then
 		os.remove(tmp)
-		return false, "mise en place impossible : " .. tostring(rename_err)
+		return false, "cannot put in place: " .. tostring(rename_err)
 	end
 	return true
 end

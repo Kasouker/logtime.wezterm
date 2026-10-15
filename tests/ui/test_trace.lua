@@ -205,8 +205,8 @@ w = new_wezterm()
 win = new_window(w)
 safe.wrap(w, "essai", function() end, true)(win, nil)
 check("trace : deux lignes pour un appel réussi", #w.logs.info, 2)
-check("trace : d'abord « appelée »", w.logs.info[1], "logtime (essai) : appelée")
-check("trace : puis « terminée »", w.logs.info[2], "logtime (essai) : terminée")
+check("trace : d'abord « appelée »", w.logs.info[1], "logtime (essai): called")
+check("trace : puis « terminée »", w.logs.info[2], "logtime (essai): done")
 check("trace : aucune erreur", #w.logs.error, 0)
 
 w = new_wezterm()
@@ -220,8 +220,8 @@ win = new_window(w)
 safe.wrap(w, "essai", function()
 	error("boum")
 end, true)(win, nil)
-check("trace avec erreur : « appelée » est écrit", w.logs.info[1], "logtime (essai) : appelée")
-check("trace avec erreur : pas de « terminée »", find(w.logs.info, "terminée"), 0)
+check("trace avec erreur : « appelée » est écrit", w.logs.info[1], "logtime (essai): called")
+check("trace avec erreur : pas de « terminée »", find(w.logs.info, "done"), 0)
 check("trace avec erreur : l'erreur reste journalisée et notifiée", #w.logs.error == 1 and #win.toasts == 1, true)
 
 w = new_wezterm(false)
@@ -247,13 +247,13 @@ check("touche dans la page : trois lignes (appelée, touche, terminée)", #w.log
 check(
 	"touche dans la page : la touche, le panneau et « est la page »",
 	w.logs.info[2],
-	"logtime (page) : touche h, panneau " .. page_pane.id .. ", est la page : true"
+	"logtime (page): key h, pane " .. page_pane.id .. ", is the page: true"
 )
-check("touche dans la page : terminée", w.logs.info[3], "logtime (page) : terminée")
+check("touche dans la page : terminée", w.logs.info[3], "logtime (page): done")
 fire(table_[2].action, new_window(w), other_pane)
 check(
 	"touche ailleurs : « est la page : false » est noté",
-	find(w.logs.info, "touche q, panneau " .. other_pane.id .. ", est la page : false"),
+	find(w.logs.info, "key q, pane " .. other_pane.id .. ", is the page: false"),
 	1
 )
 check("touche ailleurs : aucune erreur", #w.logs.error, 0)
@@ -264,7 +264,7 @@ win = new_window(w)
 keytable.activate(w, win, page_pane, "logtime_page")
 check("activation : tracée avec le nom de la table", find(w.logs.info, "logtime_page"), 1)
 keytable.leave(w, win, page_pane)
-check("retrait : tracé", find(w.logs.info, "retirées"), 1)
+check("retrait : tracé", find(w.logs.info, "removed"), 1)
 
 -- les journaux ne contiennent que le nom des touches de la page, jamais une autre frappe
 w = new_wezterm()
@@ -291,25 +291,20 @@ win = new_window(w)
 fire(config.keys[1].action, win, w.new_pane())
 check(
 	"F2 : « appelée » et « terminée » sont tracés",
-	find(w.logs.info, "logtime (ouverture) : appelée") == 1
-		and find(w.logs.info, "logtime (ouverture) : terminée") == 1,
+	find(w.logs.info, "logtime (open): called") == 1 and find(w.logs.info, "logtime (open): done") == 1,
 	true
 )
 check(
 	"F2 : la page ouverte est tracée avec son panneau",
-	find(w.logs.info, "page ouverte dans le panneau " .. w.spawned[1].id),
+	find(w.logs.info, "page opened in pane " .. w.spawned[1].id),
 	1
 )
 check(
 	"F2 : le premier dessin est tracé (mois 2026-10)",
-	find(w.logs.info, "dessin du mois 2026-10 dans le panneau " .. w.spawned[1].id) >= 1,
+	find(w.logs.info, "drawing month 2026-10 in pane " .. w.spawned[1].id) >= 1,
 	true
 )
-check(
-	"F2 : l'activation des touches est tracée",
-	find(w.logs.info, "touches de la page « logtime_page » activées"),
-	1
-)
+check("F2 : l'activation des touches est tracée", find(w.logs.info, 'page keys "logtime_page" enabled'), 1)
 
 -- une touche de la page : traces d'appel puis de dessin
 local before = #w.logs.info
@@ -323,13 +318,13 @@ for _, b in ipairs(config.key_tables.logtime_page) do
 end
 w.GLOBAL.logtime_page_pane = w.spawned[1].id
 h(new_window(w), w.spawned[1])
-check("h dans la page : le nouveau mois est tracé (septembre)", find(w.logs.info, "dessin du mois 2026-09"), 1)
+check("h dans la page : le nouveau mois est tracé (septembre)", find(w.logs.info, "drawing month 2026-09"), 1)
 check("h dans la page : plusieurs lignes de trace en plus", #w.logs.info > before + 2, true)
 
 -- le redimensionnement n'est PAS tracé (il se déclenche des dizaines de fois quand on tire sur la fenêtre)
 local info_before = #w.logs.info
 w.events["window-resized"][1](new_window(w), nil)
-check("redimensionnement : aucune ligne « appelée » ou « terminée »", find(w.logs.info, "redimensionnement"), 0)
+check("redimensionnement : aucune ligne « appelée » ou « terminée »", find(w.logs.info, "resize"), 0)
 
 check(
 	"aucune variable globale ajoutée",

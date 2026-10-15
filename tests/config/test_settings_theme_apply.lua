@@ -396,7 +396,7 @@ check(
 	plain(e.w.spawned[1]):find("Couleurs de ton thème ?", 1, true) ~= nil,
 	true
 )
-check("... et signalé dans les journaux", errors_with(e, "« theme_colors »"), 1)
+check("... et signalé dans les journaux", errors_with(e, '"theme_colors"'), 1)
 cleanup()
 
 -- ============================================================

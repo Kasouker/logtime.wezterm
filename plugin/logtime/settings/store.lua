@@ -22,7 +22,7 @@ function M.parse(text)
 		return nil, err
 	end
 	if type(object) ~= "table" or object == json.null or json.is_array(object) then
-		return nil, "le fichier doit contenir un objet entre accolades { ... }"
+		return nil, "the file must contain an object in braces { ... }"
 	end
 	local settings, problems = {}, {}
 	local keys = {}
@@ -34,13 +34,13 @@ function M.parse(text)
 		local value = object[key]
 		if value ~= json.null then
 			if not schema.is_known(key) then
-				problems[#problems + 1] = "réglage inconnu « " .. key .. " » (ignoré)"
+				problems[#problems + 1] = 'unknown setting "' .. key .. '" (ignored)'
 			else
 				local good, normalized = schema.validate(key, value)
 				if good then
 					settings[key] = normalized
 				else
-					problems[#problems + 1] = "« " .. key .. " » " .. normalized .. " (ignoré)"
+					problems[#problems + 1] = '"' .. key .. '" ' .. normalized .. " (ignored)"
 				end
 			end
 		end
@@ -123,7 +123,7 @@ local function write_file(path, text)
 	local written, write_err = f:write(text)
 	local closed, close_err = f:close() -- l'écriture sur le disque peut n'échouer qu'ici
 	if not written or not closed then
-		return false, "écriture incomplète : " .. tostring(write_err or close_err)
+		return false, "incomplete write: " .. tostring(write_err or close_err)
 	end
 	return true
 end
@@ -142,19 +142,19 @@ function M.load(path)
 	if settings then
 		return settings, "ok", problems, false
 	end
-	local reason = "le fichier de réglages est illisible : " .. tostring(problems)
+	local reason = "the settings file is unreadable: " .. tostring(problems)
 	local backup_text = read_file(path .. ".bak")
 	if backup_text then
 		local from_backup, backup_problems = M.parse(backup_text)
 		if from_backup then
-			local all = { reason .. " ; la copie de sécurité (.bak) est utilisée à la place" }
+			local all = { reason .. "; the backup copy (.bak) is used instead" }
 			for _, p in ipairs(backup_problems) do
 				all[#all + 1] = p
 			end
 			return from_backup, "corrupt", all, true
 		end
 	end
-	return {}, "corrupt", { reason .. " ; les valeurs par défaut sont utilisées" }, false
+	return {}, "corrupt", { reason .. "; the default values are used" }, false
 end
 
 local function exists(path)
@@ -188,24 +188,20 @@ local function write_atomic(path, text)
 	local ok, err = write_file(tmp, text)
 	if not ok then
 		os.remove(tmp)
-		return false, "écriture impossible : " .. tostring(err)
+		return false, "cannot write: " .. tostring(err)
 	end
 	-- La raison exacte est dans le message (voir storage/days.lua : un fichier tout juste écrit peut être bloqué un instant).
 	local check, open_err = io.open(tmp, "rb")
 	if not check then
 		os.remove(tmp)
-		return false, "la vérification après écriture a échoué : relecture impossible : " .. tostring(open_err)
+		return false, "check after writing failed: cannot read back: " .. tostring(open_err)
 	end
 	local back = check:read("*a")
 	check:close()
 	if back ~= text then
 		os.remove(tmp)
 		return false,
-			string.format(
-				"la vérification après écriture a échoué : %d octets relus au lieu de %d",
-				back and #back or 0,
-				#text
-			)
+			string.format("check after writing failed: %d bytes read back instead of %d", back and #back or 0, #text)
 	end
 	if os.rename(tmp, path) then
 		return true
@@ -218,8 +214,7 @@ local function write_atomic(path, text)
 	-- Dernier recours : copie directe. Le contenu reste dans le fichier .tmp tant que la copie n'a pas réussi.
 	local copied, copy_err = write_file(path, text)
 	if not copied then
-		return false,
-			"impossible de mettre le fichier en place (contenu conservé dans " .. tmp .. ") : " .. tostring(copy_err)
+		return false, "cannot put the file in place (content kept in " .. tmp .. ") : " .. tostring(copy_err)
 	end
 	os.remove(tmp)
 	return true
@@ -239,7 +234,7 @@ function M.save(path, settings)
 		else
 			local moved, why = quarantine(path)
 			if not moved then
-				return false, "impossible de mettre de côté le fichier illisible : " .. tostring(why)
+				return false, "cannot set aside the unreadable file: " .. tostring(why)
 			end
 		end
 	end
@@ -286,7 +281,7 @@ function M.check_options(opts, extra_known)
 	end
 	if type(opts) ~= "table" then
 		return {
-			"le deuxième argument de apply_to_config doit être une table, par exemple apply_to_config(config, { max_months = 6 }) (reçu : "
+			"the second argument of apply_to_config must be a table, for example apply_to_config(config, { max_months = 6 }) (got: "
 				.. type(opts)
 				.. ")",
 		}
@@ -310,24 +305,24 @@ function M.check_options(opts, extra_known)
 	end)
 	for _, key in ipairs(keys) do
 		if type(key) ~= "string" then
-			messages[#messages + 1] = "option sans nom ("
+			messages[#messages + 1] = "option without a name ("
 				.. tostring(key)
-				.. ") : les réglages s'écrivent nom = valeur"
+				.. "): options are written name = value"
 		elseif not is_known[key] then
 			local suggestion = closest(key, known)
 			if suggestion then
-				messages[#messages + 1] = "option inconnue « "
+				messages[#messages + 1] = 'unknown option "'
 					.. key
-					.. " » (ignorée) ; tu voulais dire « "
+					.. '" (ignored); did you mean "'
 					.. suggestion
-					.. " » ?"
+					.. '"?'
 			else
-				messages[#messages + 1] = "option inconnue « " .. key .. " » (ignorée)"
+				messages[#messages + 1] = 'unknown option "' .. key .. '" (ignored)'
 			end
 		elseif schema.is_known(key) then
 			local good, reason = schema.validate(key, opts[key])
 			if not good then
-				messages[#messages + 1] = "« " .. key .. " » " .. reason
+				messages[#messages + 1] = '"' .. key .. '" ' .. reason
 			end
 		end
 	end

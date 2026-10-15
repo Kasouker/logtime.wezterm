@@ -417,8 +417,8 @@ check(
 )
 check(
 	"ouverture : le journal dit combien de mois sont dessinés",
-	w.logs.info[#w.logs.info - 2]:find("(4 mois)", 1, true) ~= nil
-		or w.logs.info[#w.logs.info - 1]:find("(4 mois)", 1, true) ~= nil,
+	w.logs.info[#w.logs.info - 2]:find("(4 months)", 1, true) ~= nil
+		or w.logs.info[#w.logs.info - 1]:find("(4 months)", 1, true) ~= nil,
 	true
 )
 w.GLOBAL.logtime_page_pane = pane.id
@@ -473,7 +473,11 @@ check(
 	position(shown, "Logtime : Octobre 2026") ~= nil and position(shown, "Juillet 2026") == nil,
 	true
 )
-check("rétrécissement : le journal annonce 1 mois", w.logs.info[#w.logs.info]:find("(1 mois)", 1, true) ~= nil, true)
+check(
+	"rétrécissement : le journal annonce 1 mois",
+	w.logs.info[#w.logs.info]:find("(1 months)", 1, true) ~= nil,
+	true
+)
 pane.dims.cols, pane.dims.viewport_rows = 200, 60
 page.on_resize(win, pane)
 shown = last_text(pane)
@@ -482,7 +486,7 @@ check(
 	position(shown, "Juillet 2026") ~= nil and position(shown, "Octobre 2026") ~= nil,
 	true
 )
-check("agrandissement : le journal annonce 4 mois", w.logs.info[#w.logs.info]:find("(4 mois)", 1, true) ~= nil, true)
+check("agrandissement : le journal annonce 4 mois", w.logs.info[#w.logs.info]:find("(4 months)", 1, true) ~= nil, true)
 pane.dims.cols, pane.dims.viewport_rows = 200, 24
 page.on_resize(win, pane)
 shown = last_text(pane)

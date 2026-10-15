@@ -465,11 +465,7 @@ local function scenarios()
 	check("échec de sauvegarde : la barre affiche un point d'alerte", text, ICON .. " 00:00:12 ⚠")
 	check("échec de sauvegarde : le comptage n'est pas interrompu", e.M.today_seconds(), 12)
 	check("échec de sauvegarde : une seule erreur dans les journaux", #e.logs.error, 1)
-	check(
-		"échec de sauvegarde : le message le dit",
-		e.logs.error[1]:find("sauvegarde impossible", 1, true) ~= nil,
-		true
-	)
+	check("échec de sauvegarde : le message le dit", e.logs.error[1]:find("cannot save", 1, true) ~= nil, true)
 	os.execute("mkdir -p '" .. e.home .. "/pas_encore'")
 	text = run(e, t0 + 13, 12)
 	check(
@@ -485,7 +481,7 @@ local function scenarios()
 	local function recovered(logs)
 		local n = 0
 		for _, m in ipairs(logs.info) do
-			if m:find("sauvegarde réussie de nouveau", 1, true) then
+			if m:find("saved again", 1, true) then
 				n = n + 1
 			end
 		end
@@ -505,7 +501,7 @@ local function scenarios()
 	check("relecture bloquée : une seule erreur dans les journaux", #e.logs.error, 1)
 	check(
 		"relecture bloquée : le message dit pourquoi",
-		e.logs.error[1]:find("relecture impossible : .*Permission denied") ~= nil,
+		e.logs.error[1]:find("cannot read back: .*Permission denied") ~= nil,
 		true
 	)
 	check("relecture bloquée : aucun fichier temporaire laissé", has_prefix(e.data, FILE .. ".tmp"), nil)
@@ -594,7 +590,7 @@ local function scenarios()
 	check("ancien emplacement : aucune erreur", #e.logs.error, 0)
 	local said = false
 	for _, m in ipairs(e.logs.info) do
-		said = said or (m:find("copiés", 1, true) ~= nil and m:find("tu peux les supprimer", 1, true) ~= nil)
+		said = said or (m:find("files copied", 1, true) ~= nil and m:find("you can delete them", 1, true) ~= nil)
 	end
 	check("ancien emplacement : le journal dit ce qui a été copié et que l'original ne sert plus", said, true)
 	-- WezTerm réévalue la config : le dossier n'est pas préparé une seconde fois
@@ -617,7 +613,7 @@ local function scenarios()
 	check("création impossible : une erreur dans les journaux", #e.logs.error, 1)
 	check(
 		"création impossible : le message dit où restent les fichiers",
-		e.logs.error[1] and e.logs.error[1]:find("restent dans " .. e.home, 1, true) ~= nil,
+		e.logs.error[1] and e.logs.error[1]:find("stay in " .. e.home, 1, true) ~= nil,
 		true
 	)
 	check("création impossible : le comptage continue, sans alerte", text, ICON .. " 00:00:12")
@@ -641,7 +637,7 @@ local function scenarios()
 	check("copie impossible : une erreur pour le fichier, une pour l'emplacement gardé", #e.logs.error, 2)
 	check(
 		"copie impossible : le message dit que l'original est intact",
-		e.logs.error[1] and e.logs.error[1]:find("l'original est intact", 1, true) ~= nil,
+		e.logs.error[1] and e.logs.error[1]:find("the original is untouched", 1, true) ~= nil,
 		true
 	)
 	check("copie impossible : rien dans le nouveau dossier", read(e.path), nil)

@@ -45,7 +45,7 @@ end
 --   wezterm : le module wezterm (pour les thèmes intégrés ; facultatif)
 function M.extract(config, wezterm)
 	if type(config) ~= "table" then
-		return nil, "la configuration de WezTerm est introuvable"
+		return nil, "the WezTerm configuration was not found"
 	end
 	local ansi, brights = {}, {}
 	local name = field(config, "color_scheme")
@@ -83,11 +83,11 @@ function M.extract(config, wezterm)
 		if not out[i] then
 			if type(name) == "string" and name ~= "" and not scheme_name then
 				return nil,
-					"le thème « "
+					'the color scheme "'
 						.. name
-						.. " » n'est pas un thème que le plugin sait lire (ni intégré, ni dans config.color_schemes)"
+						.. '" cannot be read by the plugin (neither built in nor in config.color_schemes)'
 			end
-			return nil, "les 16 couleurs ANSI du thème ne sont pas toutes définies (il manque la couleur " .. i .. ")"
+			return nil, "the color scheme does not define all 16 ANSI colors (color " .. i .. " is missing)"
 		end
 	end
 	return out, scheme_name

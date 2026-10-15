@@ -611,11 +611,7 @@ local function scenarios()
 	check("F2 qui échoue : pas de plantage", ok_press, true)
 	check("F2 qui échoue : erreur journalisée", #w.logs.error, 1)
 	check("F2 qui échoue : notification affichée", #win.toasts, 1)
-	check(
-		"F2 qui échoue : le message nomme l'ouverture",
-		win.toasts[1].message:find("ouverture", 1, true) ~= nil,
-		true
-	)
+	check("F2 qui échoue : le message nomme l'ouverture", win.toasts[1].message:find("(open)", 1, true) ~= nil, true)
 
 	-- en anglais
 	w = new_wezterm()

@@ -214,7 +214,7 @@ function M.create(ctx)
 		safe.trace(
 			wezterm,
 			string.format(
-				"logtime : dessin du mois %d-%02d dans le panneau %s (%d mois)",
+				"logtime: drawing month %d-%02d in pane %s (%d months)",
 				year,
 				month,
 				tostring(pane:pane_id()),
@@ -265,7 +265,7 @@ function M.create(ctx)
 		G.logtime_page_pane = page_pane:pane_id()
 		G.logtime_page_year, G.logtime_page_month, G.logtime_page_day = current_month()
 		G.logtime_page_view = M.VIEW.MONTHS
-		safe.trace(wezterm, "logtime : page ouverte dans le panneau " .. tostring(page_pane:pane_id()))
+		safe.trace(wezterm, "logtime: page opened in pane " .. tostring(page_pane:pane_id()))
 
 		redraw(page_pane, true)
 		redraw_later(page_pane:pane_id(), { 0.4, 1.2 })

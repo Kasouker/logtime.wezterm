@@ -87,7 +87,7 @@ accepts("ancre first", "months_anchor", "first")
 rejects("ancre milieu", "months_anchor", "middle")
 check(
 	"la raison d'une liste cite les valeurs",
-	select(2, schema.validate("lang", "de")):find("« fr » ou « en »", 1, true) ~= nil,
+	select(2, schema.validate("lang", "de")):find('"fr" or "en"', 1, true) ~= nil,
 	true
 )
 
@@ -150,7 +150,7 @@ rejects("gradient_curve 3,1", "gradient_curve", 3.1)
 check(
 	"la raison d'un intervalle cite les bornes",
 	select(2, schema.validate("gradient_curve", 5)),
-	"doit être compris entre 0.1 et 3"
+	"must be between 0.1 and 3"
 )
 
 rejects("goal_hours NaN", "goal_hours", 0 / 0)
@@ -161,7 +161,7 @@ rejects("gradient_hours NaN", "gradient_hours", 0 / 0)
 
 -- ---- inconnu
 rejects("réglage inconnu", "gradiant", true)
-check("réglage inconnu : la raison", select(2, schema.validate("gradiant", true)), "réglage inconnu")
+check("réglage inconnu : la raison", select(2, schema.validate("gradiant", true)), "unknown setting")
 rejects("clé en nombre", 12, true)
 
 -- ---- valeurs par défaut

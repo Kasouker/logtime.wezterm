@@ -207,7 +207,7 @@ local function scenarios()
 	local shown = M.tick(nil)
 	check(
 		"erreur : un texte d'alerte est renvoyé",
-		type(shown) == "string" and shown:find("erreur", 1, true) ~= nil,
+		type(shown) == "string" and shown:find("error", 1, true) ~= nil,
 		true
 	)
 	M.tick(nil)
@@ -248,7 +248,7 @@ local function scenarios()
 	end)
 	check(
 		"sans dossier transmis ni autre piste : erreur claire",
-		ok == false and tostring(err):find("introuvable", 1, true) ~= nil,
+		ok == false and tostring(err):find("not found", 1, true) ~= nil,
 		true
 	)
 end

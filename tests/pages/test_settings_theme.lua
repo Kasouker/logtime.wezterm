@@ -568,7 +568,7 @@ check("échec : rien n'est appliqué", #e.applied, 0)
 check("échec : la palette ne change pas", has_colors(e.pane, palette.COLORS), true)
 check(
 	"échec : l'erreur est dans les journaux",
-	#e.w.logs.error == 1 and e.w.logs.error[1]:find("enregistrement des réglages impossible", 1, true) ~= nil,
+	#e.w.logs.error == 1 and e.w.logs.error[1]:find("cannot save the settings", 1, true) ~= nil,
 	true
 )
 -- un déplacement efface le message de réponse

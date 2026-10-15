@@ -38,7 +38,7 @@ local function parse_string(text, i)
 		end
 		local c = text:sub(pos, pos)
 		if c == "" then
-			return nil, "texte non terminé"
+			return nil, "unterminated string"
 		elseif c == '"' then
 			return table.concat(out), pos + 1
 		elseif c == "\\" then
@@ -46,7 +46,7 @@ local function parse_string(text, i)
 			if e == "u" then
 				local hex = text:match("^%x%x%x%x", pos + 2)
 				if not hex then
-					return nil, "séquence \\u incorrecte près du caractère " .. pos
+					return nil, "invalid \\u escape near character " .. pos
 				end
 				local code = tonumber(hex, 16)
 				pos = pos + 6
@@ -54,22 +54,22 @@ local function parse_string(text, i)
 					local low = text:match("^\\u(%x%x%x%x)", pos)
 					local low_code = low and tonumber(low, 16)
 					if not (low_code and low_code >= 0xDC00 and low_code <= 0xDFFF) then
-						return nil, "caractère Unicode incomplet près du caractère " .. pos
+						return nil, "incomplete Unicode character near character " .. pos
 					end
 					code = 0x10000 + (code - 0xD800) * 0x400 + (low_code - 0xDC00)
 					pos = pos + 6
 				elseif code >= 0xDC00 and code <= 0xDFFF then
-					return nil, "caractère Unicode incorrect près du caractère " .. (pos - 6)
+					return nil, "invalid Unicode character near character " .. (pos - 6)
 				end
 				out[#out + 1] = utf8.char(code)
 			elseif ESCAPES[e] then
 				out[#out + 1] = ESCAPES[e]
 				pos = pos + 2
 			else
-				return nil, "séquence d'échappement inconnue près du caractère " .. pos
+				return nil, "unknown escape sequence near character " .. pos
 			end
 		else
-			return nil, "caractère de contrôle dans un texte près du caractère " .. pos
+			return nil, "control character in a string near character " .. pos
 		end
 	end
 end
@@ -81,10 +81,10 @@ local function parse_number(text, i)
 	end
 	local int = text:match("^%d+", j)
 	if not int then
-		return nil, "nombre attendu près du caractère " .. i
+		return nil, "number expected near character " .. i
 	end
 	if #int > 1 and int:sub(1, 1) == "0" then
-		return nil, "nombre incorrect (zéro au début) près du caractère " .. i
+		return nil, "invalid number (leading zero) near character " .. i
 	end
 	j = j + #int
 	local frac = text:match("^%.%d+", j)
@@ -97,7 +97,7 @@ local function parse_number(text, i)
 	end
 	local value = tonumber(text:sub(i, j - 1))
 	if value == nil then
-		return nil, "nombre incorrect près du caractère " .. i
+		return nil, "invalid number near character " .. i
 	end
 	return value, j
 end
@@ -119,7 +119,7 @@ local function parse_array(text, i, depth)
 		if c == "]" then
 			return out, pos + 1
 		elseif c ~= "," then
-			return nil, "« , » ou « ] » attendu près du caractère " .. pos
+			return nil, '"," or "]" expected near character ' .. pos
 		end
 		pos = skip(text, pos + 1)
 	end
@@ -133,7 +133,7 @@ local function parse_object(text, i, depth)
 	end
 	while true do
 		if text:sub(pos, pos) ~= '"' then
-			return nil, "nom entre guillemets attendu près du caractère " .. pos
+			return nil, "quoted name expected near character " .. pos
 		end
 		local key, after_key = parse_string(text, pos)
 		if key == nil then
@@ -141,7 +141,7 @@ local function parse_object(text, i, depth)
 		end
 		pos = skip(text, after_key)
 		if text:sub(pos, pos) ~= ":" then
-			return nil, "« : » attendu près du caractère " .. pos
+			return nil, '":" expected near character ' .. pos
 		end
 		pos = skip(text, pos + 1)
 		local value, nextpos = parse_value(text, pos, depth + 1)
@@ -154,7 +154,7 @@ local function parse_object(text, i, depth)
 		if c == "}" then
 			return out, pos + 1
 		elseif c ~= "," then
-			return nil, "« , » ou « } » attendu près du caractère " .. pos
+			return nil, '"," or "}" expected near character ' .. pos
 		end
 		pos = skip(text, pos + 1)
 	end
@@ -163,7 +163,7 @@ end
 -- Renvoie la valeur et la position suivante, ou nil et un message.
 parse_value = function(text, i, depth)
 	if depth > MAX_DEPTH then
-		return nil, "trop d'imbrications près du caractère " .. i
+		return nil, "too deeply nested near character " .. i
 	end
 	local c = text:sub(i, i)
 	if c == "{" then
@@ -181,22 +181,22 @@ parse_value = function(text, i, depth)
 	elseif text:sub(i, i + 3) == "null" then
 		return M.null, i + 4
 	elseif c == "" then
-		return nil, "fin du texte inattendue"
+		return nil, "unexpected end of text"
 	end
-	return nil, "caractère inattendu « " .. c .. " » près du caractère " .. i
+	return nil, 'unexpected character "' .. c .. '" near character ' .. i
 end
 
 -- Lit un texte JSON. Renvoie la valeur, ou nil et un message en français.
 function M.decode(text)
 	if type(text) ~= "string" then
-		return nil, "ce n'est pas un texte"
+		return nil, "not a string"
 	end
 	if text:sub(1, 3) == "\239\187\191" then
 		text = text:sub(4) -- un fichier enregistré avec une marque d'ordre des octets (BOM)
 	end
 	local start = skip(text, 1)
 	if start > #text then
-		return nil, "le fichier est vide"
+		return nil, "the file is empty"
 	end
 	local value, nextpos = parse_value(text, start, 0)
 	if value == nil then
@@ -204,7 +204,7 @@ function M.decode(text)
 	end
 	local rest = skip(text, nextpos)
 	if rest <= #text then
-		return nil, "du texte en trop après la fin près du caractère " .. rest
+		return nil, "extra text after the end near character " .. rest
 	end
 	return value
 end

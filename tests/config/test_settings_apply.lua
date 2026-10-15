@@ -214,7 +214,7 @@ local function open_page(env, config)
 	local frame = pane.injected[#pane.injected]
 	local months = 0
 	for _, line in ipairs(env.w.logs.info) do
-		local n = line:match("%((%d+) mois%)")
+		local n = line:match("%((%d+) months%)")
 		if n then
 			months = tonumber(n)
 		end
@@ -353,10 +353,10 @@ check(
 	table.concat(lines, "\n"):find("October 2026", 1, true) ~= nil,
 	true
 )
-check("réglages incorrects : trois avertissements", errors_with(e, "logtime : réglages :"), 3)
-check("réglages incorrects : max_months nommé", errors_with(e, "« max_months »"), 1)
-check("réglages incorrects : lang nommé", errors_with(e, "« lang »"), 1)
-check("réglages incorrects : le réglage inconnu est nommé", errors_with(e, "« gradiant »"), 1)
+check("réglages incorrects : trois avertissements", errors_with(e, "logtime: settings:"), 3)
+check("réglages incorrects : max_months nommé", errors_with(e, '"max_months"'), 1)
+check("réglages incorrects : lang nommé", errors_with(e, '"lang"'), 1)
+check("réglages incorrects : le réglage inconnu est nommé", errors_with(e, '"gradiant"'), 1)
 check("réglages incorrects : le plugin fonctionne quand même (la page est ouverte)", frame ~= nil, true)
 cleanup(e)
 
@@ -368,8 +368,8 @@ e.settings("{ ceci n'est pas du json")
 config = e.M.apply_to_config({}, { max_months = 5 })
 frame, months = open_page(e, config)
 check("fichier illisible : les options de wezterm.lua restent (5 mois)", months, 5)
-check("fichier illisible : un avertissement", errors_with(e, "illisible"), 1)
-check("fichier illisible : le message annonce les valeurs par défaut", errors_with(e, "valeurs par défaut"), 1)
+check("fichier illisible : un avertissement", errors_with(e, "unreadable"), 1)
+check("fichier illisible : le message annonce les valeurs par défaut", errors_with(e, "default values"), 1)
 check(
 	"fichier illisible : le fichier n'est pas modifié par la lecture",
 	io.open(e.path, "rb"):read("*a"),
@@ -383,7 +383,7 @@ write(e.path .. ".bak", '{"max_months": 3}')
 config = e.M.apply_to_config({}, { max_months = 5 })
 frame, months = open_page(e, config)
 check("fichier illisible avec copie de sécurité : la copie est utilisée (3 mois)", months, 3)
-check("fichier illisible avec copie : l'avertissement parle de la copie", errors_with(e, "copie de sécurité"), 1)
+check("fichier illisible avec copie : l'avertissement parle de la copie", errors_with(e, "backup copy"), 1)
 cleanup(e)
 
 e = new_env(BIG)
@@ -391,7 +391,7 @@ e.settings("")
 config = e.M.apply_to_config({})
 frame, months = open_page(e, config)
 check("fichier vide : le plugin fonctionne avec les valeurs par défaut", months, 12)
-check("fichier vide : signalé", errors_with(e, "illisible"), 1)
+check("fichier vide : signalé", errors_with(e, "unreadable"), 1)
 cleanup(e)
 
 -- ============================================================
@@ -411,14 +411,14 @@ cleanup(e)
 e = new_env(BIG)
 config = e.M.apply_to_config({}, { gradiant = true })
 check("faute de frappe : un avertissement", #e.w.logs.error, 1)
-check("faute de frappe : avec la suggestion", errors_with(e, "tu voulais dire « gradient » ?"), 1)
+check("faute de frappe : avec la suggestion", errors_with(e, 'did you mean "gradient"?'), 1)
 check("faute de frappe : le plugin fonctionne quand même (F2 existe)", open_page(e, config) ~= nil, true)
 cleanup(e)
 
 e = new_env(BIG)
 config = e.M.apply_to_config({}, { max_months = 2 }, { gradient = false })
-check("argument en trop : un avertissement", errors_with(e, "UNE seule table"), 1)
-check("argument en trop : le nombre est donné", errors_with(e, "1 argument(s) en trop"), 1)
+check("argument en trop : un avertissement", errors_with(e, "ONE table"), 1)
+check("argument en trop : le nombre est donné", errors_with(e, "1 extra argument(s)"), 1)
 frame, months = open_page(e, config)
 check("argument en trop : le deuxième argument est quand même appliqué (2 mois)", months, 2)
 check("argument en trop : le troisième est ignoré (le dégradé reste)", frame:find(GOLD, 1, true) ~= nil, true)
@@ -426,12 +426,12 @@ cleanup(e)
 
 e = new_env(BIG)
 config = e.M.apply_to_config({}, {}, 1, 2, 3)
-check("trois arguments en trop : le nombre est donné", errors_with(e, "3 argument(s) en trop"), 1)
+check("trois arguments en trop : le nombre est donné", errors_with(e, "3 extra argument(s)"), 1)
 cleanup(e)
 
 e = new_env(BIG)
 config = e.M.apply_to_config({}, "max_months = 6")
-check("réglages donnés en texte : un avertissement sur la table", errors_with(e, "doit être une table"), 1)
+check("réglages donnés en texte : un avertissement sur la table", errors_with(e, "must be a table"), 1)
 frame = open_page(e, config)
 -- sans table, pas d'option debug : les mois sont comptés dans le dessin (12 mois : de novembre 2025 à octobre 2026,
 -- en anglais, la langue par défaut)

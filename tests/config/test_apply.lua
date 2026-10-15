@@ -156,6 +156,7 @@ end
 local HISTORY = '{"2026-10-10":15231,"2026-10-11":1900}'
 
 -- ---- l'environnement : dossier personnel temporaire, fausse API WezTerm, plugin chargé
+local all_logs = {} -- tous les messages des journaux, pour le garde-fou de la fin
 local function new_env(opts)
 	opts = opts or {}
 	local home = os.tmpname()
@@ -183,9 +184,11 @@ local function new_env(opts)
 	current_w = w
 	w.log_error = function(m)
 		w.logs.error[#w.logs.error + 1] = m
+		all_logs[#all_logs + 1] = m
 	end
 	w.log_info = function(m)
 		w.logs.info[#w.logs.info + 1] = m
+		all_logs[#all_logs + 1] = m
 	end
 	w.action = {
 		EmitEvent = function(name)
@@ -450,11 +453,7 @@ local function scenarios()
 		true
 	)
 	check("langue inconnue : un avertissement est écrit dans les journaux", #e.w.logs.error, 1)
-	check(
-		"langue inconnue : l'avertissement nomme le réglage",
-		e.w.logs.error[1]:find("« lang »", 1, true) ~= nil,
-		true
-	)
+	check("langue inconnue : l'avertissement nomme le réglage", e.w.logs.error[1]:find('"lang"', 1, true) ~= nil, true)
 	cleanup(e)
 
 	-- le décalage de journée (day_offset) décide quel jour est « aujourd'hui » (l'étoile)
@@ -486,7 +485,7 @@ local function scenarios()
 	check("configuration absente : renvoie nil", result, nil)
 	check(
 		"configuration absente : l'erreur est journalisée",
-		#e.w.logs.error == 1 and e.w.logs.error[1]:find("apply_to_config a échoué", 1, true) ~= nil,
+		#e.w.logs.error == 1 and e.w.logs.error[1]:find("apply_to_config failed", 1, true) ~= nil,
 		true
 	)
 	cleanup(e)
@@ -910,11 +909,7 @@ local function scenarios()
 		win.toasts[1],
 		"🎉 Objectif du jour atteint : 7h ! 🎉"
 	)
-	check(
-		"🎉 aussi dans les journaux",
-		e.w.logs.info[#e.w.logs.info],
-		"logtime : 🎉 Objectif du jour atteint : 7h ! 🎉"
-	)
+	check("🎉 aussi dans les journaux", e.w.logs.info[#e.w.logs.info], "logtime: daily goal reached (7h)")
 	run(e, { win }, 3, 30)
 	check("🎉 une seule fois (rien de plus ensuite)", #win.toasts, 1)
 	cleanup(e)
@@ -1247,11 +1242,11 @@ local function scenarios()
 		end
 		return n
 	end
-	check("projets, sauvegarde bloquée : une seule erreur", logged(e.w.logs.error, "sauvegarde du fichier"), 1)
+	check("projets, sauvegarde bloquée : une seule erreur", logged(e.w.logs.error, "cannot save the"), 1)
 	live(e, win, screen, 31, 60, true)
 	check(
 		"projets, sauvegarde bloquée : le retour à la normale est noté, une fois",
-		logged(e.w.logs.info, "réussie de nouveau"),
+		logged(e.w.logs.info, "saved again"),
 		1
 	)
 	check(
@@ -1288,11 +1283,7 @@ local function scenarios()
 	local function traces(env)
 		local n = 0
 		for _, m in ipairs(env.w.logs.info) do
-			if
-				m:find("logtime (", 1, true)
-				or m:find("dessin du mois", 1, true)
-				or m:find("touches de la page", 1, true)
-			then
+			if m:find("logtime (", 1, true) or m:find("drawing month", 1, true) or m:find("page keys", 1, true) then
 				n = n + 1
 			end
 		end
@@ -1372,6 +1363,22 @@ for k in pairs(_G) do
 	end
 end
 check("aucune variable globale ajoutée", table.concat(leaked, ","), "")
+
+-- Tous les messages écrits dans les journaux pendant ces scénarios (avec lang = "fr" !) sont en anglais.
+local french = {}
+for _, m in ipairs(all_logs) do
+	-- un accent, des « », ou un petit mot français courant (certaines phrases françaises n'ont aucun accent)
+	local padded = " " .. m:lower():gsub("[%p]", " ") .. " "
+	local word = false
+	for _, w in ipairs({ "dans", "le", "la", "les", "du", "des", "une", "est", "pas", "sur", "avec", "pour" }) do
+		word = word or padded:find(" " .. w .. " ", 1, true) ~= nil
+	end
+	if m:find("[éèàçêùôîâ«»]") or word then
+		french[#french + 1] = m
+	end
+end
+check("journaux : au moins 50 messages vus (le garde-fou a de quoi vérifier)", #all_logs >= 50, true)
+check("journaux : tous en anglais (aucun accent, ni « », ni petit mot français)", table.concat(french, " | "), "")
 
 print(string.format("\n%d vérifications réussies, %d échecs", passed, failed))
 os.exit(failed == 0 and 0 or 1)

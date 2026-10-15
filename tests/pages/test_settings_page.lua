@@ -456,9 +456,7 @@ check(
 check("ouverture : le choix de départ est l'or (pas de couleur enregistrée)", chosen(env.pane), 3)
 check(
 	"ouverture : le journal note l'ouverture",
-	#env.w.logs.info >= 1
-		and env.w.logs.info[1]:find("page de personnalisation ouverte dans le panneau " .. env.pane.id, 1, true)
-			~= nil,
+	#env.w.logs.info >= 1 and env.w.logs.info[1]:find("settings page opened in pane " .. env.pane.id, 1, true) ~= nil,
 	true
 )
 check("ouverture : aucune erreur", #env.w.logs.error, 0)
@@ -698,7 +696,7 @@ check(
 )
 check(
 	"échec : l'erreur est écrite dans les journaux",
-	#e.w.logs.error == 1 and e.w.logs.error[1]:find("enregistrement des réglages impossible", 1, true) ~= nil,
+	#e.w.logs.error == 1 and e.w.logs.error[1]:find("cannot save the settings", 1, true) ~= nil,
 	true
 )
 check("échec : rien n'est appliqué", #e.applied, 0)

@@ -454,7 +454,7 @@ cleanup()
 
 e = new_env()
 config = e.M.apply_to_config({}, { settings_ke = "F5" })
-check("faute de frappe sur settings_key : suggestion", errors_with(e, "tu voulais dire « settings_key » ?"), 1)
+check("faute de frappe sur settings_key : suggestion", errors_with(e, 'did you mean "settings_key"?'), 1)
 cleanup()
 
 -- ============================================================
@@ -472,7 +472,7 @@ check(
 	plain_lines(failing):find("✗ Enregistrement impossible", 1, true) ~= nil,
 	true
 )
-check("échec : l'erreur est dans les journaux", errors_with(e, "enregistrement des réglages impossible"), 1)
+check("échec : l'erreur est dans les journaux", errors_with(e, "cannot save the settings"), 1)
 check("échec : le calendrier garde sa couleur (or)", last_frame(e.w.spawned[1]):find(GOLD, 1, true) ~= nil, true)
 cleanup()
 

@@ -137,7 +137,7 @@ check("parse : une valeur incorrecte est ignorée", settings.max_months, nil)
 check("parse : une autre aussi", settings.lang, nil)
 check("parse : la valeur correcte est gardée", settings.center, true)
 check("parse : deux problèmes", #problems, 2)
-check("parse : le problème cite la raison (bornes)", problems[2]:find("compris entre 1 et 12", 1, true) ~= nil, true)
+check("parse : le problème cite la raison (bornes)", problems[2]:find("between 1 and 12", 1, true) ~= nil, true)
 settings, problems = store.parse('{"goal_hours": null, "max_months": null}')
 check("parse : null est ignoré sans problème", next(settings) == nil and #problems == 0, true)
 settings, problems = store.parse("{}")
@@ -162,7 +162,7 @@ for name, text in pairs({
 	check("parse : « " .. name .. " » n'est pas un objet : refusé", value, nil)
 	check(
 		"parse : « " .. name .. " » : message sur les accolades",
-		type(err) == "string" and err:find("objet", 1, true) ~= nil,
+		type(err) == "string" and err:find("object", 1, true) ~= nil,
 		true
 	)
 end
@@ -171,7 +171,7 @@ check("parse : texte illisible refusé", value, nil)
 check("parse : avec un message", type(err), "string")
 value, err = store.parse("")
 check("parse : fichier vide refusé", value, nil)
-check("parse : le message dit qu'il est vide", err:find("vide", 1, true) ~= nil, true)
+check("parse : le message dit qu'il est vide", err:find("empty", 1, true) ~= nil, true)
 
 -- ============================================================
 -- encode
@@ -207,11 +207,7 @@ check(
 check("encode : un réglage absent (nil) n'est pas écrit", store.encode({ goal_hours = nil }), "{}\n")
 local text, why = store.encode({ max_months = 100 })
 check("encode : une valeur incorrecte est refusée", text, nil)
-check(
-	"encode : avec la raison",
-	why:find("max_months", 1, true) ~= nil and why:find("compris entre", 1, true) ~= nil,
-	true
-)
+check("encode : avec la raison", why:find("max_months", 1, true) ~= nil and why:find("between", 1, true) ~= nil, true)
 check(
 	"encode : 0,1 + 0,2 s'écrit proprement",
 	store.encode({ gradient_light = 0.1 + 0.2 }),
@@ -318,14 +314,14 @@ corrupt_tmp_reads = false
 check("save : écriture corrompue : échec", saved, false)
 check(
 	"save : écriture corrompue : la raison parle de la vérification",
-	save_err:find("vérification", 1, true) ~= nil,
+	save_err:find("check after writing", 1, true) ~= nil,
 	true
 )
 check("save : écriture corrompue : le fichier d'origine est intact", read(path), intact)
 check("save : écriture corrompue : le fichier temporaire est retiré", read(path .. ".tmp"), nil)
 check(
 	"save : écriture corrompue : la raison dit combien d'octets ont été relus",
-	save_err:find("16 octets relus au lieu de", 1, true) ~= nil,
+	save_err:find("16 bytes read back instead of", 1, true) ~= nil,
 	true
 )
 
@@ -337,7 +333,7 @@ check("save : relecture bloquée : échec", saved, false)
 check(
 	"save : relecture bloquée : la raison du système est donnée",
 	save_err,
-	"la vérification après écriture a échoué : relecture impossible : " .. path .. ".tmp: Permission denied"
+	"check after writing failed: cannot read back: " .. path .. ".tmp: Permission denied"
 )
 check("save : relecture bloquée : le fichier d'origine est intact", read(path), intact)
 check("save : relecture bloquée : le fichier temporaire est retiré", read(path .. ".tmp"), nil)
@@ -350,7 +346,7 @@ check("save : fermeture en échec : échec", saved, false)
 check(
 	"save : fermeture en échec : la raison du système est donnée",
 	save_err,
-	"écriture impossible : écriture incomplète : No space left on device"
+	"cannot write: incomplete write: No space left on device"
 )
 check("save : fermeture en échec : le fichier d'origine est intact", read(path), intact)
 check("save : fermeture en échec : le fichier temporaire est retiré", read(path .. ".tmp"), nil)
@@ -382,7 +378,7 @@ check("load : fichier illisible", state, "corrupt")
 check("load : illisible sans copie : réglages vides", next(loaded), nil)
 check(
 	"load : illisible : le problème le dit",
-	issues[1]:find("illisible", 1, true) ~= nil and issues[1]:find("valeurs par défaut", 1, true) ~= nil,
+	issues[1]:find("unreadable", 1, true) ~= nil and issues[1]:find("default values", 1, true) ~= nil,
 	true
 )
 check("load : illisible sans copie : pas depuis la copie", from_backup, false)
@@ -400,7 +396,7 @@ loaded, state, issues, from_backup = store.load(path2)
 check("load : illisible avec copie : état corrupt", state, "corrupt")
 check("load : la copie de sécurité est utilisée", loaded.max_months == 7 and loaded.lang == "en", true)
 check("load : on sait que c'est la copie", from_backup, true)
-check("load : le problème parle de la copie", issues[1]:find("copie de sécurité", 1, true) ~= nil, true)
+check("load : le problème parle de la copie", issues[1]:find("backup copy", 1, true) ~= nil, true)
 write(path2 .. ".bak", "copie abîmée aussi")
 loaded, state, issues, from_backup = store.load(path2)
 check("load : copie abîmée aussi : réglages vides", next(loaded) == nil and from_backup == false, true)
@@ -473,38 +469,30 @@ check(
 )
 messages = store.check_options({ gradiant = true }, EXTRA)
 check("options : une faute de frappe est signalée", #messages, 1)
-check(
-	"options : avec la suggestion « gradient »",
-	messages[1]:find("tu voulais dire « gradient » ?", 1, true) ~= nil,
-	true
-)
-check("options : le nom fautif est cité", messages[1]:find("« gradiant »", 1, true) ~= nil, true)
+check("options : avec la suggestion « gradient »", messages[1]:find('did you mean "gradient"?', 1, true) ~= nil, true)
+check("options : le nom fautif est cité", messages[1]:find('"gradiant"', 1, true) ~= nil, true)
 messages = store.check_options({ gradient_colour = "#3366CC" }, EXTRA)
-check(
-	"options : gradient_colour suggère gradient_color",
-	messages[1]:find("« gradient_color » ?", 1, true) ~= nil,
-	true
-)
+check("options : gradient_colour suggère gradient_color", messages[1]:find('"gradient_color"?', 1, true) ~= nil, true)
 messages = store.check_options({ maxmonths = 6 }, EXTRA)
-check("options : maxmonths suggère max_months", messages[1]:find("« max_months » ?", 1, true) ~= nil, true)
+check("options : maxmonths suggère max_months", messages[1]:find('"max_months"?', 1, true) ~= nil, true)
 messages = store.check_options({ centre = true }, EXTRA)
-check("options : centre suggère center", messages[1]:find("« center » ?", 1, true) ~= nil, true)
+check("options : centre suggère center", messages[1]:find('"center"?', 1, true) ~= nil, true)
 messages = store.check_options({ open_ke = "F3" }, EXTRA)
 check(
 	"options : une faute sur une option hors schéma suggère aussi (open_key)",
-	messages[1]:find("« open_key » ?", 1, true) ~= nil,
+	messages[1]:find('"open_key"?', 1, true) ~= nil,
 	true
 )
 messages = store.check_options({ gradient_hour = 12 }, EXTRA)
 check(
 	"options : gradient_hour suggère le plus proche (gradient_hours)",
-	messages[1]:find("« gradient_hours » ?", 1, true) ~= nil,
+	messages[1]:find('"gradient_hours"?', 1, true) ~= nil,
 	true
 )
 messages = store.check_options({ zzzzzzzzzz = 1 }, EXTRA)
 check(
 	"options : un nom très différent : signalé sans suggestion",
-	#messages == 1 and messages[1]:find("tu voulais dire", 1, true) == nil,
+	#messages == 1 and messages[1]:find("did you mean", 1, true) == nil,
 	true
 )
 check(
@@ -521,7 +509,7 @@ messages = store.check_options({ max_months = 100 }, EXTRA)
 check("options : une valeur hors limites est signalée", #messages, 1)
 check(
 	"options : le message cite le nom et les bornes",
-	messages[1]:find("« max_months »", 1, true) ~= nil and messages[1]:find("compris entre 1 et 12", 1, true) ~= nil,
+	messages[1]:find('"max_months"', 1, true) ~= nil and messages[1]:find("between 1 and 12", 1, true) ~= nil,
 	true
 )
 messages = store.check_options({ lang = "de", center = "oui" }, EXTRA)
@@ -529,7 +517,7 @@ check("options : deux valeurs incorrectes : deux messages", #messages, 2)
 messages = store.check_options({ "gradient" }, EXTRA)
 check(
 	"options : une liste à la place de réglages nommés",
-	#messages == 1 and messages[1]:find("sans nom", 1, true) ~= nil,
+	#messages == 1 and messages[1]:find("without a name", 1, true) ~= nil,
 	true
 )
 messages = store.check_options({ zeta = 1, alpha = 2 }, EXTRA)

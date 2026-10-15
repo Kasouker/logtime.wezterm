@@ -135,7 +135,11 @@ end
 copied, problems = location.migrate(old, new, "/")
 io.open = real_open
 check("vérification : refusée", #copied == 0 and #problems == 1, true)
-check("vérification : la raison est donnée", problems[1] and problems[1]:find("vérification", 1, true) ~= nil, true)
+check(
+	"vérification : la raison est donnée",
+	problems[1] and problems[1]:find("check after writing", 1, true) ~= nil,
+	true
+)
 check("vérification : fichier temporaire retiré", read(new .. "/.logtime_projects.json.tmp"), nil)
 check("vérification : rien dans le nouveau dossier", read(new .. "/.logtime_projects.json"), nil)
 

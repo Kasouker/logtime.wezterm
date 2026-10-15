@@ -19,15 +19,15 @@ end
 function M.wrap(wezterm, name, fn, trace)
 	return function(window, pane, ...)
 		if trace then
-			M.trace(wezterm, string.format("logtime (%s) : appelée", name))
+			M.trace(wezterm, string.format("logtime (%s): called", name))
 		end
 		local ok, err = pcall(fn, window, pane, ...)
 		if ok then
 			if trace then
-				M.trace(wezterm, string.format("logtime (%s) : terminée", name))
+				M.trace(wezterm, string.format("logtime (%s): done", name))
 			end
 		else
-			local message = string.format("logtime (%s) : %s", name, tostring(err))
+			local message = string.format("logtime (%s): %s", name, tostring(err))
 			wezterm.log_error(message)
 			pcall(function()
 				window:toast_notification("logtime", message, nil, 10000)

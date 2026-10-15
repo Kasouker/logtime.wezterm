@@ -53,20 +53,20 @@ function M.decode(text)
 		return nil, err
 	end
 	if type(value) ~= "table" or json.is_array(value) then
-		return nil, "ce n'est pas un objet JSON"
+		return nil, "not a JSON object"
 	end
 	local projects = {}
 	for key, of_day in pairs(value) do
 		if type(key) ~= "string" or not key:match(DATE) then
-			return nil, "clé qui n'est pas une date : " .. tostring(key)
+			return nil, "key that is not a date: " .. tostring(key)
 		end
 		if type(of_day) ~= "table" or json.is_array(of_day) then
-			return nil, "pas un objet pour " .. key
+			return nil, "not an object for " .. key
 		end
 		projects[key] = {}
 		for label, secs in pairs(of_day) do
 			if type(label) ~= "string" or not valid_secs(secs) then
-				return nil, "valeur invalide pour " .. key .. " / " .. tostring(label)
+				return nil, "invalid value for " .. key .. " / " .. tostring(label)
 			end
 			projects[key][label] = secs
 		end

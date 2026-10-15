@@ -7,7 +7,7 @@ local wezterm = require("wezterm")
 local sep = package.config:sub(1, 1)
 
 local M = {}
-M.version = "1.0.0" -- MAJEUR.MINEUR.CORRECTIF : 1.0.1 une correction, 1.1.0 une nouveauté, 2.0.0 si la config des gens casse
+M.version = "1.0.1" -- MAJEUR.MINEUR.CORRECTIF : 1.0.1 une correction, 1.1.0 une nouveauté, 2.0.0 si la config des gens casse
 
 -- ------------------------------------------------------------
 -- Retrouver le dossier du plugin
@@ -52,7 +52,7 @@ end
 
 local DIR = find_plugin_dir(...)
 if not DIR then
-	error("logtime : dossier du plugin introuvable (il doit contenir plugin/logtime/core/counter.lua)", 0)
+	error("logtime: plugin folder not found (it must contain plugin/logtime/core/counter.lua)", 0)
 end
 
 -- ------------------------------------------------------------
@@ -64,7 +64,7 @@ local function load_module(name)
 		local path = table.concat({ DIR, "plugin", "logtime", (name:gsub("/", sep)) .. ".lua" }, sep)
 		local f = io.open(path, "rb")
 		if not f then
-			error("logtime : module introuvable : " .. path, 0)
+			error("logtime: module not found: " .. path, 0)
 		end
 		local source = f:read("*a")
 		f:close()
@@ -151,31 +151,27 @@ local function data_dir()
 		pcall(wezterm.run_child_process, location.mkdir_args(platform.os_name(wezterm.target_triple), dir))
 	end
 	if not location.writable(dir, sep) then
-		wezterm.log_error(
-			"logtime : impossible de créer le dossier " .. dir .. " : les fichiers restent dans " .. home
-		)
+		wezterm.log_error("logtime: cannot create the folder " .. dir .. "; the files stay in " .. home)
 		chosen = home
 	else
 		local copied, problems = location.migrate(home, dir, sep)
 		if #problems > 0 then
 			for _, problem in ipairs(problems) do
 				wezterm.log_error(
-					"logtime : copie impossible vers " .. dir .. " : " .. problem .. " (l'original est intact)"
+					"logtime: cannot copy to " .. dir .. ": " .. problem .. " (the original is untouched)"
 				)
 			end
-			wezterm.log_error(
-				"logtime : les fichiers restent dans " .. home .. " (nouvel essai au prochain démarrage)"
-			)
+			wezterm.log_error("logtime: the files stay in " .. home .. " (new attempt at the next start)")
 			chosen = home
 		elseif #copied > 0 then
 			wezterm.log_info(
-				"logtime : fichiers copiés dans "
+				"logtime: files copied to "
 					.. dir
-					.. " : "
+					.. ": "
 					.. table.concat(copied, ", ")
-					.. ". Les originaux, dans "
+					.. ". The originals, in "
 					.. home
-					.. ", ne servent plus : tu peux les supprimer."
+					.. ", are no longer used: you can delete them."
 			)
 		end
 	end
@@ -201,7 +197,7 @@ function M.setup(opts)
 		cfg[key] = value
 	end
 	for _, problem in ipairs(problems) do
-		wezterm.log_error("logtime : réglages : " .. problem)
+		wezterm.log_error("logtime: settings: " .. problem)
 	end
 	safe.debug = cfg.debug == true
 	return M
@@ -286,7 +282,7 @@ local function sync_from_file(now)
 	local path = data_path()
 	local ok, from_file, state, err = pcall(storage.load, path)
 	if not ok then
-		sync_failed(now, "logtime : lecture du fichier d'heures impossible : " .. tostring(from_file))
+		sync_failed(now, "logtime: cannot read the hours file: " .. tostring(from_file))
 		return
 	end
 
@@ -296,19 +292,16 @@ local function sync_from_file(now)
 			-- impossible de le mettre de côté : on ne l'écrase surtout pas, on compte en mémoire seulement
 			sync_failed(
 				now,
-				"logtime : le fichier d'heures est illisible ("
+				"logtime: the hours file is unreadable ("
 					.. tostring(err)
-					.. ") et n'a pas pu être mis de côté ("
+					.. ") and could not be set aside ("
 					.. tostring(qerr)
-					.. ") : rien n'est sauvegardé"
+					.. "): nothing is saved"
 			)
 			return
 		end
 		wezterm.log_error(
-			"logtime : le fichier d'heures était illisible ("
-				.. tostring(err)
-				.. ") : il a été mis de côté dans "
-				.. moved
+			"logtime: the hours file was unreadable (" .. tostring(err) .. "): it was set aside as " .. moved
 		)
 	end
 
@@ -350,13 +343,13 @@ local function maybe_save(now, days)
 	G.logtime_saved = now
 	if ok and saved then
 		if G.logtime_save_failed then
-			wezterm.log_info("logtime : sauvegarde réussie de nouveau (le problème précédent était passager)")
+			wezterm.log_info("logtime: saved again (the previous problem was temporary)")
 		end
 		G.logtime_dirty = false
 		G.logtime_save_failed = false
 	else
 		if not G.logtime_save_failed then
-			wezterm.log_error("logtime : sauvegarde impossible : " .. tostring(ok and err or saved))
+			wezterm.log_error("logtime: cannot save: " .. tostring(ok and err or saved))
 		end
 		G.logtime_save_failed = true
 	end
@@ -410,20 +403,20 @@ local function side_file(o)
 					if not (moved_ok and moved) then
 						G[key("broken")] = true -- surtout ne pas l'écraser
 						wezterm.log_error(
-							"logtime : le fichier "
+							"logtime: the "
 								.. o.what
-								.. " est illisible ("
+								.. " file is unreadable ("
 								.. tostring(err)
-								.. ") et n'a pas pu être mis de côté : il n'est pas sauvegardé"
+								.. ") and could not be set aside: it is not saved"
 						)
 						return mem
 					end
 					wezterm.log_error(
-						"logtime : le fichier "
+						"logtime: the "
 							.. o.what
-							.. " était illisible ("
+							.. " file was unreadable ("
 							.. tostring(err)
-							.. ") : mis de côté dans "
+							.. "): set aside as "
 							.. moved
 					)
 					from_file = {}
@@ -455,19 +448,13 @@ local function side_file(o)
 		G[key("saved")] = now
 		if ok and saved then
 			if G[key("save_failed")] then
-				wezterm.log_info(
-					"logtime : sauvegarde du fichier "
-						.. o.what
-						.. " réussie de nouveau (le problème précédent était passager)"
-				)
+				wezterm.log_info("logtime: " .. o.what .. " file saved again (the previous problem was temporary)")
 			end
 			G[key("dirty")] = false
 			G[key("save_failed")] = false
 		elseif not G[key("save_failed")] then
 			G[key("save_failed")] = true
-			wezterm.log_error(
-				"logtime : sauvegarde du fichier " .. o.what .. " impossible : " .. tostring(ok and err or saved)
-			)
+			wezterm.log_error("logtime: cannot save the " .. o.what .. " file: " .. tostring(ok and err or saved))
 		end
 	end
 	return file
@@ -475,7 +462,7 @@ end
 
 local idle_file = side_file({
 	prefix = "logtime_idle",
-	what = "du temps inactif",
+	what = "idle time",
 	path = function()
 		return cfg.idle_file or (data_dir() .. sep .. ".logtime_idle.json")
 	end,
@@ -493,7 +480,7 @@ local get_idle = idle_file.get
 
 local projects_file = side_file({
 	prefix = "logtime_projects",
-	what = "du temps par projet",
+	what = "project time",
 	path = function()
 		return cfg.projects_file or (data_dir() .. sep .. ".logtime_projects.json")
 	end,
@@ -658,9 +645,9 @@ local function status_text()
 		local message = tostring(result)
 		if G.logtime_error_message ~= message then
 			G.logtime_error_message = message
-			wezterm.log_error("logtime : " .. message)
+			wezterm.log_error("logtime: " .. message)
 		end
-		return "logtime : erreur (voir les journaux)"
+		return "logtime: error (see logs)"
 	end
 	if G.logtime_error_message ~= nil then
 		G.logtime_error_message = nil
@@ -723,7 +710,7 @@ local function maybe_announce(window, reached)
 		pcall(function()
 			window:toast_notification("logtime", message, nil, 10000)
 		end)
-		wezterm.log_info("logtime : " .. message)
+		wezterm.log_info("logtime: daily goal reached (" .. status.goal_short(cfg.goal_hours) .. ")") -- toujours en anglais, comme tous les journaux
 	end
 end
 
@@ -771,7 +758,7 @@ local function on_update_status(window, pane, tabline_url)
 		window:set_right_status(text .. " ") -- un espace au bord : sinon le dernier caractère touche le bord et est rogné
 	elseif mode == "tabline" then
 		if auto.ensure_component(tabline_opts, tabline_items) then
-			wezterm.log_info("logtime : compteur ajouté à la barre de tabline.wez")
+			wezterm.log_info("logtime: counter added to the tabline.wez bar")
 		end
 	end
 end
@@ -809,13 +796,13 @@ function M.apply_to_config(config, opts, ...)
 	local extra = select("#", ...)
 	local ok, err = pcall(function()
 		for _, message in ipairs(settings.check_options(opts, EXTRA_OPTIONS)) do
-			wezterm.log_error("logtime : " .. message)
+			wezterm.log_error("logtime: " .. message)
 		end
 		if extra > 0 then
 			wezterm.log_error(
-				"logtime : apply_to_config reçoit deux arguments (config, réglages) ; "
+				"logtime: apply_to_config takes two arguments (config, options); "
 					.. extra
-					.. " argument(s) en trop ignoré(s). Mets tous tes réglages dans UNE seule table : apply_to_config(config, { ... })"
+					.. " extra argument(s) ignored. Put all your options in ONE table: apply_to_config(config, { ... })"
 			)
 		end
 		M.setup(opts)
@@ -899,18 +886,18 @@ function M.apply_to_config(config, opts, ...)
 			local ok_status, status_err = pcall(on_update_status, window, pane, tabline_url)
 			if not ok_status and G.logtime_error_message ~= tostring(status_err) then
 				G.logtime_error_message = tostring(status_err)
-				wezterm.log_error("logtime : " .. tostring(status_err))
+				wezterm.log_error("logtime: " .. tostring(status_err))
 			end
 		end)
 	end)
 	if not ok then
-		wezterm.log_error("logtime : apply_to_config a échoué : " .. tostring(err))
+		wezterm.log_error("logtime: apply_to_config failed: " .. tostring(err))
 	end
 	return config
 end
 
 if wezterm.log_info then
-	wezterm.log_info("logtime : version " .. M.version .. " chargée depuis " .. DIR)
+	wezterm.log_info("logtime: version " .. M.version .. " loaded from " .. DIR)
 end
 
 return M

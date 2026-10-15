@@ -216,7 +216,7 @@ check("save : écriture tronquée détectée, échec", ok, false)
 check(
 	"save : écriture tronquée, la raison dit combien d'octets ont été relus",
 	why,
-	"la vérification après écriture a échoué : 18 octets relus au lieu de 36"
+	"check after writing failed: 18 bytes read back instead of 36"
 )
 check("save : écriture tronquée, l'ancien fichier est intact", read(file), '{"2026-10-10":1}')
 check("save : écriture tronquée, fichier temporaire supprimé", read(file .. ".tmp"), nil)
@@ -240,11 +240,7 @@ end
 ok, why = days_mod.save(file, { ["2026-10-10"] = 5 })
 io.open = real_open2
 check("save : fermeture en échec, échec", ok, false)
-check(
-	"save : fermeture en échec, la raison du système est donnée",
-	why,
-	"écriture incomplète : No space left on device"
-)
+check("save : fermeture en échec, la raison du système est donnée", why, "incomplete write: No space left on device")
 check("save : fermeture en échec, l'ancien fichier est intact", read(file), '{"2026-10-10":1}')
 check("save : fermeture en échec, fichier temporaire supprimé", read(file .. ".tmp"), nil)
 
@@ -261,7 +257,7 @@ check("save : relecture bloquée, échec", ok, false)
 check(
 	"save : relecture bloquée, la raison du système est donnée",
 	why,
-	"la vérification après écriture a échoué : relecture impossible : " .. file .. ".tmp: Permission denied"
+	"check after writing failed: cannot read back: " .. file .. ".tmp: Permission denied"
 )
 check("save : relecture bloquée, l'ancien fichier est intact", read(file), '{"2026-10-10":1}')
 check("save : relecture bloquée, fichier temporaire supprimé", read(file .. ".tmp"), nil)

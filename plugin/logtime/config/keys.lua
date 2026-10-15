@@ -15,15 +15,15 @@ function M.apply(config, wezterm, opts)
 	for _, binding in ipairs(config.keys) do
 		if binding.key == opts.open_key and (binding.mods == nil or binding.mods == "") then
 			wezterm.log_error(
-				"logtime : la touche "
+				"logtime: the key "
 					.. opts.open_key
-					.. " est déjà utilisée dans ta configuration ; vérifie qu'elle ne fait pas autre chose"
+					.. " is already used in your configuration; check that it does not do something else"
 			)
 			break
 		end
 	end
 
-	local open = safe.wrap(wezterm, "ouverture", function(window, pane)
+	local open = safe.wrap(wezterm, "open", function(window, pane)
 		opts.page.open(window, pane)
 	end, true)
 	wezterm.on(opts.open_event or M.OPEN_EVENT, function(window, pane)
