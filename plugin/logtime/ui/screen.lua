@@ -47,6 +47,17 @@ function M.bind(wezterm)
 		pane:inject_output(M.frame(text, dims.viewport_rows, first, keep_last))
 	end
 
+	-- Le titre de l'onglet du panneau (sinon WezTerm montre le programme qui garde l'onglet ouvert : « PING.EXE »).
+	-- Seulement s'il change ; une erreur (onglet disparu, API absente) est ignorée.
+	function api.title(pane, title)
+		pcall(function()
+			local tab = pane:tab()
+			if tab and tab:get_title() ~= title then
+				tab:set_title(title)
+			end
+		end)
+	end
+
 	-- Redessine plus tard (après chaque délai, en secondes) : certains systèmes (ConPTY sous Windows) repeignent l'écran
 	-- juste après le démarrage ou un redimensionnement, ce qui effacerait un dessin fait trop tôt.
 	-- `redraw(pane)` n'est appelée que si le panneau existe encore.

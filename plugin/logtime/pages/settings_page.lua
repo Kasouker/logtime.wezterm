@@ -606,6 +606,8 @@ function M.create(ctx)
 			)
 		)
 		ui.draw(pane, table.concat(lines, "\n"), first)
+		local labels = ctx.labels()
+		ui.title(pane, labels.title .. " · " .. labels.settings_title) -- « Logtime · Settings », suit la langue
 	end
 
 	function page.is_page(pane)

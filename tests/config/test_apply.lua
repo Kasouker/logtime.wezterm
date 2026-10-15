@@ -226,9 +226,16 @@ local function new_env(opts)
 	w.next_id = 200
 	function w.new_pane()
 		w.next_id = w.next_id + 1
-		local tab = { activated = false }
+		local tab = { activated = false, title = "", title_changes = 0 }
 		function tab:activate()
 			self.activated = true
+		end
+		function tab:get_title()
+			return self.title
+		end
+		function tab:set_title(title)
+			self.title = title
+			self.title_changes = self.title_changes + 1
 		end
 		local pane = { id = w.next_id, injected = {}, dims = { viewport_rows = 40, cols = 120 }, the_tab = tab }
 		function pane:pane_id()
@@ -579,6 +586,7 @@ local function scenarios()
 		type(win.right) == "string" and win.right:find(HMS) ~= nil,
 		true
 	)
+	check("automatique : un espace au bord (sinon le dernier caractère est rogné)", win.right:sub(-1), " ")
 	clock.now = T0 + 1
 	update(e, win)
 	check("automatique : sans aucun tick(), le temps compte (1 s)", e.M.today_seconds(), 1)
@@ -1264,6 +1272,16 @@ local function scenarios()
 	local page_text = last_text(e.w.spawned[#e.w.spawned].pane)
 	check("langue par défaut : le calendrier est en anglais", page_text:find("October 2026", 1, true) ~= nil, true)
 	check("langue par défaut : rien en français", page_text:find("Octobre", 1, true), nil)
+	local cal_tab = e.w.spawned[#e.w.spawned].pane.the_tab
+	check("onglet du calendrier : son titre est « Logtime » (et non PING.EXE)", cal_tab.title, "Logtime")
+	page_binding(config, "l")(win, e.w.spawned[#e.w.spawned].pane)
+	check("onglet du calendrier : le titre n'est pas redonné à chaque dessin", cal_tab.title_changes, 1)
+	open_binding(config, "F4")(win, screen)
+	check(
+		"onglet des réglages : « Logtime · Settings » (dans la langue choisie)",
+		e.w.spawned[#e.w.spawned].pane.the_tab.title,
+		"Logtime · Settings"
+	)
 	cleanup(e)
 
 	-- les traces (chaque touche, chaque dessin) : éteintes par défaut, allumées avec debug = true

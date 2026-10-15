@@ -768,7 +768,7 @@ local function on_update_status(window, pane, tabline_url)
 				pcall(wezterm.format, { { Foreground = { Color = reached_color() } }, { Text = text } })
 			text = ok and formatted or text
 		end
-		window:set_right_status(text)
+		window:set_right_status(text .. " ") -- un espace au bord : sinon le dernier caractère touche le bord et est rogné
 	elseif mode == "tabline" then
 		if auto.ensure_component(tabline_opts, tabline_items) then
 			wezterm.log_info("logtime : compteur ajouté à la barre de tabline.wez")

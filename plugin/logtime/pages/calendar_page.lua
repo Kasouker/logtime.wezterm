@@ -222,6 +222,7 @@ function M.create(ctx)
 			)
 		)
 		ui.draw(pane, centered(text, dims, width), first)
+		ui.title(pane, ctx.labels().title) -- « Logtime »
 	end
 
 	-- Ce panneau est-il la page ?
