@@ -17,6 +17,9 @@ return {
 	weekdays = { "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim" },
 	weekdays_long = { "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche" },
 	title = "Logtime",
+	colon = " : ", -- « Total du mois : 42h10 » (espace avant les deux-points en français)
+	percent = "%3d %%", -- « 83 % » (dans les colonnes du détail du jour)
+	day_month = "{day} {month_lower}", -- « 14 octobre » (le meilleur jour de l'année)
 	total = "Total du mois",
 	active = "Jours actifs",
 	average = "Moyenne par jour actif",

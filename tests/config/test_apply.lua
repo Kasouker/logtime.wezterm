@@ -427,15 +427,11 @@ local function scenarios()
 	text = last_text(e.w.spawned[1].pane)
 	check(
 		"réglages : en anglais",
-		text:find("Logtime : October 2026", 1, true) ~= nil and text:find("Enter details", 1, true) ~= nil,
+		text:find("Logtime: October 2026", 1, true) ~= nil and text:find("Enter details", 1, true) ~= nil,
 		true
 	)
 	check("réglages : la semaine commence le dimanche", text:find("Sun%s+Mon") ~= nil, true)
-	check(
-		"réglages : objectif de 3 h atteint 1 jour (le 10)",
-		text:find("Validated days : 1/31", 1, true) ~= nil,
-		true
-	)
+	check("réglages : objectif de 3 h atteint 1 jour (le 10)", text:find("Validated days: 1/31", 1, true) ~= nil, true)
 	cleanup(e)
 
 	e = new_env()

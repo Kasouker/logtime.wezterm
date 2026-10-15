@@ -164,6 +164,9 @@ p = plain((detail.render(week, idle, "2026-10-14", "x", gradient.apply_to({ goal
 check("anglais : objectif 7h30", p[3], "  Total     10h04   ✓ 7h30 goal reached")
 check("anglais : semaine validée", p[7], "  Week      24h16   ✓ week validated (2/2 days)")
 check("anglais : idle", p[5]:sub(1, 10), "  Idle    ")
+check("anglais : le pourcentage collé au nombre (83%)", p[4]:match("%d%%$") ~= nil and p[4]:find(" %%$") == nil, true)
+local p_fr = plain((detail.render(week, idle, "2026-10-14", "x", gradient.apply_to({}), fr)))
+check("français : le pourcentage garde son espace (85 %)", p_fr[4]:find("%d %%$") ~= nil, true)
 
 -- ---- par projet
 local projects = {
@@ -224,6 +227,32 @@ check(
 	"projets : un projet plus grand que le jour (fichiers fusionnés) : 100 % au plus",
 	plain((detail.render({ ["2026-10-14"] = 60 }, nil, "2026-10-14", "x", cfg, fr, { ["2026-10-14"] = { a = 999 } })))[8],
 	"    a                               0h01   ████████████  100 %"
+)
+-- moins d'une minute s'afficherait « 0h00 » : la ligne est cachée (« autres » comme un petit projet)
+local small = plain((detail.render(week, idle, "2026-10-14", "x", cfg, fr, {
+	["2026-10-14"] = { gros = 3600, petit = 59, ["?"] = 30 },
+})))
+local small_text = table.concat(small, "\n")
+check("moins d'une minute : le gros projet est affiché", small_text:find("    gros ", 1, true) ~= nil, true)
+check("moins d'une minute : le petit projet (59 s) est caché", small_text:find("petit", 1, true), nil)
+check("moins d'une minute : « autres » (30 s) est caché", small_text:find("autres", 1, true), nil)
+check("moins d'une minute : aucune ligne à 0h00 dans la section", small_text:find("0h00   ", 1, true), nil)
+check(
+	"une minute pile : affichée (0h01)",
+	table
+		.concat(plain((detail.render(week, idle, "2026-10-14", "x", cfg, fr, { ["2026-10-14"] = { pile = 60 } }))), "\n")
+		:find("    pile ", 1, true) ~= nil,
+	true
+)
+check(
+	"que des projets de moins d'une minute : pas de section du tout",
+	table
+		.concat(
+			plain((detail.render(week, idle, "2026-10-14", "x", cfg, fr, { ["2026-10-14"] = { a = 10, ["?"] = 5 } }))),
+			"\n"
+		)
+		:find("Par projet", 1, true),
+	nil
 )
 local pe = plain((detail.render(week, idle, "2026-10-14", "x", cfg, en, projects)))
 check("projets : anglais", pe[7], "  By project (active time)")

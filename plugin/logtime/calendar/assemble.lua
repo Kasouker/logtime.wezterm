@@ -363,7 +363,8 @@ end
 
 -- En haut, à côté du titre : « Total du mois : 42h10 / Jours actifs : 12 ».
 local function totals_text(s, labels)
-	return string.format("%s : %s / %s : %d", labels.total, stats.hm(s.total), labels.active, s.active)
+	local c = labels.colon
+	return string.format("%s%s%s / %s%s%d", labels.total, c, stats.hm(s.total), labels.active, c, s.active)
 end
 
 -- En bas : « Semaines validées : 3/5 / Jours validés : 12/30 » (sur le nombre de jours du mois). Sans objectif : nil.
@@ -373,11 +374,13 @@ local function validated_text(days, year, month, cfg, s, labels)
 		return nil
 	end
 	return string.format(
-		"%s : %d/%d / %s : %d/%d",
+		"%s%s%d/%d / %s%s%d/%d",
 		labels.validated_weeks,
+		labels.colon,
 		weeks,
 		total_weeks,
 		labels.validated_days,
+		labels.colon,
 		s.goal_days,
 		dates.days_in_month(year, month)
 	)
@@ -502,7 +505,16 @@ function M.render_month(days, year, month, today_key, cfg, labels)
 			)
 		)
 	else
-		add(string.format("  %s : %s %d   %s", labels.title, labels.months[month], year, totals_text(s, labels)))
+		add(
+			string.format(
+				"  %s%s%s %d   %s",
+				labels.title,
+				labels.colon,
+				labels.months[month],
+				year,
+				totals_text(s, labels)
+			)
+		)
 		add("")
 	end
 	add(header_line(cfg, labels))
@@ -514,12 +526,13 @@ function M.render_month(days, year, month, today_key, cfg, labels)
 	end
 
 	-- Statistiques (le total et les jours actifs sont en haut, à côté du titre)
-	text(string.format("  %s : %s", labels.average, stats.hm(s.average)))
+	text(string.format("  %s%s%s", labels.average, labels.colon, stats.hm(s.average)))
 	local line = {}
 	if s.best_day then
-		line[#line + 1] = string.format("%s : %d (%s)", labels.best, s.best_day, stats.hm(s.best_secs))
+		line[#line + 1] = string.format("%s%s%d (%s)", labels.best, labels.colon, s.best_day, stats.hm(s.best_secs))
 	end
-	line[#line + 1] = string.format("%s : %d %s", labels.streak, stats.streak(days, today_key), labels.streak_unit)
+	line[#line + 1] =
+		string.format("%s%s%d %s", labels.streak, labels.colon, stats.streak(days, today_key), labels.streak_unit)
 	text("  " .. table.concat(line, "   "))
 	local validated = validated_text(days, year, month, cfg, s, labels)
 	if b then

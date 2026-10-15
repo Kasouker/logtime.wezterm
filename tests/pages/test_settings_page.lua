@@ -231,6 +231,7 @@ local english = render({ index = 3, current = "#C9AB6B", message = 1 }, en)
 check("anglais : le titre et les onglets", strip(english[1]), "  Settings  [Colors]  Calendar   General ")
 check("anglais : le nom de la couleur", strip(english[20]), "  Choice: 3 Gold (#C9AB6B)")
 check("anglais : le message", strip(english[23]), "  " .. en.settings_saved)
+check("anglais : l'aperçu, sans espace avant les deux-points", strip(english[19]):find("  Preview: 0h", 1, true), 1)
 check("anglais : les noms dans le tableau", strip(english[8]):find("Gold", 1, true) ~= nil, true)
 
 -- ============================================================

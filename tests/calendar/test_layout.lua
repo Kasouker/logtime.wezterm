@@ -267,7 +267,7 @@ check(
 check(
 	"month_block : anglais",
 	strip(assemble.month_block(days, 2026, 10, "x", {}, en, false).lines[1]),
-	"  October 2026   Month total : 5h45 / Active days : 3"
+	"  October 2026   Month total: 5h45 / Active days: 3"
 )
 check(
 	"month_block : semaine du dimanche",

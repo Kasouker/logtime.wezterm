@@ -512,7 +512,7 @@ local blk_oct = assemble.month_block(five, 2026, 10, "2026-10-20", { goal_hours 
 check(
 	"plusieurs mois, anglais : la ligne du bas",
 	strip(blk_oct.lines[#blk_oct.lines]),
-	"  Validated weeks : 1/5 / Validated days : 5/31"
+	"  Validated weeks: 1/5 / Validated days: 5/31"
 )
 check("plusieurs mois : toujours 21 lignes", #blk_oct.lines, 21)
 check(
@@ -849,10 +849,10 @@ check(
 
 -- anglais
 local english = lines_of(strip(render(days, 2026, 10, "2026-10-12", {}, en)))
-check("anglais : titre", english[2], "  Logtime : October 2026   Month total : 5h45 / Active days : 3")
+check("anglais : titre", english[2], "  Logtime: October 2026   Month total: 5h45 / Active days: 3")
 check("anglais : en-tête", english[4]:match("^%s*(%a+)"), "Mon")
-check("anglais : statistiques", english[#english - 2], "  Average per active day : 1h55")
-check("anglais : série", english[#english - 1], "  Best day : 10 (4h13)   Current streak : 3 d")
+check("anglais : statistiques", english[#english - 2], "  Average per active day: 1h55")
+check("anglais : série", english[#english - 1], "  Best day: 10 (4h13)   Current streak: 3 d")
 check("anglais : légende", english[#english]:match("%* = today$"), "* = today")
 
 -- ============================================================

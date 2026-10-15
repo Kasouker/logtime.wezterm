@@ -627,7 +627,7 @@ local function scenarios()
 	page.open(new_window(w), w.new_pane())
 	check(
 		"anglais : la page est en anglais",
-		strip(w.spawned[1].pane.injected[1]):find("Logtime : October 2026", 1, true) ~= nil
+		strip(w.spawned[1].pane.injected[1]):find("Logtime: October 2026", 1, true) ~= nil
 			and strip(w.spawned[1].pane.injected[1]):find("Enter details", 1, true) ~= nil,
 		true
 	)

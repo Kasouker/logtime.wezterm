@@ -142,16 +142,18 @@ function M.render(days, year, today_key, cfg, labels, idle_days)
 	content[#content + 1] = ""
 
 	-- les statistiques
-	local line = { string.format("%s : %s", labels.average, stats.hm(s.average)) }
+	local c = labels.colon
+	local line = { string.format("%s%s%s", labels.average, c, stats.hm(s.average)) }
 	if s.best_key then
 		local _, m, d = s.best_key:match("^(%d+)-(%d+)-(%d+)$")
-		line[#line + 1] = string.format(
-			"%s : %d %s (%s)",
-			labels.best,
-			tonumber(d),
-			labels.months[tonumber(m)],
-			stats.hm(s.best_secs)
-		)
+		local month = labels.months[tonumber(m)]
+		-- « 14 octobre » ou "October 14", selon la langue
+		local date = labels.day_month:gsub("{([%w_]+)}", {
+			day = tostring(tonumber(d)),
+			month = month,
+			month_lower = month:lower(),
+		})
+		line[#line + 1] = string.format("%s%s%s (%s)", labels.best, c, date, stats.hm(s.best_secs))
 	end
 	if idle_days and s.total > 0 then
 		local _, percent = idle.share(s.total, s.idle)
@@ -159,15 +161,17 @@ function M.render(days, year, today_key, cfg, labels, idle_days)
 	end
 	content[#content + 1] = table.concat(line, "   ")
 	local title =
-		string.format("%d   %s : %s / %s : %d", year, labels.year_total, stats.hm(s.total), labels.active, s.active)
+		string.format("%d   %s%s%s / %s%s%d", year, labels.year_total, c, stats.hm(s.total), labels.active, c, s.active)
 	local validated = nil
 	if stats.has_goal(cfg.goal_hours) then
 		validated = string.format(
-			"%s : %d/%d / %s : %d/%d",
+			"%s%s%d/%d / %s%s%d/%d",
 			labels.validated_weeks,
+			c,
 			s.validated_weeks,
 			s.weeks,
 			labels.validated_days,
+			c,
 			s.goal_days,
 			s.days
 		)

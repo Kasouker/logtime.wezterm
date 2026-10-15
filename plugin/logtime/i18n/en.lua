@@ -17,6 +17,9 @@ return {
 	weekdays = { "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun" },
 	weekdays_long = { "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday" },
 	title = "Logtime",
+	colon = ": ", -- "Month total: 42h10" (no space before the colon in English)
+	percent = "%3d%%", -- "83%" (in the day detail columns)
+	day_month = "{month} {day}", -- "October 14" (the best day of the year)
 	total = "Month total",
 	active = "Active days",
 	average = "Average per active day",

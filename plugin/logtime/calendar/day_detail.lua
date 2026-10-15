@@ -67,7 +67,12 @@ end
 
 -- « Par projet » : les plus gros projets du jour, en temps actif, avec leur part du total du jour (total > 0).
 local function project_lines(of_day, total, color, labels)
-	local list = activity.top(of_day, M.PROJECTS)
+	local list = {}
+	for _, item in ipairs(activity.top(of_day, M.PROJECTS)) do
+		if item.secs >= 60 then -- moins d'une minute s'afficherait « 0h00 » : la ligne n'apprend rien
+			list[#list + 1] = item
+		end
+	end
 	if #list == 0 then
 		return {}
 	end
@@ -82,7 +87,8 @@ local function project_lines(of_day, total, color, labels)
 			.. value
 			.. "   "
 			.. bar(secs, total, color, M.PROJECT_BAR)
-			.. string.format("  %3d %%", math.floor(secs * 100 / total + 0.5))
+			.. "  "
+			.. string.format(labels.percent, math.floor(secs * 100 / total + 0.5))
 	end
 	return out
 end
@@ -141,11 +147,13 @@ function M.render(days, idle_days, key, today_key, cfg, labels, projects)
 		content[#content + 1] = row(labels.detail_active, active)
 			.. "   "
 			.. bar(active, total, color)
-			.. string.format("  %3d %%", 100 - idle_percent)
+			.. "  "
+			.. string.format(labels.percent, 100 - idle_percent)
 		content[#content + 1] = row(labels.detail_idle, idle_secs)
 			.. "   "
 			.. bar(idle_secs, total, M.IDLE_COLOR)
-			.. string.format("  %3d %%", idle_percent)
+			.. "  "
+			.. string.format(labels.percent, idle_percent)
 		local by_project = project_lines(projects and projects[key], total, color, labels)
 		if #by_project > 0 then
 			content[#content + 1] = ""

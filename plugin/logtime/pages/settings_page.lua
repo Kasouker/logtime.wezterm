@@ -371,7 +371,7 @@ function M.render(state, labels)
 	end
 	lines[#lines + 1] = ""
 	local chosen = colors[state.index]
-	lines[#lines + 1] = "  " .. labels.settings_preview .. " : " .. gradient.make({ color = chosen }).legend()
+	lines[#lines + 1] = "  " .. labels.settings_preview .. labels.colon .. gradient.make({ color = chosen }).legend()
 	lines[#lines + 1] = "  " .. string.format(labels.settings_selected, state.index, names[state.index] or "", chosen)
 	if state.current then
 		local known = palette.index_of(state.current, colors) ~= nil

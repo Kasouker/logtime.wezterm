@@ -120,7 +120,7 @@ check(
 	true
 )
 check("un jour sans travail : le gris foncé", raw:find(convert.fg(year.EMPTY_COLOR) .. "■", 1, true) ~= nil, true)
-check("ligne 12 : moyenne et meilleur jour", p[12], "  Moyenne par jour actif : 3h45   Meilleur jour : 12 Mars (9h30)")
+check("ligne 12 : moyenne et meilleur jour", p[12], "  Moyenne par jour actif : 3h45   Meilleur jour : 12 mars (9h30)")
 check("sans objectif : pas de ligne « validées »", table.concat(p, "\n"):find("validé", 1, true), nil)
 
 -- ---- le temps inactif
@@ -133,7 +133,7 @@ local ip = plain((year.render(days, 2026, "2026-10-13", cfg, fr, idle_days)))
 check(
 	"inactif : 1h30 sur 15h00 = 10 %",
 	ip[12],
-	"  Moyenne par jour actif : 3h45   Meilleur jour : 12 Mars (9h30)   Inactif : 1h30 (10 %)"
+	"  Moyenne par jour actif : 3h45   Meilleur jour : 12 mars (9h30)   Inactif : 1h30 (10 %)"
 )
 check("inactif : year_stats", year.year_stats(days, 2026, cfg, idle_days).idle, 5400)
 check(
@@ -204,9 +204,15 @@ check("semaine du dimanche : la dernière est Sam", sun[10]:sub(1, 7), "  Sam  "
 
 -- ---- anglais
 local eng = plain((year.render(days, 2026, "x", cfg, en)))
-check("anglais : le titre", eng[1], "  2026   Year total : 15h00 / Active days : 4")
+check("anglais : le titre", eng[1], "  2026   Year total: 15h00 / Active days: 4")
 check("anglais : Jun et Jul", eng[3]:find("Jun", 1, true) ~= nil and eng[3]:find("Jul", 1, true) ~= nil, true)
 check("anglais : les jours", eng[4]:sub(1, 7), "  Mon  ")
+check(
+	"anglais : le meilleur jour, le mois puis le jour",
+	table.concat(eng, "\n"):find("Best day: March 12 (9h30)", 1, true) ~= nil,
+	true
+)
+check("anglais : jamais d'espace avant les deux-points", table.concat(eng, "\n"):find(" :", 1, true), nil)
 
 -- ---- avec les encadrés
 local boxed, boxed_width =
