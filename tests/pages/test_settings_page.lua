@@ -211,9 +211,60 @@ check(
 	"  " .. fr.settings_saved
 )
 check(
-	"message : échec",
+	"message : échec, avec la raison",
+	strip(render({ index = 3, message = settings_page.MESSAGE.FAILED, error = "disque plein" })[23]),
+	"  ✗ Pas enregistré : disque plein"
+)
+check(
+	"message : échec sans raison connue",
 	strip(render({ index = 3, message = settings_page.MESSAGE.FAILED })[23]),
-	"  " .. fr.settings_failed
+	"  ✗ Pas enregistré : ?"
+)
+-- une raison trop longue : on garde sa FIN (la cause), coupée par la gauche, sans dépasser la largeur de la page
+local long_reason = "cannot write: /home/vitia/.local/share/logtime/.logtime_settings.json.tmp: Permission denied"
+local failure = settings_page.failure_line(en, long_reason)
+check("raison trop longue : la fin (la cause) est gardée", failure:sub(-#"Permission denied"), "Permission denied")
+check("raison trop longue : coupée par la gauche avec …", failure:find("Not saved: …", 1, true) ~= nil, true)
+check("raison trop longue : jamais plus large que la page", utf8.len(failure), settings_page.GRID_WIDTH)
+local P = "/home/vitia/.local/share/logtime/.logtime_settings.json"
+check(
+	"raison sans le chemin du fichier temporaire",
+	settings_page.short_reason("cannot write: " .. P .. ".tmp: Permission denied", P),
+	"cannot write: Permission denied"
+)
+check(
+	"raison sans le chemin du fichier (relecture)",
+	settings_page.short_reason("check after writing failed: cannot read back: " .. P .. ".tmp: Permission denied", P),
+	"check after writing failed: cannot read back: Permission denied"
+)
+check(
+	"raison : un chemin avec des caractères spéciaux (Windows, parenthèses, %)",
+	settings_page.short_reason("cannot write: C:\\Users\\a (1)\\x%.json.tmp: denied", "C:\\Users\\a (1)\\x%.json"),
+	"cannot write: denied"
+)
+check("raison : sans chemin connu, inchangée", settings_page.short_reason("disk full", nil), "disk full")
+check("raison : pas un texte", settings_page.short_reason(nil, P), "nil")
+check("raison courte : entière", settings_page.failure_line(en, "disk full"), "  ✗ Not saved: disk full")
+check(
+	"raison sur plusieurs lignes : une seule ligne",
+	settings_page.failure_line(en, "a\nb\t c"),
+	"  ✗ Not saved: a b c"
+)
+check(
+	"raison pile à la largeur : pas coupée",
+	utf8.len(settings_page.failure_line(en, string.rep("x", settings_page.GRID_WIDTH - utf8.len("  ✗ Not saved: "))))
+		.. " "
+		.. tostring(
+			settings_page
+				.failure_line(en, string.rep("x", settings_page.GRID_WIDTH - utf8.len("  ✗ Not saved: ")))
+				:find("…", 1, true)
+		),
+	settings_page.GRID_WIDTH .. " nil"
+)
+check(
+	"raison avec des accents : coupée sans casser un caractère",
+	utf8.len(settings_page.failure_line(fr, string.rep("é", 100))) ~= nil,
+	true
 )
 check("message inconnu : ligne vide", strip(render({ index = 3, message = 99 })[23]), "")
 local stable = true
@@ -691,7 +742,7 @@ e = open({ path = "/tmp/dossier_qui_nexiste_pas_logtime/sous/.logtime_settings.j
 press(e, "Enter", e.pane)
 check(
 	"échec : le message d'échec est affiché",
-	table.concat(shown_lines(e.pane), "\n"):find("✗ Enregistrement impossible", 1, true) ~= nil,
+	table.concat(shown_lines(e.pane), "\n"):find("✗ Pas enregistré", 1, true) ~= nil,
 	true
 )
 check(
@@ -844,8 +895,10 @@ check(
 )
 check(
 	"onglet Calendrier : le message d'échec",
-	strip(render({ tab = 2, row = 1, values = { max_months = 6 }, message = settings_page.MESSAGE.FAILED })[23]),
-	"  " .. fr.settings_failed
+	strip(
+		render({ tab = 2, row = 1, values = { max_months = 6 }, message = settings_page.MESSAGE.FAILED, error = "x" })[23]
+	),
+	"  ✗ Pas enregistré : x"
 )
 check(
 	"onglet Calendrier : valeur absente, la valeur par défaut (12)",
@@ -965,7 +1018,7 @@ press(e, "Tab", e.pane)
 press(e, "h", e.pane)
 check(
 	"échec (onglet Calendrier) : le message d'échec",
-	shown_text(e):find("✗ Enregistrement impossible", 1, true) ~= nil,
+	shown_text(e):find("✗ Pas enregistré", 1, true) ~= nil,
 	true
 )
 check("échec (onglet Calendrier) : rien n'est appliqué", #e.applied, 0)

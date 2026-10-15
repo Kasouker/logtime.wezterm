@@ -7,7 +7,7 @@ local wezterm = require("wezterm")
 local sep = package.config:sub(1, 1)
 
 local M = {}
-M.version = "1.0.1" -- MAJEUR.MINEUR.CORRECTIF : 1.0.1 une correction, 1.1.0 une nouveauté, 2.0.0 si la config des gens casse
+M.version = "1.0.2" -- MAJEUR.MINEUR.CORRECTIF : 1.0.1 une correction, 1.1.0 une nouveauté, 2.0.0 si la config des gens casse
 
 -- ------------------------------------------------------------
 -- Retrouver le dossier du plugin

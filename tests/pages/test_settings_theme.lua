@@ -563,7 +563,7 @@ check(
 -- échec d'enregistrement
 e = open({ path = "/tmp/dossier_qui_nexiste_pas_logtime/sous/.logtime_settings.json" })
 press(e, "y", e.pane)
-check("échec : le message d'échec", shown(e.pane):find("✗ Enregistrement impossible", 1, true) ~= nil, true)
+check("échec : le message d'échec", shown(e.pane):find("✗ Pas enregistré", 1, true) ~= nil, true)
 check("échec : rien n'est appliqué", #e.applied, 0)
 check("échec : la palette ne change pas", has_colors(e.pane, palette.COLORS), true)
 check(

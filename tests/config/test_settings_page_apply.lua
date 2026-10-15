@@ -467,12 +467,25 @@ open_key(e, config, "F4")
 local failing = e.w.spawned[2]
 press(e, config, "j", failing)
 press(e, config, "Enter", failing)
+check("échec : le message est affiché", plain_lines(failing):find("✗ Pas enregistré", 1, true) ~= nil, true)
+check("échec : l'erreur est dans les journaux", errors_with(e, "cannot save the settings"), 1)
 check(
-	"échec : le message est affiché",
-	plain_lines(failing):find("✗ Enregistrement impossible", 1, true) ~= nil,
+	"échec : la raison retenue pour la page, sans le chemin du fichier",
+	tostring(e.w.GLOBAL.logtime_settings_error),
+	"cannot write: No such file or directory"
+)
+check(
+	"échec : le journal donne le chemin du fichier",
+	errors_with(e, "/tmp/dossier_inexistant_logtime/sous/reglages.json"),
+	1
+)
+check(
+	"échec : la page montre la raison (la fin du message du système), pas seulement « voir les journaux »",
+	plain_lines(failing):find("✗ Pas enregistré : …", 1, true) ~= nil
+		and plain_lines(failing):find("No such file or directory", 1, true) ~= nil
+		and plain_lines(failing):find("dossier_inexistant", 1, true) == nil, -- le chemin n'est pas à l'écran
 	true
 )
-check("échec : l'erreur est dans les journaux", errors_with(e, "cannot save the settings"), 1)
 check("échec : le calendrier garde sa couleur (or)", last_frame(e.w.spawned[1]):find(GOLD, 1, true) ~= nil, true)
 cleanup()
 

@@ -127,9 +127,10 @@ Pourquoi pas directement dans le dossier personnel : WezTerm recharge toute sa c
 
 ## En cas de problème
 
-Ouvre les journaux : `Ctrl+Shift+L` (fenêtre de débogage). Au chargement, tu dois lire `logtime: version 1.0.1 loaded from ...`. Le plugin y écrit ses erreurs, **toujours en anglais** (comme la plupart des programmes) : une option mal écrite, une touche déjà utilisée dans ta config, une sauvegarde qui a échoué…
+Ouvre les journaux : `Ctrl+Shift+L` (fenêtre de débogage). Au chargement, tu dois lire `logtime: version 1.0.2 loaded from ...`. Le plugin y écrit ses erreurs, **toujours en anglais** (comme la plupart des programmes) : une option mal écrite, une touche déjà utilisée dans ta config, une sauvegarde qui a échoué…
 
 - **Pas de compteur** : vérifie que `status` n'est pas à `false`. Si tu affiches ta propre barre, appelle `logtime.tick(window)` dedans.
+- **Un réglage n'est pas enregistré** (`✗ Pas enregistré : …` dans la page `F4`) : la raison est affichée en bas de la page, et en entier (avec le chemin du fichier) dans les journaux.
 - **Un `⚠` à côté du compteur** : la dernière sauvegarde a échoué (la raison est dans les journaux). Rien n'est perdu : le temps attend en mémoire et la sauvegarde est retentée 10 s plus tard.
 - **La notification ne s'affiche pas** : Windows peut masquer les notifications (assistant de concentration). Le `✓` du compteur le montre de toute façon.
 

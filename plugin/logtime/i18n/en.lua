@@ -104,7 +104,7 @@ return {
 	settings_current_custom = "Saved color: %s (custom)",
 	settings_gradient_off = "Gradient is off: this color has no effect.",
 	settings_saved = "✓ Saved: the calendar now uses this color.",
-	settings_failed = "✗ Could not save (see the logs).",
+	settings_failed = "✗ Not saved: %s", -- the reason (its end, if it is too long; in full in the logs)
 	settings_too_small = "Window too small",
 	settings_too_small_hint = "Please enlarge it: at least %d columns by %d rows are needed for the settings.",
 	settings_preview_small = "Calendar preview: window too small.",

@@ -104,7 +104,7 @@ return {
 	settings_current_custom = "Couleur enregistrée : %s (personnalisée)",
 	settings_gradient_off = "Dégradé désactivé : cette couleur n'a pas d'effet.",
 	settings_saved = "✓ Enregistré : le calendrier utilise cette couleur.",
-	settings_failed = "✗ Enregistrement impossible (voir les journaux).",
+	settings_failed = "✗ Pas enregistré : %s", -- la raison (sa fin si elle est trop longue ; en entier dans les journaux)
 	settings_too_small = "Fenêtre trop petite",
 	settings_too_small_hint = "Agrandis-la : il faut au moins %d colonnes sur %d lignes pour les réglages.",
 	settings_preview_small = "Aperçu du calendrier : fenêtre trop petite.",

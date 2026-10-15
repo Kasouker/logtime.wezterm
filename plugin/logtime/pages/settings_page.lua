@@ -203,11 +203,37 @@ local function value_text(key, value, labels, state)
 	return (texts[key] or {})[value] or tostring(value)
 end
 
-local function message_line(message, labels)
+-- Le message d'échec, avec la raison (state.error) : sa FIN si elle est trop longue (c'est elle qui dit l'essentiel,
+-- par exemple « Permission denied » après le chemin du fichier). La raison complète est dans les journaux.
+function M.failure_line(labels, reason)
+	local empty = "  " .. string.format(labels.settings_failed, "")
+	local room = M.GRID_WIDTH - utf8.len(empty)
+	reason = tostring(reason or "?"):gsub("%s+", " ")
+	local len = utf8.len(reason) or #reason
+	if len > room then
+		reason = "…" .. reason:sub(utf8.offset(reason, len - room + 2) or 1)
+	end
+	return "  " .. string.format(labels.settings_failed, reason)
+end
+
+-- La raison, sans le chemin du fichier (long, et la page sait déjà de quel fichier il s'agit) : il reste la cause,
+-- « cannot write: Permission denied ». Le chemin complet est dans les journaux.
+function M.short_reason(reason, path)
+	reason = tostring(reason)
+	if type(path) == "string" and path ~= "" then
+		for _, p in ipairs({ path .. ".tmp", path }) do
+			local escaped = p:gsub("[%^%$%(%)%%%.%[%]%*%+%-%?]", "%%%0")
+			reason = reason:gsub(escaped .. ": ", ""):gsub(escaped, "")
+		end
+	end
+	return reason
+end
+
+local function message_line(message, labels, reason)
 	if message == M.MESSAGE.SAVED then
 		return "  " .. labels.settings_saved
 	elseif message == M.MESSAGE.FAILED then
-		return "  " .. labels.settings_failed
+		return M.failure_line(labels, reason)
 	elseif message == M.MESSAGE.CONSENT then
 		return "  " .. labels.settings_consent_saved
 	elseif message == M.MESSAGE.SETTING_SAVED then
@@ -250,7 +276,7 @@ local function render_list(state, labels)
 	while #lines < LINES - 1 do
 		lines[#lines + 1] = ""
 	end
-	lines[#lines + 1] = message_line(state.message, labels)
+	lines[#lines + 1] = message_line(state.message, labels, state.error)
 	return lines, M.GRID_WIDTH
 end
 
@@ -381,7 +407,7 @@ function M.render(state, labels)
 		lines[#lines + 1] = ""
 	end
 	lines[#lines + 1] = state.gradient_off and ("  " .. labels.settings_gradient_off) or ""
-	lines[#lines + 1] = message_line(state.message, labels)
+	lines[#lines + 1] = message_line(state.message, labels, state.error)
 	return lines, M.GRID_WIDTH
 end
 
@@ -531,6 +557,7 @@ function M.create(ctx)
 			current = current_color(),
 			gradient_off = ctx.cfg().gradient == false,
 			message = num(G.logtime_settings_message) or M.MESSAGE.NONE,
+			error = G.logtime_settings_error and tostring(G.logtime_settings_error) or nil,
 			colors = active.colors,
 			names = (active.kind == "theme" and labels.palette_theme) or labels.palette,
 			consent_line = consent_line,
@@ -664,8 +691,9 @@ function M.create(ctx)
 		current[key] = value
 		local ok, err = ctx.store.save(path, current)
 		if not ok then
-			wezterm.log_error("logtime: cannot save the settings: " .. tostring(err))
+			wezterm.log_error("logtime: cannot save the settings to " .. tostring(path) .. ": " .. tostring(err))
 			G.logtime_settings_message = M.MESSAGE.FAILED
+			G.logtime_settings_error = M.short_reason(err, path)
 			return false
 		end
 		ctx.apply({ [key] = value })
