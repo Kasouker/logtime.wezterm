@@ -176,8 +176,20 @@ local function new_env(global)
 	end
 	package.loaded["wezterm"] = w
 	local env = { home = home, w = w, path = home .. "/.local/share/logtime/.logtime_settings.json", toasts = {} }
+	-- Ces tests vérifient les textes français : lang = "fr" sauf si le test choisit une langue (le défaut est l'anglais).
 	function env.load()
-		return assert(loadfile(root .. "/plugin/init.lua"))(root)
+		local M = assert(loadfile(root .. "/plugin/init.lua"))(root)
+		local setup = M.setup
+		M.setup = function(opts)
+			if opts == nil then
+				opts = {}
+			end
+			if type(opts) == "table" and opts.lang == nil then
+				opts.lang = "fr"
+			end
+			return setup(opts)
+		end
+		return M
 	end
 	env.win = { performed = {} }
 	function env.win:perform_action(action, pane)

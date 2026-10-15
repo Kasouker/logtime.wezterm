@@ -9,7 +9,7 @@ local M = {}
 -- être écrite dans le fichier de réglages, et l'emporte alors sur la valeur de wezterm.lua.
 -- step : de combien la valeur change à chaque appui sur ← ou → dans la page de personnalisation (1 par défaut).
 M.DEFINITIONS = {
-	{ key = "lang", kind = "enum", values = { "fr", "en" }, default = "fr" },
+	{ key = "lang", kind = "enum", values = { "fr", "en" }, default = "en" },
 	{ key = "week_starts_on", kind = "enum", values = { "monday", "sunday" }, default = "monday" },
 	{ key = "goal_hours", kind = "number", min = 0.5, max = 24, default = nil, none = 0, step = 0.5 },
 	{ key = "goal_days", kind = "integer", min = 1, max = 7, default = 5 },

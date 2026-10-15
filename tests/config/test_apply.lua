@@ -272,8 +272,20 @@ local function new_env(opts)
 	}
 	package.loaded["wezterm"] = w
 	local env = { home = home, w = w }
+	-- Ces tests vérifient les textes français : lang = "fr" sauf si le test choisit une langue (le défaut est l'anglais).
 	function env.load()
-		return assert(loadfile(root .. "/plugin/init.lua"))(root)
+		local M = assert(loadfile(root .. "/plugin/init.lua"))(root)
+		local setup = M.setup
+		M.setup = function(opts)
+			if opts == nil then
+				opts = {}
+			end
+			if type(opts) == "table" and opts.lang == nil then
+				opts.lang = "fr"
+			end
+			return setup(opts)
+		end
+		return M
 	end
 	function env.window()
 		local win = { performed = {}, toasts = {} }
@@ -1243,6 +1255,19 @@ local function scenarios()
 		read(e.home .. "/.local/share/logtime/.logtime_projects.json"),
 		'{"2026-10-13":{"a/b":51}}'
 	)
+	cleanup(e)
+
+	-- sans option lang : l'interface est en anglais (le plugin chargé tel quel, sans le lang = "fr" de ces tests)
+	clock.now = T0
+	e = new_env({ file = false })
+	e.M = assert(loadfile(root .. "/plugin/init.lua"))(root)
+	config = e.M.apply_to_config({})
+	win = e.window()
+	screen = screen_pane(e)
+	open_binding(config, "F2")(win, screen)
+	local page_text = last_text(e.w.spawned[#e.w.spawned].pane)
+	check("langue par défaut : le calendrier est en anglais", page_text:find("October 2026", 1, true) ~= nil, true)
+	check("langue par défaut : rien en français", page_text:find("Octobre", 1, true), nil)
 	cleanup(e)
 
 	-- les traces (chaque touche, chaque dessin) : éteintes par défaut, allumées avec debug = true

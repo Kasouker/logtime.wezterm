@@ -433,15 +433,16 @@ e = new_env(BIG)
 config = e.M.apply_to_config({}, "max_months = 6")
 check("réglages donnés en texte : un avertissement sur la table", errors_with(e, "doit être une table"), 1)
 frame = open_page(e, config)
--- sans table, pas d'option debug : les mois sont comptés dans le dessin (12 mois : de novembre 2025 à octobre 2026)
+-- sans table, pas d'option debug : les mois sont comptés dans le dessin (12 mois : de novembre 2025 à octobre 2026,
+-- en anglais, la langue par défaut)
 check(
-	"réglages donnés en texte : le plugin fonctionne avec les valeurs par défaut (12 mois)",
-	strip(frame):find("Novembre 2025", 1, true) ~= nil and strip(frame):find("Octobre 2026", 1, true) ~= nil,
+	"réglages donnés en texte : le plugin fonctionne avec les valeurs par défaut (12 mois, en anglais)",
+	strip(frame):find("November 2025", 1, true) ~= nil and strip(frame):find("October 2026", 1, true) ~= nil,
 	true
 )
 check(
 	"réglages donnés en texte : pas un mois de plus (pas d'octobre 2025)",
-	strip(frame):find("Octobre 2025", 1, true),
+	strip(frame):find("October 2025", 1, true),
 	nil
 )
 cleanup(e)

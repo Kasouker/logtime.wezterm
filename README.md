@@ -35,7 +35,6 @@ local config = wezterm.config_builder()
 
 local logtime = wezterm.plugin.require("https://github.com/Kasouker/logtime.wezterm")
 logtime.apply_to_config(config, {
-	lang = "en", -- the interface is in French by default
 	goal_hours = 7, -- optional: a daily goal
 })
 
@@ -71,7 +70,7 @@ Options are read in this order (the last one wins): **plugin defaults → option
 
 | Name | Values | Default | Meaning |
 |---|---|---|---|
-| `lang` | `"fr"`, `"en"` | `"fr"` | interface language |
+| `lang` | `"en"`, `"fr"` | `"en"` | interface language (English or French) |
 | `week_starts_on` | `"monday"`, `"sunday"` | `"monday"` | first day of the week |
 | `goal_hours` | `0` (none), or 0.5 to 24 | none | hours per day that count as "goal reached" |
 | `goal_days` | 1 to 7 | `5` | days at the goal that make a validated week |

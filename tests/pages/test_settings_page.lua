@@ -1392,6 +1392,7 @@ press(e, "h", e.pane)
 check("de 7h00, ← : 6h30", read(e.path), '{\n  "goal_hours": 6.5\n}\n')
 -- la langue : la page change de langue tout de suite
 e = open({ labels_from_cfg = true })
+e.cfg.lang = "fr" -- on part du français (la valeur par défaut est l'anglais)
 to_general(e)
 press(e, "l", e.pane)
 check("langue → : English est enregistré", read(e.path), '{\n  "lang": "en"\n}\n')
@@ -1399,7 +1400,12 @@ check("langue → : appliqué tout de suite", e.cfg.lang, "en")
 check("langue → : la page est redessinée en anglais", shown_text(e):find("[General]", 1, true) ~= nil, true)
 check("langue → : la langue garde son nom (English)", shown_text(e):find("◀ English ▶", 1, true) ~= nil, true)
 press(e, "d", e.pane)
-check("langue d : retour au français", shown_text(e):find("◀ français ▶", 1, true) ~= nil, true)
+check(
+	"langue d : retour à la valeur par défaut, l'anglais",
+	shown_text(e):find("◀ English ▶", 1, true) ~= nil,
+	true
+)
+check("langue d : enregistré", read(e.path), '{\n  "lang": "en"\n}\n')
 
 -- la couleur du trait : les choix et le défilement (fonctions pures)
 local choices = settings_page.border_choices(palette.COLORS, fr.palette, "Gris")

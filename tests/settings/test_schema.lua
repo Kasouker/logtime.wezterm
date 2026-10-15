@@ -208,7 +208,8 @@ rejects("goal_days 4,5", "goal_days", 4.5)
 check("goal_days : 5 par défaut", defaults.goal_days, 5)
 rejects("max_months 0 (pas de valeur none pour lui)", "max_months", 0)
 defaults.lang = "xx"
-check("defaults() renvoie une copie", schema.defaults().lang, "fr")
+check("defaults() renvoie une copie", schema.defaults().lang, "en")
+check("langue par défaut : l'anglais", defaults.lang == "xx" and schema.defaults().lang, "en")
 
 -- ---- cohérence avec les valeurs par défaut des autres modules (si l'un change sans l'autre, ce test le dit)
 check("gradient_color = la couleur par défaut du dégradé", schema.defaults().gradient_color, gradient.DEFAULT_COLOR)
