@@ -1,9 +1,11 @@
 
 # tes heures et leurs copies de sécurité : ne jamais publier
 
-.logtime.json
+.logtime*.json
 
-.logtime.json.*
+.logtime*.json.*
+
+.logtime_probe
 
 *.bak
 
