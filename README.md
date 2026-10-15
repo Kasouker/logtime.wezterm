@@ -4,7 +4,7 @@
 
 A [WezTerm](https://wezterm.org) plugin that **tracks the time you spend in your terminal** and shows it in the tab bar, with an **interactive calendar**, a **year view**, a **day detail** (active / idle time, time per project) and a **settings page**. Nothing else to install: everything runs inside WezTerm.
 
-![The calendar](docs/calendar.png)
+![The calendar](docs/calendar.en.png)
 
 ## Features
 
@@ -21,7 +21,7 @@ A [WezTerm](https://wezterm.org) plugin that **tracks the time you spend in your
 
 | Day detail | Year view | Settings (`F4`) |
 |---|---|---|
-| ![Day detail](docs/day-detail.png) | ![Year view](docs/year.png) | ![Settings](docs/settings.png) |
+| ![Day detail](docs/day-detail.en.png) | ![Year view](docs/year.en.png) | ![Settings](docs/settings.en.png) |
 
 ## Installation
 

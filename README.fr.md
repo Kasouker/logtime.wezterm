@@ -4,7 +4,7 @@
 
 Un plugin [WezTerm](https://wezterm.org) qui **compte le temps passé dans ton terminal** et l'affiche dans la barre d'onglets, avec un **calendrier interactif**, une **vue de l'année**, un **détail du jour** (temps actif / inactif, temps par projet) et une **page de réglages**. Rien d'autre à installer : tout se passe dans WezTerm.
 
-![Le calendrier](docs/calendar.png)
+![Le calendrier](docs/calendar.fr.png)
 
 ## Fonctionnalités
 
@@ -21,7 +21,7 @@ Un plugin [WezTerm](https://wezterm.org) qui **compte le temps passé dans ton t
 
 | Détail du jour | Vue de l'année | Réglages (`F4`) |
 |---|---|---|
-| ![Détail du jour](docs/day-detail.png) | ![Vue de l'année](docs/year.png) | ![Réglages](docs/settings.png) |
+| ![Détail du jour](docs/day-detail.fr.png) | ![Vue de l'année](docs/year.fr.png) | ![Réglages](docs/settings.fr.png) |
 
 ## Installation
 
