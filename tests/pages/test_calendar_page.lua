@@ -287,9 +287,11 @@ local function new_page(w, extra)
 	end
 	return calendar_page.create(ctx), ctx
 end
+-- key : "h", ou "SHIFT-Tab" pour une touche avec un modificateur
 local function binding(page, key)
+	local mods, plain_key = key:match("^(%u+)%-(.+)$")
 	for _, b in ipairs(page.key_table()) do
-		if b.key == key then
+		if b.key == (plain_key or key) and b.mods == mods then
 			return function(window, pane)
 				fire(b.action, window, pane)
 			end
@@ -445,6 +447,17 @@ local function scenarios()
 	press("PageDown")
 	year, month = month_of(w)
 	check("PgDn trois fois : trois mois plus tard = novembre 2026", year .. "-" .. month, "2026-11")
+	-- Tab et Shift+Tab : comme PgDn et PgUp (tous les claviers n'ont pas ces touches)
+	press("Tab")
+	year, month = month_of(w)
+	check("Tab : le mois suivant (décembre 2026)", year .. "-" .. month, "2026-12")
+	press("SHIFT-Tab")
+	press("SHIFT-Tab")
+	year, month = month_of(w)
+	check("Shift+Tab deux fois : deux mois avant (octobre 2026)", year .. "-" .. month, "2026-10")
+	press("Tab")
+	year, month = month_of(w)
+	check("Tab : retour à novembre 2026", year .. "-" .. month, "2026-11")
 	check(
 		"novembre affiche ses heures (2h00 le 2)",
 		strip(page_pane.injected[#page_pane.injected]):find("2h00", 1, true) ~= nil,
@@ -563,7 +576,11 @@ local function scenarios()
 		#config.keys == 2 and config.keys[1] == existing and config.keys[2].key == "F2",
 		true
 	)
-	check("keys : la table de touches de la page existe, avec 16 touches", #config.key_tables.logtime_page, 16)
+	check(
+		"keys : la table de touches de la page existe, avec 18 touches (Tab et Shift+Tab compris)",
+		#config.key_tables.logtime_page,
+		18
+	)
 	check(
 		"keys : un gestionnaire de redimensionnement est installé",
 		w.events["window-resized"] ~= nil and #w.events["window-resized"],

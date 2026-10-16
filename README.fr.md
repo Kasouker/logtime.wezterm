@@ -55,11 +55,11 @@ C'est tout : le compteur apparaît dans la barre d'onglets, `F2` ouvre le calend
 | `F2` | partout | ouvre le calendrier dans un nouvel onglet (ou le remet devant) |
 | `F4` | partout | ouvre la page de réglages |
 
-**Dans le calendrier** : `←` `→` (ou `h` `l`) jour d'avant / d'après · `↑` `↓` (ou `k` `j`) semaine d'avant / d'après · `PgUp` `PgDn` mois précédent / suivant · `Entrée` détail du jour choisi · `a` vue de l'année (et retour) · `t` aujourd'hui · `r` rafraîchir · `q` ou `Échap` fermer. Dans la vue de l'année, `←` `→` changent d'année.
+**Dans le calendrier** : `←` `→` (ou `h` `l`) jour d'avant / d'après · `↑` `↓` (ou `k` `j`) semaine d'avant / d'après · `Maj+Tab` `Tab` (ou `PgUp` `PgDn`) mois précédent / suivant · `Entrée` détail du jour choisi · `a` vue de l'année (et retour) · `t` aujourd'hui · `r` rafraîchir · `q` ou `Échap` fermer. Dans la vue de l'année, `←` `→` changent d'année.
 
 **Dans le détail du jour** : `←` `→` `↑` `↓` passent à un autre jour · `Entrée` ou `Échap` reviennent au calendrier.
 
-**Dans la page de réglages** : `Tab` onglet suivant (Couleurs, Calendrier, Général) · flèches ou `h j k l` choisir · `Entrée` enregistrer une couleur · `←` `→` changer une valeur (enregistrée tout de suite) · `d` valeur par défaut · `y` / `n` utiliser (ou non) les couleurs de ton thème · `q` ou `Échap` fermer.
+**Dans la page de réglages** (elle remplit toute la fenêtre, avec l'aperçu du mois à droite quand il y a la place) : `Tab` / `Maj+Tab` onglet suivant / précédent (Couleurs, Calendrier, Général) · flèches ou `h j k l` choisir · `Entrée` enregistrer une couleur · `←` `→` changer une valeur (enregistrée tout de suite) · `d` valeur par défaut · `y` / `n` utiliser (ou non) les couleurs de ton thème · `q` ou `Échap` fermer.
 
 Les touches de la page n'agissent que dans l'onglet de la page : ailleurs, une touche va à ton shell comme d'habitude.
 

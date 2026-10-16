@@ -368,10 +368,17 @@ local function scenarios()
 		true
 	)
 	check(
-		"apply : la table de touches de la page, avec 16 touches (dont a : l'année, Entrée : le détail)",
+		"apply : la table de touches de la page, avec 18 touches (dont a : l'année, Entrée : le détail, Tab / Shift+Tab : le mois)",
 		#config.key_tables.logtime_page,
-		16
+		18
 	)
+	local shift_tab = nil
+	for _, binding in ipairs(config.key_tables.logtime_page) do
+		if binding.key == "Tab" and binding.mods == "SHIFT" then
+			shift_tab = binding
+		end
+	end
+	check("apply : Shift+Tab est une touche à part (avec son modificateur)", shift_tab ~= nil, true)
 	check(
 		"apply : un gestionnaire de redimensionnement par page (calendrier et personnalisation)",
 		e.w.events["window-resized"] ~= nil and #e.w.events["window-resized"],
@@ -396,7 +403,7 @@ local function scenarios()
 	check(
 		"F2 : la ligne d'aide est la première ligne affichée (le dessin est centré)",
 		(text:gsub("^\n+", "")):match("^%s*(.-)\n"),
-		"Logtime   ←→↑↓ jour   PgUp PgDn mois   Entrée détail   a année   t aujourd'hui"
+		"Logtime   ←→↑↓ jour   Tab Maj+Tab mois   Entrée détail   a année   t aujourd'hui"
 	)
 	check(
 		"F2 : lire les heures n'écrit rien (rien de nouveau à sauvegarder)",

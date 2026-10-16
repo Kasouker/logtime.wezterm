@@ -6,7 +6,8 @@ local safe = load("ui/safe")
 local M = {}
 
 -- Construit la table de touches d'une page.
---   bindings : liste de { key = "h", run = function(window, pane) ... end }
+--   bindings : liste de { key = "h", run = function(window, pane) ... end }, avec mods (facultatif) : "SHIFT" pour
+--              Shift+Tab ({ key = "Tab", mods = "SHIFT" }) ; son événement porte le nom « <préfixe>-SHIFT-Tab »
 --   is_page  : function(pane) -> true si ce panneau est la page
 --   prefix   : début du nom des événements ("logtime-page" : la touche h émet "logtime-page-h")
 -- Chaque touche émet un événement à NOM FIXE, enregistré avec wezterm.on. On n'utilise pas wezterm.action_callback :
@@ -20,8 +21,8 @@ function M.build(wezterm, bindings, is_page, prefix)
 	local act = wezterm.action
 	local out = {}
 	for _, binding in ipairs(bindings) do
-		local key, run = binding.key, binding.run
-		local event = (prefix or "logtime-page") .. "-" .. key
+		local key, run, mods = binding.key, binding.run, binding.mods
+		local event = (prefix or "logtime-page") .. "-" .. (mods and (mods .. "-") or "") .. key
 		local handler = safe.wrap(wezterm, "page", function(window, pane)
 			local on_page = is_page(pane)
 			safe.trace(
@@ -35,7 +36,7 @@ function M.build(wezterm, bindings, is_page, prefix)
 			)
 			if not on_page then
 				window:perform_action(act.PopKeyTable, pane)
-				window:perform_action(act.SendKey({ key = key }), pane)
+				window:perform_action(act.SendKey({ key = key, mods = mods }), pane)
 				return
 			end
 			run(window, pane)
@@ -44,7 +45,7 @@ function M.build(wezterm, bindings, is_page, prefix)
 			handler(window, pane)
 			return false -- si la même touche est enregistrée deux fois (config appliquée deux fois), la seconde n'est pas appelée
 		end)
-		out[#out + 1] = { key = key, action = act.EmitEvent(event) }
+		out[#out + 1] = { key = key, mods = mods, action = act.EmitEvent(event) }
 	end
 	return out
 end

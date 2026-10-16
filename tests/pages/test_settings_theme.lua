@@ -296,6 +296,14 @@ local function has_colors(pane, list)
 	end
 	return true
 end
+-- Les couleurs classiques, sans l'or : l'or (la couleur enregistrée par défaut) colore aussi l'onglet ouvert et le
+-- bouton actif, il n'est donc pas un signe de la palette classique.
+local CLASSIC_BUT_GOLD = {}
+for i, color in ipairs(palette.COLORS) do
+	if i ~= palette.DEFAULT_INDEX then
+		CLASSIC_BUT_GOLD[#CLASSIC_BUT_GOLD + 1] = color
+	end
+end
 local function has_any_color(pane, list)
 	local raw = frame_of(pane)
 	for _, color in ipairs(list) do
@@ -315,89 +323,84 @@ for i, binding in ipairs(e.table) do
 	keys[i] = binding.key
 end
 check(
-	"avec la question : quinze touches (Tab compris), y et n à la fin",
-	#keys == 15 and keys[14] == "y" and keys[15] == "n",
+	"avec la question : seize touches (Tab et Shift+Tab compris), y et n à la fin",
+	#keys == 16 and keys[15] == "y" and keys[16] == "n",
 	true
 )
 check(
 	"les événements de y et n ont des noms fixes",
-	e.table[14].action.name == "logtime-settings-y" and e.table[15].action.name == "logtime-settings-n",
+	e.table[15].action.name == "logtime-settings-y" and e.table[16].action.name == "logtime-settings-n",
 	true
 )
 e = new_env({ no_consent = true })
-check("sans la question : treize touches (Tab compris)", #e.table, 13)
+check("sans la question : quatorze touches (Tab et Shift+Tab compris)", #e.table, 14)
 
 -- ============================================================
--- la ligne de question (ligne 4)
+-- le bouton « y : utiliser les couleurs de ton thème »
 -- ============================================================
-local function consent_line(opts)
-	local env = open(opts)
-	return lines_of(shown(env.pane))
-end
-local function row4(opts)
-	local env = open(opts)
-	local ls = lines_of(shown(env.pane))
-	for i, line in ipairs(ls) do
-		if line:find("Personnalisation", 1, true) or line:find("Settings", 1, true) then
-			return ls[i + 3]
-		end
+-- La ligne du bouton (son texte, puis la note à sa droite), sans le cadre ni les espaces de remplissage.
+local function button_line(env, labels)
+	local line = line_containing(env.pane, (labels or fr).settings_theme_button)
+	if not line then
+		return nil
 	end
+	return ((line:gsub("^│", ""):match("^(.-)%s*│%s*$") or line):gsub("%s+$", ""):gsub("^%s+", ""))
 end
+-- Le bouton est-il coloré (fond de la couleur enregistrée, ou de l'or) ?
+local function button_active(env, labels, accent)
+	accent = accent or palette.COLORS[palette.DEFAULT_INDEX]
+	return frame_of(env.pane):find(
+		convert.bg(accent) .. convert.fg(convert.contrast(accent)) .. " " .. (labels or fr).settings_theme_button,
+		1,
+		true
+	) ~= nil
+end
+e = open({})
 check(
-	"pas encore répondu : la question et ses deux réponses",
-	row4({}):gsub("^%s+", ""),
-	"Couleurs de ton thème ?   y : oui   n : non"
+	"pas encore répondu : le bouton, et à côté comment garder la palette classique",
+	button_line(e),
+	"│ " .. fr.settings_theme_button .. " │  " .. fr.settings_theme_ask
 )
+check("pas encore répondu : le bouton n'est pas coloré", button_active(e), false)
+e = open({ consent = true })
 check(
-	"répondu oui, thème lu : la réponse et la commande pour changer",
-	(row4({ consent = true }):gsub("^%s+", "")),
-	"Couleurs de ton thème : oui   (n : palette classique)"
+	"répondu oui, thème lu : le bouton, et comment revenir",
+	button_line(e),
+	"│ " .. fr.settings_theme_button .. " │  " .. fr.settings_theme_back
 )
-check(
-	"répondu non : la réponse et la commande pour changer",
-	(row4({ consent = false }):gsub("^%s+", "")),
-	"Palette classique   (y : couleurs de ton thème)"
-)
+check("répondu oui, thème lu : le bouton est coloré", button_active(e), true)
+e = open({ consent = false })
+check("répondu non : le bouton seul", button_line(e), "│ " .. fr.settings_theme_button .. " │")
+check("répondu non : le bouton n'est pas coloré", button_active(e), false)
+e = open({ consent = true, theme_missing = true })
 check(
 	"répondu oui mais thème introuvable : le dit",
-	(row4({ consent = true, theme_missing = true }):gsub("^%s+", "")),
-	"Thème introuvable : palette classique (n : arrêter)"
+	button_line(e),
+	"│ " .. fr.settings_theme_button .. " │  " .. fr.settings_theme_missing
 )
-check("en anglais : la question", (row4({ labels = en }):gsub("^%s+", "")), "Use your theme's colors?   y: yes   n: no")
+check("thème introuvable : le bouton n'est pas coloré (rien n'est actif)", button_active(e), false)
+e = open({ labels = en, consent = true })
 check(
-	"en anglais : oui",
-	(row4({ labels = en, consent = true }):gsub("^%s+", "")),
-	"Theme colors: on   (n: classic palette)"
+	"en anglais : le bouton et la note",
+	button_line(e, en),
+	"│ y: use your theme colors │  n: back to the classic palette"
 )
-check(
-	"en anglais : non",
-	(row4({ labels = en, consent = false }):gsub("^%s+", "")),
-	"Classic palette   (y: use your theme colors)"
-)
-check(
-	"en anglais : thème introuvable",
-	(row4({ labels = en, consent = true, theme_missing = true }):gsub("^%s+", "")),
-	"Theme not found: classic palette (n: stop)"
-)
-local narrow_ok = true
-for _, labels in ipairs({ fr, en }) do
-	for _, line in ipairs({ labels.consent_ask, labels.consent_yes, labels.consent_no, labels.consent_unavailable }) do
-		if layout.visible_width("  " .. line) > settings_page.GRID_WIDTH then
-			narrow_ok = false
-		end
-	end
-end
-check("chaque ligne de question tient dans la largeur du tableau (57)", narrow_ok, true)
+check("en anglais : coloré", button_active(e, en), true)
 e = open({ no_consent = true })
+check("sans la question : pas de bouton", line_containing(e.pane, fr.settings_theme_button), nil)
 check(
-	"sans la question : la ligne 4 est vide, comme avant",
-	select(2, shown(e.pane):gsub("Couleurs de ton thème", "")),
-	0
-)
-check(
-	"toujours 23 lignes avec la question",
-	#(settings_page.render({ index = 1, consent_line = "x", message = 3 }, fr)),
-	23
+	"le bouton est encadré (au-dessus et en dessous)",
+	(function()
+		local env = open({})
+		local ls = lines_of(shown(env.pane))
+		for i, line in ipairs(ls) do
+			if line:find(fr.settings_theme_button, 1, true) then
+				return ls[i - 1]:find("╭─", 1, true) ~= nil and ls[i + 1]:find("╰─", 1, true) ~= nil
+			end
+		end
+		return false
+	end)(),
+	true
 )
 
 -- ============================================================
@@ -405,41 +408,25 @@ check(
 -- ============================================================
 e = open({ consent = true })
 check("palette du thème : les 16 couleurs du thème sont dessinées", has_colors(e.pane, THEME), true)
-check("palette du thème : aucune couleur de la palette classique", has_any_color(e.pane, palette.COLORS), false)
 check(
-	"palette du thème : les noms sont ceux du thème (Noir, Rouge, ..., Blanc vif)",
-	(function()
-		local text = shown(e.pane)
-		for _, name in ipairs({
-			"Noir",
-			"Rouge",
-			"Vert",
-			"Jaune",
-			"Bleu",
-			"Magenta",
-			"Cyan",
-			"Blanc",
-			"Gris",
-			"Rouge vif",
-			"Blanc vif",
-		}) do
-			if not text:find(name, 1, true) then
-				return false
-			end
-		end
-		return true
-	end)(),
+	"palette du thème : aucune couleur de la palette classique (l'or, couleur d'accent, mis à part)",
+	has_any_color(e.pane, CLASSIC_BUT_GOLD),
+	false
+)
+check(
+	"palette du thème : la ligne « Choix » donne le nom du thème (la case 4 : Jaune)",
+	line_containing(e.pane, "Choix") ~= nil and line_containing(e.pane, "Choix"):find("Choix : 4 Jaune", 1, true) ~= nil,
 	true
 )
 check(
-	"palette du thème : pas les noms de la palette classique (Citron, Turquoise)",
-	shown(e.pane):find("Citron", 1, true) == nil and shown(e.pane):find("Turquoise", 1, true) == nil,
+	"palette du thème : plus aucun nom dans la grille (les cases sont seulement colorées)",
+	shown(e.pane):find("Blanc vif", 1, true) == nil and shown(e.pane):find("Citron", 1, true) == nil,
 	true
 )
 e = open({ consent = true, labels = en })
 check(
-	"palette du thème en anglais : noms anglais",
-	shown(e.pane):find("Lt Magenta", 1, true) ~= nil and shown(e.pane):find("Red", 1, true) ~= nil,
+	"palette du thème en anglais : le nom anglais dans la ligne « Choice »",
+	line_containing(e.pane, "Choice: 4 Yellow") ~= nil,
 	true
 )
 e = open({ consent = false })
@@ -500,14 +487,11 @@ check("y : appliqué tout de suite", #e.applied == 1 and e.applied[1].theme_colo
 check("y : le message de réponse enregistrée", shown(e.pane):find("✓ Réponse enregistrée.", 1, true) ~= nil, true)
 check(
 	"y : la palette du thème est affichée",
-	has_colors(e.pane, THEME) and not has_any_color(e.pane, palette.COLORS),
+	has_colors(e.pane, THEME) and not has_any_color(e.pane, CLASSIC_BUT_GOLD),
 	true
 )
-check(
-	"y : la ligne de question dit la nouvelle réponse et la commande inverse",
-	line_containing(e.pane, "(n : palette classique)") ~= nil,
-	true
-)
+check("y : le bouton devient coloré", button_active(e), true)
+check("y : à côté du bouton, comment revenir", button_line(e):find(fr.settings_theme_back, 1, true) ~= nil, true)
 check("y : aucune erreur", #e.w.logs.error, 0)
 press(e, "n", e.pane)
 check("n : « theme_colors »: false est enregistré", read(e.path), '{\n  "theme_colors": false\n}\n')
@@ -516,11 +500,8 @@ check(
 	has_colors(e.pane, palette.COLORS) and not has_any_color(e.pane, { THEME[2], THEME[5] }),
 	true
 )
-check(
-	"n : la ligne de question dit la commande pour revenir",
-	line_containing(e.pane, "(y : couleurs de ton thème)") ~= nil,
-	true
-)
+check("n : le bouton n'est plus coloré", button_active(e), false)
+check("n : le bouton seul (plus de note)", button_line(e), "│ " .. fr.settings_theme_button .. " │")
 check("n : la copie de sécurité garde l'état précédent", read(e.path .. ".bak"), '{\n  "theme_colors": true\n}\n')
 press(e, "y", e.pane)
 check("changer d'avis : y à nouveau", read(e.path), '{\n  "theme_colors": true\n}\n')

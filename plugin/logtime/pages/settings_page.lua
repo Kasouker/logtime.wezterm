@@ -16,16 +16,13 @@ local palette = load("color/palette")
 local convert = load("color/convert")
 local schema = load("settings/schema")
 local assemble = load("calendar/assemble")
+local view = load("pages/settings_view")
 
 local M = {}
 
 M.TABLE_NAME = "logtime_settings"
 M.EVENT_PREFIX = "logtime-settings"
 
-local COLUMNS = 4
-local ROWS = 4
-local CELL = 11 -- largeur d'une couleur, sans ses crochets
-local LINES = 23 -- hauteur de la page, la même dans tous les onglets (la page ne saute pas quand on change d'onglet)
 local NAME_WIDTH = 30 -- largeur du nom d'un réglage dans un onglet de réglages (les valeurs sont alignées après)
 
 -- Les onglets de la page (gardés dans wezterm.GLOBAL sous forme de nombres).
@@ -44,48 +41,11 @@ M.LISTS = {
 	[M.TAB.GENERAL] = { settings = M.GENERAL_SETTINGS, heading = "settings_general" },
 }
 
+-- La taille par défaut quand la fenêtre est inconnue (pas de panneau : dans les tests).
+M.DEFAULT_DIMS = { cols = 120, rows = 40 }
+
 -- Les messages affichés en bas de la page (gardés dans wezterm.GLOBAL sous forme de nombres).
 M.MESSAGE = { NONE = 0, SAVED = 1, FAILED = 2, CONSENT = 3, SETTING_SAVED = 4 }
-
--- Largeur du tableau de couleurs, avec la marge de gauche : 2 + 4 x (11 + 2 crochets) + 3 espaces.
-M.GRID_WIDTH = 2 + COLUMNS * (CELL + 2) + (COLUMNS - 1)
-
-local function center(text, width)
-	local len = utf8.len(text) or #text
-	if len >= width then
-		return text
-	end
-	local left = math.floor((width - len) / 2)
-	return string.rep(" ", left) .. text .. string.rep(" ", width - len - left)
-end
-
-local function truncate(text, width)
-	if (utf8.len(text) or #text) <= width then
-		return text
-	end
-	return text:sub(1, (utf8.offset(text, width + 1) or (#text + 1)) - 1)
-end
-
--- Une couleur : deux lignes (le numéro, puis le nom) sur le fond de la couleur ; la couleur choisie est entre crochets.
-local function cell(index, selected, colors, names)
-	local hex = colors[index]
-	local style = convert.bg(hex) .. convert.fg(convert.contrast(hex))
-	local name = truncate(names[index] or "", CELL)
-	local left, right = selected and "[" or " ", selected and "]" or " "
-	return left .. style .. center(tostring(index), CELL) .. convert.RESET .. right,
-		left .. style .. center(name, CELL) .. convert.RESET .. right
-end
-
--- La ligne 1 : le titre, puis les onglets ; l'onglet affiché est entre crochets.
-local function title_line(tab, labels)
-	local names = labels.settings_tabs or {}
-	local parts = {}
-	for i = 1, M.TAB_COUNT do
-		local name = names[i] or tostring(i)
-		parts[i] = (i == tab) and ("[" .. name .. "]") or (" " .. name .. " ")
-	end
-	return "  " .. labels.settings_title .. "  " .. table.concat(parts, " ")
-end
 
 -- La valeur d'un réglage quand rien n'est choisi : sa valeur par défaut, sinon sa valeur « aucun » (none).
 function M.fallback(definition)
@@ -205,15 +165,15 @@ end
 
 -- Le message d'échec, avec la raison (state.error) : sa FIN si elle est trop longue (c'est elle qui dit l'essentiel,
 -- par exemple « Permission denied » après le chemin du fichier). La raison complète est dans les journaux.
-function M.failure_line(labels, reason)
-	local empty = "  " .. string.format(labels.settings_failed, "")
-	local room = M.GRID_WIDTH - utf8.len(empty)
+function M.failure_line(labels, reason, width)
+	local empty = " " .. string.format(labels.settings_failed, "")
+	local room = (width or 57) - utf8.len(empty)
 	reason = tostring(reason or "?"):gsub("%s+", " ")
 	local len = utf8.len(reason) or #reason
 	if len > room then
 		reason = "…" .. reason:sub(utf8.offset(reason, len - room + 2) or 1)
 	end
-	return "  " .. string.format(labels.settings_failed, reason)
+	return " " .. string.format(labels.settings_failed, reason)
 end
 
 -- La raison, sans le chemin du fichier (long, et la page sait déjà de quel fichier il s'agit) : il reste la cause,
@@ -229,34 +189,28 @@ function M.short_reason(reason, path)
 	return reason
 end
 
-local function message_line(message, labels, reason)
+-- Le message du bas du panneau de gauche (`width` : sa largeur, pour couper la raison d'un échec).
+function M.message_line(message, labels, reason, width)
 	if message == M.MESSAGE.SAVED then
-		return "  " .. labels.settings_saved
+		return " " .. labels.settings_saved
 	elseif message == M.MESSAGE.FAILED then
-		return M.failure_line(labels, reason)
+		return M.failure_line(labels, reason, width)
 	elseif message == M.MESSAGE.CONSENT then
-		return "  " .. labels.settings_consent_saved
+		return " " .. labels.settings_consent_saved
 	elseif message == M.MESSAGE.SETTING_SAVED then
-		return "  " .. labels.settings_setting_saved
+		return " " .. labels.settings_setting_saved
 	end
 	return ""
 end
 
--- Un onglet de réglages (Calendrier, Général) : un réglage par ligne, le réglage choisi marqué par « ▸ », son explication
--- en dessous de la liste.
---   state = { tab = l'onglet, row = le numéro du réglage choisi, values = { max_months = 12, ... }, message = M.MESSAGE.* }
-local function render_list(state, labels)
+-- Les lignes d'un onglet de réglages (Calendrier, Général) : son intitulé, un réglage par ligne (le réglage choisi
+-- marqué par « ▸ »), puis l'explication du réglage choisi.
+--   state = { tab = l'onglet, row = le numéro du réglage choisi, values = { max_months = 12, ... }, border_choices }
+function M.list_lines(state, labels)
 	local list = M.LISTS[state.tab]
 	local names = labels.settings_names or {}
 	local hints = labels.settings_hints or {}
-	local lines = {
-		title_line(state.tab, labels),
-		"  " .. labels.settings_calendar_help1,
-		"  " .. labels.settings_calendar_help2,
-		"",
-		"  " .. (labels[list.heading] or ""),
-		"",
-	}
+	local lines = { " " .. (labels[list.heading] or ""), "" }
 	for i, key in ipairs(list.settings) do
 		local definition = schema.get(key)
 		local value = state.values[key]
@@ -265,150 +219,15 @@ local function render_list(state, labels)
 		end
 		local name = names[key] or key
 		local padding = string.rep(" ", math.max(1, NAME_WIDTH - (utf8.len(name) or #name)))
-		lines[#lines + 1] = (i == state.row and "▸ " or "  ")
+		lines[#lines + 1] = (i == state.row and " ▸ " or "   ")
 			.. name
 			.. padding
 			.. M.format_value(definition, value, value_text(key, value, labels, state))
 	end
 	lines[#lines + 1] = ""
 	local selected = list.settings[state.row]
-	lines[#lines + 1] = (selected and hints[selected]) and ("  " .. hints[selected]) or ""
-	while #lines < LINES - 1 do
-		lines[#lines + 1] = ""
-	end
-	lines[#lines + 1] = message_line(state.message, labels, state.error)
-	return lines, M.GRID_WIDTH
-end
-
--- La page dans un cadre (les mêmes traits que le calendrier) : le haut, la barre d'onglets, une jonction « ├─┤ », le
--- reste de la page, le bas. Chaque ligne est complétée jusqu'à width (sa largeur visible, sans les codes de couleur).
--- Renvoie les lignes et la nouvelle largeur (width + 2).
-function M.frame(lines, width, b, color)
-	local function edge(left, right)
-		return color .. left .. string.rep(b.h, width) .. right .. convert.RESET
-	end
-	local v = color .. b.v .. convert.RESET
-	local out = { edge(b.tl, b.tr) }
-	for i, line in ipairs(lines) do
-		out[#out + 1] = v .. line .. string.rep(" ", math.max(0, width - layout.visible_width(line))) .. v
-		if i == 1 then
-			out[#out + 1] = edge(b.l, b.r)
-		end
-	end
-	out[#out + 1] = edge(b.bl, b.br)
-	return out, width + 2
-end
-
-M.PREVIEW_GAP = 3 -- espaces entre les réglages et l'aperçu du mois, quand il est à droite
-
--- Place l'aperçu du mois à côté des réglages, selon la taille de la fenêtre (cols x rows). Les réglages passent toujours
--- avant l'aperçu :
---   "right"   : l'aperçu à droite des réglages, si la fenêtre est assez large et assez haute ;
---   "below"   : sinon l'aperçu sous les réglages (une ligne vide entre les deux), si elle est assez haute ;
---   "message" : sinon les réglages, et juste en dessous un message qui dit la taille qu'il faudrait pour l'aperçu ;
---   "alone"   : sinon les réglages seuls (pas même la place du message).
--- Renvoie les lignes, leur largeur (celle qu'on centre) et le cas choisi.
-function M.place(settings, settings_width, preview, preview_width, cols, rows, labels)
-	local function pad(line, width)
-		return line .. string.rep(" ", math.max(0, width - layout.visible_width(line)))
-	end
-	local right_cols = settings_width + M.PREVIEW_GAP + preview_width
-	local right_rows = math.max(#settings, #preview)
-	local below_cols = math.max(settings_width, preview_width)
-	local below_rows = #settings + 1 + #preview
-	if cols >= right_cols and rows >= right_rows then
-		local out = {}
-		for i = 1, right_rows do
-			out[i] = pad(settings[i] or "", settings_width) .. string.rep(" ", M.PREVIEW_GAP) .. (preview[i] or "")
-		end
-		return out, right_cols, "right"
-	end
-	if cols >= below_cols and rows >= below_rows then
-		local out = {}
-		for _, line in ipairs(settings) do
-			out[#out + 1] = line
-		end
-		out[#out + 1] = ""
-		for _, line in ipairs(preview) do
-			out[#out + 1] = line
-		end
-		return out, below_cols, "below"
-	end
-	local message = {
-		"  " .. labels.settings_preview_small,
-		"  " .. string.format(labels.settings_preview_small_hint, right_cols, right_rows, below_cols, below_rows),
-	}
-	if rows >= #settings + 1 + #message then
-		local out = {}
-		for _, line in ipairs(settings) do
-			out[#out + 1] = line
-		end
-		out[#out + 1] = ""
-		for _, line in ipairs(message) do
-			out[#out + 1] = line
-		end
-		local width = settings_width
-		for _, line in ipairs(message) do
-			width = math.max(width, layout.visible_width(line))
-		end
-		return out, width, "message"
-	end
-	return settings, settings_width, "alone"
-end
-
--- Le texte de la page, sous forme de lignes. Toujours le même nombre de lignes (les lignes facultatives restent vides),
--- pour que la page ne saute pas quand un message apparaît.
---   state.tab = l'onglet affiché (M.TAB.COLORS par défaut) ; pour l'onglet Calendrier, voir render_calendar.
---   state = { index = 1 à 16 (la couleur choisie), current = "#RRGGBB" ou nil (la couleur enregistrée),
---             gradient_off = true si le dégradé est désactivé, message = M.MESSAGE.*,
---             colors = les 16 couleurs (la palette classique par défaut), names = leurs 16 noms (ceux de la palette classique
---             par défaut), consent_line = le texte de la question sur les couleurs du thème (ligne 4), ou nil }
--- Renvoie les lignes et la largeur du tableau de couleurs (la largeur qu'on centre).
-function M.render(state, labels)
-	if M.LISTS[state.tab] then
-		return render_list(state, labels)
-	end
-	local colors = state.colors or palette.COLORS
-	local names = state.names or labels.palette or {}
-	local lines = {}
-	lines[#lines + 1] = title_line(M.TAB.COLORS, labels)
-	lines[#lines + 1] = "  " .. labels.settings_help1
-	lines[#lines + 1] = "  " .. labels.settings_help2
-	lines[#lines + 1] = state.consent_line and ("  " .. state.consent_line) or ""
-	lines[#lines + 1] = "  " .. labels.settings_color
-	lines[#lines + 1] = ""
-	for row = 0, ROWS - 1 do
-		local first, second = { "  " }, { "  " }
-		for col = 0, COLUMNS - 1 do
-			local index = row * COLUMNS + col + 1
-			local a, b = cell(index, index == state.index, colors, names)
-			first[#first + 1] = a
-			second[#second + 1] = b
-			if col < COLUMNS - 1 then
-				first[#first + 1] = " "
-				second[#second + 1] = " "
-			end
-		end
-		lines[#lines + 1] = table.concat(first)
-		lines[#lines + 1] = table.concat(second)
-		if row < ROWS - 1 then
-			lines[#lines + 1] = ""
-		end
-	end
-	lines[#lines + 1] = ""
-	local chosen = colors[state.index]
-	lines[#lines + 1] = "  " .. labels.settings_preview .. labels.colon .. gradient.make({ color = chosen }).legend()
-	lines[#lines + 1] = "  " .. string.format(labels.settings_selected, state.index, names[state.index] or "", chosen)
-	if state.current then
-		local known = palette.index_of(state.current, colors) ~= nil
-		lines[#lines + 1] = "  "
-			.. string.format(known and labels.settings_current or labels.settings_current_custom, state.current)
-	else
-		lines[#lines + 1] = ""
-	end
-	lines[#lines + 1] = state.gradient_off and ("  " .. labels.settings_gradient_off) or ""
-	lines[#lines + 1] = message_line(state.message, labels, state.error)
-	return lines, M.GRID_WIDTH
+	lines[#lines + 1] = (selected and hints[selected]) and (" " .. hints[selected]) or ""
+	return lines
 end
 
 -- ctx fournit ce que la page ne sait pas faire seule (days et today_key sont facultatifs : sans eux, pas d'aperçu) :
@@ -526,66 +345,95 @@ function M.create(ctx)
 		return nil
 	end
 
-	-- Le texte de la page (lignes) pour cette taille de fenêtre. Renvoie les lignes, la largeur à centrer, et true si la
-	-- page tient en entier. Si elle ne tient pas, ce sont les lignes d'un message « fenêtre trop petite ».
+	-- Le texte de la page (lignes) pour cette taille de fenêtre : toute la fenêtre est utilisée (pages/settings_view.lua).
+	-- Renvoie les lignes, leur largeur, et true si la page tient ; sinon les lignes d'un message « fenêtre trop petite ».
 	function page.build_lines(dims)
+		dims = dims or M.DEFAULT_DIMS
+		local cols, rows = tonumber(dims.cols) or 0, tonumber(dims.rows) or 0
 		local labels = ctx.labels()
 		local active = active_palette()
-		local consent_line
-		if ctx.consent then
-			local answer = ctx.consent()
-			if answer == nil then
-				consent_line = labels.consent_ask
-			elseif answer == true then
-				consent_line = (active.kind == "theme") and labels.consent_yes or labels.consent_unavailable
-			else
-				consent_line = labels.consent_no
+		local cfg = ctx.cfg()
+		local tab = current_tab()
+		local border = cfg.border_color
+		if type(border) ~= "string" or not border:match("^#%x%x%x%x%x%x$") then
+			border = assemble.BORDER_COLOR
+		end
+		local o = {
+			b = assemble.BORDER_STYLES[cfg.border_style] or assemble.BORDER_STYLES.rounded,
+			edge = convert.fg(border),
+			accent = current_color() or DEFAULT_COLOR,
+			tabs = {
+				labels.settings_title,
+				(labels.settings_tabs or {})[1],
+				(labels.settings_tabs or {})[2],
+				(labels.settings_tabs or {})[3],
+			},
+			tab = tab,
+			preview = page.preview_block(labels, active),
+		}
+		if tab == M.TAB.COLORS then
+			o.help = { labels.settings_help_top, labels.settings_help_colors }
+			if ctx.consent then
+				local answer = ctx.consent()
+				local note
+				if answer == nil then
+					note = labels.settings_theme_ask
+				elseif answer == true then
+					note = (active.kind == "theme") and labels.settings_theme_back or labels.settings_theme_missing
+				end
+				o.button = {
+					text = labels.settings_theme_button,
+					active = answer == true and active.kind == "theme",
+					note = note,
+				}
 			end
-		end
-		local values = {}
-		for _, list in pairs(M.LISTS) do
-			for _, key in ipairs(list.settings) do
-				values[key] = setting_value(key)
+			local names = (active.kind == "theme" and labels.palette_theme) or labels.palette or {}
+			local index = selected_index()
+			local chosen = active.colors[index]
+			local saved = current_color()
+			local saved_text = nil
+			if saved then
+				local known = palette.index_of(saved, active.colors) ~= nil
+				saved_text = string.format(known and labels.settings_current or labels.settings_current_custom, saved)
 			end
-		end
-		local lines, width = M.render({
-			tab = current_tab(),
-			row = current_row(),
-			values = values,
-			border_choices = border_choices(),
-			index = selected_index(),
-			current = current_color(),
-			gradient_off = ctx.cfg().gradient == false,
-			message = num(G.logtime_settings_message) or M.MESSAGE.NONE,
-			error = G.logtime_settings_error and tostring(G.logtime_settings_error) or nil,
-			colors = active.colors,
-			names = (active.kind == "theme" and labels.palette_theme) or labels.palette,
-			consent_line = consent_line,
-		}, labels)
-		-- avec les encadrés : la page dans un cadre, avec les traits du calendrier
-		local b, color = assemble.border_of(ctx.cfg())
-		if b then
-			lines, width = M.frame(lines, width, b, color)
-		end
-		if dims and ((tonumber(dims.cols) or 0) < width or (tonumber(dims.rows) or 0) < #lines) then
-			local title = labels.settings_too_small
-			local hint = string.format(labels.settings_too_small_hint, width, #lines)
-			return { title, hint }, math.max(layout.visible_width(title), layout.visible_width(hint)), false
-		end
-		-- l'aperçu du mois actuel, s'il y a la place (les réglages passent avant)
-		local preview = dims and page.preview_block(labels, active) or nil
-		if preview then
-			lines, width = M.place(
-				lines,
-				width,
-				preview.lines,
-				preview.width,
-				tonumber(dims.cols) or 0,
-				tonumber(dims.rows) or 0,
+			o.colors_tab = {
+				colors = active.colors,
+				index = index,
+				gradient_title = labels.settings_color .. labels.colon:gsub("%s+$", ""),
+				gradient_preview = labels.settings_preview .. labels.colon .. gradient
+					.make({ color = chosen })
+					.legend(),
+				choice = string.format(labels.settings_selected, index, names[index] or "", chosen),
+				saved = saved_text,
+				gradient_off = cfg.gradient == false and labels.settings_gradient_off or nil,
+			}
+		else
+			o.help = { labels.settings_help_top, labels.settings_help_list }
+			local values = {}
+			for _, list in pairs(M.LISTS) do
+				for _, key in ipairs(list.settings) do
+					values[key] = setting_value(key)
+				end
+			end
+			o.list = M.list_lines(
+				{ tab = tab, row = current_row(), values = values, border_choices = border_choices() },
 				labels
 			)
 		end
-		return lines, width, true
+		local min_left = view.minimum(o)
+		o.message = M.message_line(
+			num(G.logtime_settings_message) or M.MESSAGE.NONE,
+			labels,
+			G.logtime_settings_error and tostring(G.logtime_settings_error) or nil,
+			math.max(min_left, math.floor((cols - 3) * view.LEFT_SHARE))
+		)
+		local lines, need_cols, need_rows = view.draw(o, cols, rows)
+		if not lines then
+			local title = labels.settings_too_small
+			local hint = string.format(labels.settings_too_small_hint, need_cols, need_rows)
+			return { title, hint }, math.max(layout.visible_width(title), layout.visible_width(hint)), false
+		end
+		return lines, cols, true
 	end
 
 	-- L'aperçu : le mois actuel, avec les vraies heures, dessiné comme dans le calendrier avec les réglages en cours.
@@ -739,9 +587,9 @@ function M.create(ctx)
 				return
 			end
 			local index = selected_index() - 1
-			local row = math.max(0, math.min(ROWS - 1, index // COLUMNS + delta_row))
-			local col = math.max(0, math.min(COLUMNS - 1, index % COLUMNS + delta_col))
-			G.logtime_settings_index = row * COLUMNS + col + 1
+			local row = math.max(0, math.min(view.ROWS - 1, index // view.COLUMNS + delta_row))
+			local col = math.max(0, math.min(view.COLUMNS - 1, index % view.COLUMNS + delta_col))
+			G.logtime_settings_index = row * view.COLUMNS + col + 1
 			G.logtime_settings_message = M.MESSAGE.NONE
 			redraw(pane, false)
 		end
@@ -779,13 +627,16 @@ function M.create(ctx)
 		save(window, pane, DEFAULT_COLOR)
 	end
 
-	-- Tab : l'onglet suivant (après le dernier, retour au premier).
-	local function next_tab(window, pane)
-		G.logtime_settings_tab = current_tab() % M.TAB_COUNT + 1
-		G.logtime_settings_row = 1
-		G.logtime_settings_message = M.MESSAGE.NONE
-		redraw(pane, false)
+	-- Tab : l'onglet suivant (après le dernier, retour au premier) ; Shift+Tab : le précédent.
+	local function change_tab(delta)
+		return function(window, pane)
+			G.logtime_settings_tab = (current_tab() - 1 + delta) % M.TAB_COUNT + 1
+			G.logtime_settings_row = 1
+			G.logtime_settings_message = M.MESSAGE.NONE
+			redraw(pane, false)
+		end
 	end
+	local next_tab = change_tab(1)
 
 	-- y / n : la réponse à la question sur les couleurs du thème, enregistrée dans le fichier de réglages et appliquée
 	-- tout de suite. La palette proposée change ; le choix se replace sur la couleur enregistrée (ou la plus proche).
@@ -841,6 +692,7 @@ function M.create(ctx)
 			{ key = "Enter", run = choose },
 			{ key = "d", run = default },
 			{ key = "Tab", run = next_tab },
+			{ key = "Tab", mods = "SHIFT", run = change_tab(-1) },
 			{ key = "q", run = close },
 			{ key = "Escape", run = close },
 		}

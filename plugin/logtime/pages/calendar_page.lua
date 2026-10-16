@@ -373,6 +373,8 @@ function M.create(ctx)
 			{ key = "DownArrow", run = shift_day(7) },
 			{ key = "PageUp", run = shift_month(-1) },
 			{ key = "PageDown", run = shift_month(1) },
+			{ key = "Tab", run = shift_month(1) }, -- tous les claviers n'ont pas PgUp / PgDn
+			{ key = "Tab", mods = "SHIFT", run = shift_month(-1) },
 			{ key = "Enter", run = toggle_detail },
 			{ key = "t", run = go_today },
 			{ key = "a", run = toggle_view },

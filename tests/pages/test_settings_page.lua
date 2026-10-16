@@ -17,6 +17,7 @@ local function load_module(name)
 end
 load_module("ui/safe").debug = true -- ces tests lisent les traces du journal (éteintes par défaut)
 local settings_page = load_module("pages/settings_page")
+local settings_view = load_module("pages/settings_view")
 local palette = load_module("color/palette")
 local gradient = load_module("color/gradient")
 local convert = load_module("color/convert")
@@ -82,150 +83,41 @@ local function usub(line, first, last)
 end
 
 -- ============================================================
--- le dessin (fonction pure)
+-- le message du bas (fonctions pures) ; le dessin de la page : tests/pages/test_settings_view.lua
 -- ============================================================
-local function render(state, labels)
-	local lines, width = settings_page.render(state, labels or fr)
-	return lines, width
-end
-local lines, width = render({ index = 3, current = "#C9AB6B", message = 0 })
-check("23 lignes, toujours", #lines, 23)
-check("la largeur à centrer est celle du tableau (57)", width, 57)
-check("la largeur annoncée est GRID_WIDTH", settings_page.GRID_WIDTH, 57)
-local plain = {}
-for i, line in ipairs(lines) do
-	plain[i] = strip(line)
-end
-check(
-	"ligne 1 : le titre et les onglets (Couleurs affiché)",
-	plain[1],
-	"  Personnalisation  [Couleurs]  Calendrier   Général "
-)
-check("ligne 2 : l'aide, première partie", plain[2], "  " .. fr.settings_help1)
-check("ligne 3 : l'aide, seconde partie", plain[3], "  " .. fr.settings_help2)
-check("ligne 4 : vide", plain[4], "")
-check("ligne 5 : l'intitulé du tableau", plain[5], "  Couleur du dégradé")
-check("ligne 6 : vide", plain[6], "")
-local grid_ok, widths_ok = true, true
-for row = 0, 3 do
-	local numbers, names = plain[7 + row * 3], plain[8 + row * 3]
-	for col = 0, 3 do
-		local index = row * 4 + col + 1
-		local start = 3 + col * 14
-		local number_cell, name_cell = usub(numbers, start, start + 12), usub(names, start, start + 12)
-		if not number_cell:find(tostring(index), 1, true) then
-			grid_ok = false
-		end
-		if not name_cell:find(fr.palette[index], 1, true) then
-			grid_ok = false
-		end
-	end
-	if layout.visible_width(lines[7 + row * 3]) ~= 57 or layout.visible_width(lines[8 + row * 3]) ~= 57 then
-		widths_ok = false
-	end
-	if row < 3 and plain[9 + row * 3] ~= "" then
-		grid_ok = false
-	end
-end
-check("le tableau : les 16 numéros et les 16 noms, à leur place", grid_ok, true)
-check("le tableau : chaque ligne fait exactement 57 colonnes", widths_ok, true)
-check("ligne 18 : vide", plain[18], "")
-check("ligne 19 : l'aperçu du dégradé", plain[19]:find("  Aperçu : 0h", 1, true), 1)
-check("ligne 19 : l'aperçu va jusqu'à 24h", plain[19]:sub(-4), " 24h")
-check("ligne 20 : le choix", plain[20], "  Choix : 3 Or (#C9AB6B)")
-check("ligne 21 : la couleur enregistrée", plain[21], "  Couleur enregistrée : #C9AB6B")
-check("ligne 22 : vide (dégradé actif)", plain[22], "")
-check("ligne 23 : vide (aucun message)", plain[23], "")
-
-local colors_ok, contrast_ok = true, true
-local joined = table.concat(lines, "\n")
-for i, color in ipairs(palette.COLORS) do
-	if not joined:find(convert.bg(color), 1, true) then
-		colors_ok = false
-	end
-	if not joined:find(convert.bg(color) .. convert.fg(convert.contrast(color)), 1, true) then
-		contrast_ok = false
-	end
-end
-check("chaque couleur est dessinée sur son propre fond", colors_ok, true)
-check("le texte de chaque couleur est lisible (contraste automatique)", contrast_ok, true)
-check(
-	"l'aperçu utilise le dégradé de la couleur choisie",
-	lines[19]:find(gradient.make({ color = palette.COLORS[3] }).legend(), 1, true) ~= nil,
-	true
-)
-
--- la couleur choisie est entre crochets
-local function brackets(state)
-	local ls = render(state)
-	local found = {}
-	for row = 0, 3 do
-		for _, offset in ipairs({ 0, 1 }) do
-			local line = strip(ls[7 + row * 3 + offset])
-			for col = 0, 3 do
-				local start = 3 + col * 14
-				if usub(line, start, start) == "[" and usub(line, start + 12, start + 12) == "]" then
-					found[#found + 1] = row * 4 + col + 1
-				end
-			end
-		end
-	end
-	return found
-end
-local every_selected_ok = true
-for index = 1, 16 do
-	local found = brackets({ index = index, message = 0 })
-	if not (#found == 2 and found[1] == index and found[2] == index) then
-		every_selected_ok = false
-	end
-end
-check(
-	"pour les 16 choix : la couleur choisie (et elle seule) est entre crochets, sur ses deux lignes",
-	every_selected_ok,
-	true
-)
-check(
-	"le choix change la ligne « Choix »",
-	strip(render({ index = 11, message = 0 })[20]),
-	"  Choix : 11 Bleu (#6989C9)"
-)
-check("le choix 16 : le gris", strip(render({ index = 16, message = 0 })[20]), "  Choix : 16 Gris (#999999)")
-
--- la couleur enregistrée
-check("couleur enregistrée absente : ligne vide", strip(render({ index = 3, message = 0 })[21]), "")
-check(
-	"couleur enregistrée hors palette : « personnalisée »",
-	strip(render({ index = 3, current = "#123456", message = 0 })[21]),
-	"  Couleur enregistrée : #123456 (personnalisée)"
-)
--- dégradé désactivé
-check(
-	"dégradé désactivé : la ligne d'avertissement",
-	strip(render({ index = 3, gradient_off = true, message = 0 })[22]),
-	"  " .. fr.settings_gradient_off
-)
--- messages
-check(
-	"message : enregistré",
-	strip(render({ index = 3, message = settings_page.MESSAGE.SAVED })[23]),
-	"  " .. fr.settings_saved
-)
+check("message : enregistré", settings_page.message_line(settings_page.MESSAGE.SAVED, fr), " " .. fr.settings_saved)
 check(
 	"message : échec, avec la raison",
-	strip(render({ index = 3, message = settings_page.MESSAGE.FAILED, error = "disque plein" })[23]),
-	"  ✗ Pas enregistré : disque plein"
+	settings_page.message_line(settings_page.MESSAGE.FAILED, fr, "disque plein", 60),
+	" ✗ Pas enregistré : disque plein"
 )
 check(
 	"message : échec sans raison connue",
-	strip(render({ index = 3, message = settings_page.MESSAGE.FAILED })[23]),
-	"  ✗ Pas enregistré : ?"
+	settings_page.message_line(settings_page.MESSAGE.FAILED, fr, nil, 60),
+	" ✗ Pas enregistré : ?"
 )
--- une raison trop longue : on garde sa FIN (la cause), coupée par la gauche, sans dépasser la largeur de la page
+check(
+	"message : réponse enregistrée",
+	settings_page.message_line(settings_page.MESSAGE.CONSENT, fr),
+	" " .. fr.settings_consent_saved
+)
+check(
+	"message : réglage enregistré",
+	settings_page.message_line(settings_page.MESSAGE.SETTING_SAVED, fr),
+	" " .. fr.settings_setting_saved
+)
+check("message inconnu : rien", settings_page.message_line(99, fr), "")
+-- une raison trop longue : on garde sa FIN (la cause), coupée par la gauche, sans dépasser la largeur du panneau
 local long_reason = "cannot write: /home/vitia/.local/share/logtime/.logtime_settings.json.tmp: Permission denied"
-local failure = settings_page.failure_line(en, long_reason)
+local failure = settings_page.failure_line(en, long_reason, 57)
 check("raison trop longue : la fin (la cause) est gardée", failure:sub(-#"Permission denied"), "Permission denied")
 check("raison trop longue : coupée par la gauche avec …", failure:find("Not saved: …", 1, true) ~= nil, true)
-check("raison trop longue : jamais plus large que la page", utf8.len(failure), settings_page.GRID_WIDTH)
+check("raison trop longue : jamais plus large que le panneau", utf8.len(failure), 57)
+check(
+	"raison trop longue : un panneau plus large garde plus de texte",
+	utf8.len(settings_page.failure_line(en, long_reason, 80)),
+	80
+)
 local P = "/home/vitia/.local/share/logtime/.logtime_settings.json"
 check(
 	"raison sans le chemin du fichier temporaire",
@@ -244,46 +136,25 @@ check(
 )
 check("raison : sans chemin connu, inchangée", settings_page.short_reason("disk full", nil), "disk full")
 check("raison : pas un texte", settings_page.short_reason(nil, P), "nil")
-check("raison courte : entière", settings_page.failure_line(en, "disk full"), "  ✗ Not saved: disk full")
+check("raison courte : entière", settings_page.failure_line(en, "disk full", 57), " ✗ Not saved: disk full")
 check(
 	"raison sur plusieurs lignes : une seule ligne",
-	settings_page.failure_line(en, "a\nb\t c"),
-	"  ✗ Not saved: a b c"
+	settings_page.failure_line(en, "a\nb\t c", 57),
+	" ✗ Not saved: a b c"
 )
+local exact = string.rep("x", 57 - utf8.len(" ✗ Not saved: "))
 check(
 	"raison pile à la largeur : pas coupée",
-	utf8.len(settings_page.failure_line(en, string.rep("x", settings_page.GRID_WIDTH - utf8.len("  ✗ Not saved: "))))
+	utf8.len(settings_page.failure_line(en, exact, 57))
 		.. " "
-		.. tostring(
-			settings_page
-				.failure_line(en, string.rep("x", settings_page.GRID_WIDTH - utf8.len("  ✗ Not saved: ")))
-				:find("…", 1, true)
-		),
-	settings_page.GRID_WIDTH .. " nil"
+		.. tostring(settings_page.failure_line(en, exact, 57):find("…", 1, true)),
+	"57 nil"
 )
 check(
 	"raison avec des accents : coupée sans casser un caractère",
-	utf8.len(settings_page.failure_line(fr, string.rep("é", 100))) ~= nil,
+	utf8.len(settings_page.failure_line(fr, string.rep("é", 100), 57)) ~= nil,
 	true
 )
-check("message inconnu : ligne vide", strip(render({ index = 3, message = 99 })[23]), "")
-local stable = true
-for _, state in ipairs({
-	{ index = 1, message = 0 },
-	{ index = 16, current = "#C9AB6B", gradient_off = true, message = 1 },
-	{ index = 8, current = "#123456", message = 2 },
-}) do
-	if #render(state) ~= 23 then
-		stable = false
-	end
-end
-check("le nombre de lignes ne change jamais (la page ne saute pas)", stable, true)
-local english = render({ index = 3, current = "#C9AB6B", message = 1 }, en)
-check("anglais : le titre et les onglets", strip(english[1]), "  Settings  [Colors]  Calendar   General ")
-check("anglais : le nom de la couleur", strip(english[20]), "  Choice: 3 Gold (#C9AB6B)")
-check("anglais : le message", strip(english[23]), "  " .. en.settings_saved)
-check("anglais : l'aperçu, sans espace avant les deux-points", strip(english[19]):find("  Preview: 0h", 1, true), 1)
-check("anglais : les noms dans le tableau", strip(english[8]):find("Gold", 1, true) ~= nil, true)
 
 -- ============================================================
 -- la page, avec une fausse API WezTerm
@@ -430,9 +301,11 @@ local function new_env(opts)
 	return env
 end
 -- Comme WezTerm : une touche de la page émet son événement
+-- key : "h", ou "SHIFT-Tab" pour une touche avec un modificateur
 local function press(env, key, pane)
+	local mods, plain_key = key:match("^(%u+)%-(.+)$")
 	for _, binding in ipairs(env.table) do
-		if binding.key == key then
+		if binding.key == (plain_key or key) and binding.mods == mods then
 			for _, handler in ipairs(env.w.events[binding.action.name] or {}) do
 				if handler(env.window, pane) == false then
 					return
@@ -473,21 +346,35 @@ end
 -- ---- la taille de la fenêtre
 local env = new_env({})
 local got, got_width, fits = env.page.build_lines(nil)
-check("sans taille connue : la page entière", #got == 23 and fits == true, true)
-got, got_width, fits = env.page.build_lines({ cols = 57, rows = 23 })
-check("57 x 23 : la page tient (taille exacte)", fits, true)
-got, got_width, fits = env.page.build_lines({ cols = 56, rows = 40 })
-check("56 colonnes : trop étroit : message", fits == false and #got == 2, true)
+check("sans taille connue : la page entière, à la taille par défaut (120 x 40)", #got == 40 and fits == true, true)
+check("sans taille connue : la largeur par défaut", got_width, 120)
+got, got_width, fits = env.page.build_lines({ cols = 40, rows = 60 })
+check("40 colonnes : trop étroit : message", fits == false and #got == 2, true)
+check("40 colonnes : le titre du message", strip(got[1]), "Fenêtre trop petite")
+local need_cols, need_rows = strip(got[2]):match("il faut au moins (%d+) colonnes sur (%d+) lignes")
+need_cols, need_rows = tonumber(need_cols), tonumber(need_rows)
 check(
-	"56 colonnes : le message dit la taille nécessaire",
-	strip(got[2]),
-	"Agrandis-la : il faut au moins 57 colonnes sur 23 lignes pour les réglages."
+	"le message dit la taille nécessaire : la ligne d'aide la plus longue (ou 57) + sa marge + le cadre",
+	need_cols,
+	math.max(settings_view.MIN_LEFT, utf8.len(fr.settings_help_top) + 2) + 2
 )
-check("56 colonnes : le titre du message", strip(got[1]), "Fenêtre trop petite")
-got, got_width, fits = env.page.build_lines({ cols = 120, rows = 22 })
-check("22 lignes : trop bas : message", fits, false)
+check(
+	"à la taille nécessaire exactement : la page tient",
+	select(3, env.page.build_lines({ cols = need_cols, rows = need_rows })),
+	true
+)
+check(
+	"une colonne de moins : trop étroit",
+	select(3, env.page.build_lines({ cols = need_cols - 1, rows = need_rows })),
+	false
+)
+check(
+	"une ligne de moins : trop bas",
+	select(3, env.page.build_lines({ cols = need_cols, rows = need_rows - 1 })),
+	false
+)
 got, got_width, fits = env.page.build_lines({ cols = 200, rows = 60 })
-check("200 x 60 : la page tient", fits, true)
+check("200 x 60 : la page tient, sur toute la fenêtre", fits and #got == 60 and got_width == 200, true)
 
 -- ---- l'ouverture
 env = open({})
@@ -556,32 +443,12 @@ check(
 	nil
 )
 
--- ---- le centrage dans la fenêtre
+-- ---- la page remplit la fenêtre (elle n'est plus centrée au milieu de marges vides)
 e = open({ cols = 120, rows = 40 })
 local shown = shown_lines(e.pane)
-check(
-	"centré : (40 - 23) / 2 = 8 lignes vides en haut",
-	(function()
-		local n = 0
-		for _, line in ipairs(shown) do
-			if line ~= "" then
-				break
-			end
-			n = n + 1
-		end
-		return n
-	end)(),
-	8
-)
-local _, title_line = (function()
-	for i, line in ipairs(shown) do
-		if line:find("Personnalisation", 1, true) then
-			return i, line
-		end
-	end
-end)()
-check("centré : marge à gauche (120 - 57) / 2 = 31, plus 2 espaces", leading(title_line), 31 + 2)
-check("centré : le dessin tient dans la fenêtre", #shown <= 40, true)
+check("plein écran : pas de ligne vide en haut, le cadre commence à la 1re ligne", shown[1]:sub(1, #"╭"), "╭")
+check("plein écran : pas de marge à gauche", leading(shown[2]), 0)
+check("plein écran : 40 lignes", #shown, 40)
 
 -- ---- la navigation
 e = open({})
@@ -862,56 +729,38 @@ check("step : +1 au maximum reste au maximum", settings_page.step(max_def, 12, 1
 check("step : -1 au minimum reste au minimum", settings_page.step(max_def, 1, -1), 1)
 check("step : +1 au milieu", settings_page.step(max_def, 6, 1), 7)
 
--- le dessin (fonction pure)
-local cal = render({ tab = settings_page.TAB.CALENDAR, row = 1, values = { max_months = 12 }, message = 0 })
+-- les lignes de l'onglet (fonction pure) ; le cadre, l'aide et le message : tests/pages/test_settings_view.lua
+local function list(state, labels)
+	return settings_page.list_lines(state, labels or fr)
+end
+local cal = list({ tab = settings_page.TAB.CALENDAR, row = 1, values = { max_months = 12 } })
 local cal_plain = {}
 for i, line in ipairs(cal) do
 	cal_plain[i] = strip(line)
 end
-check("onglet Calendrier : 23 lignes, comme l'onglet Couleurs", #cal, 23)
+check("onglet Calendrier : l'intitulé", cal_plain[1], " Réglages du calendrier")
 check(
-	"onglet Calendrier : ligne 1, l'onglet affiché est entre crochets",
-	cal_plain[1],
-	"  Personnalisation   Couleurs  [Calendrier]  Général "
-)
-check("onglet Calendrier : ligne 2, l'aide", cal_plain[2], "  " .. fr.settings_calendar_help1)
-check("onglet Calendrier : ligne 3, l'aide", cal_plain[3], "  " .. fr.settings_calendar_help2)
-check("onglet Calendrier : ligne 5, l'intitulé", cal_plain[5], "  Réglages du calendrier")
-check(
-	"onglet Calendrier : ligne 7, le réglage choisi et sa valeur alignée",
-	cal_plain[7],
-	"▸ Mois affichés au maximum      ◀ 12"
+	"onglet Calendrier : le réglage choisi et sa valeur alignée",
+	cal_plain[3],
+	" ▸ Mois affichés au maximum      ◀ 12"
 )
 check(
-	"onglet Calendrier : ligne 14, l'explication du réglage choisi",
-	cal_plain[14],
-	"  " .. fr.settings_hints.max_months
-)
-check("onglet Calendrier : ligne 23 vide (aucun message)", cal_plain[23], "")
-check(
-	"onglet Calendrier : le message « enregistré »",
-	strip(render({ tab = 2, row = 1, values = { max_months = 6 }, message = settings_page.MESSAGE.SETTING_SAVED })[23]),
-	"  " .. fr.settings_setting_saved
-)
-check(
-	"onglet Calendrier : le message d'échec",
-	strip(
-		render({ tab = 2, row = 1, values = { max_months = 6 }, message = settings_page.MESSAGE.FAILED, error = "x" })[23]
-	),
-	"  ✗ Pas enregistré : x"
+	"onglet Calendrier : l'explication du réglage choisi, en dernier",
+	cal_plain[#cal_plain],
+	" " .. fr.settings_hints.max_months
 )
 check(
 	"onglet Calendrier : valeur absente, la valeur par défaut (12)",
-	strip(render({ tab = 2, row = 1, values = {}, message = 0 })[7]):match("◀ 12$") ~= nil,
+	strip(list({ tab = 2, row = 1, values = {} })[3]):match("◀ 12$") ~= nil,
 	true
 )
 check(
-	"onglet Calendrier : aucune ligne ne dépasse 57 colonnes (français et anglais)",
+	"onglet Calendrier : aucune ligne plus large que le panneau minimum (français et anglais)",
 	(function()
 		for _, labels in ipairs({ fr, en }) do
-			for _, line in ipairs(render({ tab = 2, row = 1, values = { max_months = 6 }, message = 4 }, labels)) do
-				if utf8.len(strip(line)) > 57 then
-					return false
+			for _, line in ipairs(list({ tab = 2, row = 1, values = { max_months = 6 } }, labels)) do
+				if utf8.len(strip(line)) > settings_view.MIN_LEFT then
+					return strip(line)
 				end
 			end
 		end
@@ -919,34 +768,50 @@ check(
 	end)(),
 	true
 )
-check(
-	"anglais : la barre d'onglets",
-	strip(render({ tab = 2, row = 1, values = {}, message = 0 }, en)[1]),
-	"  Settings   Colors  [Calendar]  General "
-)
 
 -- la page, avec la fausse API
 local function shown_text(env)
 	return table.concat(shown_lines(env.pane), "\n")
 end
+-- Le texte d'une ligne dans le panneau de gauche : sans le cadre, ni les espaces qui complètent la ligne.
+local function panel_text(line)
+	local inner = line:match("^│(.*)$") or line
+	return inner:match("^(.-)%s*│") or inner
+end
 local function months_line(env)
 	for _, line in ipairs(shown_lines(env.pane)) do
 		if line:find("Mois affichés au maximum", 1, true) then
-			return line
+			return panel_text(line)
 		end
+	end
+end
+-- L'onglet ouvert : son nom est dessiné sur le fond coloré de la barre d'onglets (la couleur enregistrée, ou l'or).
+local function open_tab_is(env, name)
+	local frame = frame_of(env.pane)
+	local start = 1
+	while true do
+		local s = frame:find("\27[48;2;", start, true)
+		if not s then
+			return false
+		end
+		local stop = frame:find("\27[0m", s, true) or #frame
+		if frame:sub(s, stop):find(name, 1, true) then
+			return true
+		end
+		start = s + 1
 	end
 end
 
 e = open({})
 press(e, "Tab", e.pane)
-check("Tab : l'onglet Calendrier est affiché", shown_text(e):find("[Calendrier]", 1, true) ~= nil, true)
+check("Tab : l'onglet Calendrier est affiché", open_tab_is(e, "Calendrier"), true)
 check("Tab : le réglage est affiché avec sa valeur (12 par défaut)", months_line(e):match("◀ 12$") ~= nil, true)
-check("Tab : la page tient toujours dans 57 x 23", select(3, e.page.build_lines({ cols = 57, rows = 23 })), true)
+check("Tab : la page tient toujours dans 120 x 40", select(3, e.page.build_lines({ cols = 120, rows = 40 })), true)
 check("Tab : rien n'est écrit en changeant d'onglet", read(e.path), nil)
 press(e, "Tab", e.pane)
-check("Tab deux fois : l'onglet Général", shown_text(e):find("[Général]", 1, true) ~= nil, true)
+check("Tab deux fois : l'onglet Général", open_tab_is(e, "Général"), true)
 press(e, "Tab", e.pane)
-check("Tab trois fois : retour à l'onglet Couleurs", shown_text(e):find("[Couleurs]", 1, true) ~= nil, true)
+check("Tab trois fois : retour à l'onglet Couleurs", open_tab_is(e, "Couleurs"), true)
 
 -- ← : la valeur baisse, est enregistrée, appliquée, et le calendrier redessiné
 e = open({})
@@ -1056,7 +921,7 @@ check(
 )
 check("format oui/non : toujours les deux flèches", settings_page.format_value(bool_def, false, "non"), "◀ non ▶")
 
-local four = render({
+local four = list({
 	tab = 2,
 	row = 3,
 	values = { max_months = 6, months_anchor = "first", week_starts_on = "sunday" },
@@ -1066,51 +931,59 @@ local four_plain = {}
 for i, line in ipairs(four) do
 	four_plain[i] = strip(line)
 end
-check("trois réglages : toujours 23 lignes", #four, 23)
-check("ligne 7 : le nombre de mois", four_plain[7], "  Mois affichés au maximum      ◀ 6 ▶")
+check("l'onglet Calendrier : intitulé, ligne vide, 6 réglages, ligne vide, explication (10 lignes)", #four, 10)
+check("onglet Calendrier : le nombre de mois", four_plain[3], "   Mois affichés au maximum      ◀ 6 ▶")
 check(
-	"ligne 8 : la place du mois choisi (traduite)",
-	four_plain[8],
-	"  Place du mois choisi          ◀ au début ▶"
+	"onglet Calendrier : la place du mois choisi (traduite)",
+	four_plain[4],
+	"   Place du mois choisi          ◀ au début ▶"
 )
 check(
-	"ligne 9 : le début de la semaine, choisi (▸)",
-	four_plain[9],
-	"▸ Début de la semaine           ◀ dimanche ▶"
+	"onglet Calendrier : le début de la semaine, choisi (▸)",
+	four_plain[5],
+	" ▸ Début de la semaine           ◀ dimanche ▶"
 )
-check("ligne 10 : les encadrés, « non » par défaut", four_plain[10], "  Encadrés                      ◀ non ▶")
 check(
-	"ligne 11 : le style du trait, avec un aperçu",
-	four_plain[11],
-	"  Style du trait                ◀ arrondi ╭─╮ ▶"
+	"onglet Calendrier : les encadrés, « non » par défaut",
+	four_plain[6],
+	"   Encadrés                      ◀ non ▶"
+)
+check(
+	"onglet Calendrier : le style du trait, avec un aperçu",
+	four_plain[7],
+	"   Style du trait                ◀ arrondi ╭─╮ ▶"
 )
 check("le centrage n'apparaît pas dans la page", table.concat(four_plain, "\n"):find("centr", 1, true), nil)
 check(
-	"ligne 12 : la couleur du trait, grise par défaut, avec un aperçu",
-	four_plain[12],
-	"  Couleur du trait              ◀ Gris ╭─╮ ▶"
+	"onglet Calendrier : la couleur du trait, grise par défaut, avec un aperçu",
+	four_plain[8],
+	"   Couleur du trait              ◀ Gris ╭─╮ ▶"
 )
-check("ligne 14 : l'explication du réglage choisi (le 3e)", four_plain[14], "  " .. fr.settings_hints.week_starts_on)
-local boxed = render({ tab = 2, row = 4, values = { borders = false, border_style = "heavy" }, message = 0 })
+check(
+	"onglet Calendrier : l'explication du réglage choisi (le 3e)",
+	four_plain[10],
+	" " .. fr.settings_hints.week_starts_on
+)
+local boxed = list({ tab = 2, row = 4, values = { borders = false, border_style = "heavy" }, message = 0 })
 check(
 	"encadrés « non » reste « non » (false n'est pas remplacé par la valeur par défaut)",
-	strip(boxed[10]),
-	"▸ Encadrés                      ◀ non ▶"
+	strip(boxed[6]),
+	" ▸ Encadrés                      ◀ non ▶"
 )
 check(
 	"encadrés « oui »",
-	strip(render({ tab = 2, row = 1, values = { borders = true }, message = 0 })[10]),
-	"  Encadrés                      ◀ oui ▶"
+	strip(list({ tab = 2, row = 1, values = { borders = true }, message = 0 })[6]),
+	"   Encadrés                      ◀ oui ▶"
 )
-check("style épais : son aperçu", strip(boxed[11]), "  Style du trait                ◀ épais ┏━┓ ▶")
+check("style épais : son aperçu", strip(boxed[7]), "   Style du trait                ◀ épais ┏━┓ ▶")
 check(
 	"anglais : le style double",
-	strip(render({ tab = 2, row = 1, values = { border_style = "double" }, message = 0 }, en)[11]),
-	"  Border style                  ◀ double ╔═╗ ▶"
+	strip(list({ tab = 2, row = 1, values = { border_style = "double" }, message = 0 }, en)[7]),
+	"   Border style                  ◀ double ╔═╗ ▶"
 )
 local four_en =
-	render({ tab = 2, row = 1, values = { months_anchor = "last", week_starts_on = "monday" }, message = 0 }, en)
-check("anglais : le début de la semaine", strip(four_en[9]), "  Week starts on                ◀ Monday ▶")
+	list({ tab = 2, row = 1, values = { months_anchor = "last", week_starts_on = "monday" }, message = 0 }, en)
+check("anglais : le début de la semaine", strip(four_en[5]), "   Week starts on                ◀ Monday ▶")
 check(
 	"chaque réglage de l'onglet a un nom, une explication et (si choix) ses valeurs, en français et en anglais",
 	(function()
@@ -1292,7 +1165,7 @@ check(
 	false
 )
 
-local gen = render({
+local gen = list({
 	tab = settings_page.TAB.GENERAL,
 	row = 2,
 	values = { lang = "fr", goal_hours = 7.5, goal_days = 4 },
@@ -1302,44 +1175,39 @@ local gen_plain = {}
 for i, line in ipairs(gen) do
 	gen_plain[i] = strip(line)
 end
-check("onglet Général : 23 lignes", #gen, 23)
-check(
-	"onglet Général : ligne 1, la barre d'onglets",
-	gen_plain[1],
-	"  Personnalisation   Couleurs   Calendrier  [Général]"
-)
-check("onglet Général : ligne 5, l'intitulé", gen_plain[5], "  Réglages généraux")
+check("onglet Général : intitulé, ligne vide, 3 réglages, ligne vide, explication (7 lignes)", #gen, 7)
+check("onglet Général : l'intitulé", gen_plain[1], " Réglages généraux")
 check(
 	"onglet Général : la langue, dans sa propre langue",
-	gen_plain[7],
-	"  Langue                        ◀ français ▶"
+	gen_plain[3],
+	"   Langue                        ◀ français ▶"
 )
 check(
 	"onglet Général : l'objectif en heures et minutes, choisi",
-	gen_plain[8],
-	"▸ Objectif par jour             ◀ 7h30 ▶"
+	gen_plain[4],
+	" ▸ Objectif par jour             ◀ 7h30 ▶"
 )
-check("onglet Général : les jours par semaine", gen_plain[9], "  Jours d'objectif par semaine  ◀ 4 sur 7 ▶")
-check("onglet Général : l'explication de l'objectif", gen_plain[11], "  " .. fr.settings_hints.goal_hours)
-local gen_none = render({ tab = 3, row = 1, values = { goal_hours = 0 }, message = 0 })
+check("onglet Général : les jours par semaine", gen_plain[5], "   Jours d'objectif par semaine  ◀ 4 sur 7 ▶")
+check("onglet Général : l'explication de l'objectif", gen_plain[7], " " .. fr.settings_hints.goal_hours)
+local gen_none = list({ tab = 3, row = 1, values = { goal_hours = 0 }, message = 0 })
 check(
 	"onglet Général : objectif 0 affiché « aucun »",
-	strip(gen_none[8]),
-	"  Objectif par jour               aucun ▶"
+	strip(gen_none[4]),
+	"   Objectif par jour               aucun ▶"
 )
 check(
 	"onglet Général : sans valeurs, objectif « aucun » et 5 jours par défaut",
-	strip(render({ tab = 3, row = 1, values = {}, message = 0 })[8])
+	strip(list({ tab = 3, row = 1, values = {}, message = 0 })[4])
 		.. "|"
-		.. strip(render({ tab = 3, row = 1, values = {}, message = 0 })[9]),
-	"  Objectif par jour               aucun ▶|  Jours d'objectif par semaine  ◀ 5 sur 7 ▶"
+		.. strip(list({ tab = 3, row = 1, values = {}, message = 0 })[5]),
+	"   Objectif par jour               aucun ▶|   Jours d'objectif par semaine  ◀ 5 sur 7 ▶"
 )
 check(
 	"onglet Général en anglais : English reste English, aucun devient none",
-	strip(render({ tab = 3, row = 1, values = { lang = "en" }, message = 0 }, en)[7])
+	strip(list({ tab = 3, row = 1, values = { lang = "en" }, message = 0 }, en)[3])
 		.. "|"
-		.. strip(render({ tab = 3, row = 1, values = {}, message = 0 }, en)[8]),
-	"▸ Language                      ◀ English ▶|  Daily goal                      none ▶"
+		.. strip(list({ tab = 3, row = 1, values = {}, message = 0 }, en)[4]),
+	" ▸ Language                      ◀ English ▶|   Daily goal                      none ▶"
 )
 check(
 	"chaque réglage de l'onglet Général a un nom et une explication de 55 caractères au plus (français et anglais)",
@@ -1357,19 +1225,16 @@ check(
 	true
 )
 check(
-	"aucune ligne de l'onglet Général ne dépasse 57 colonnes",
+	"aucune ligne de l'onglet Général ne dépasse la largeur minimum du panneau",
 	(function()
 		for _, labels in ipairs({ fr, en }) do
 			for row = 1, 3 do
 				for _, line in
 					ipairs(
-						render(
-							{ tab = 3, row = row, values = { goal_hours = 23.5, goal_days = 7 }, message = 4 },
-							labels
-						)
+						list({ tab = 3, row = row, values = { goal_hours = 23.5, goal_days = 7 }, message = 4 }, labels)
 					)
 				do
-					if utf8.len(strip(line)) > 57 then
+					if utf8.len(strip(line)) > settings_view.MIN_LEFT then
 						return strip(line)
 					end
 				end
@@ -1395,7 +1260,7 @@ check(
 	true
 )
 press(e, "Tab", e.pane)
-check("Général : l'onglet est affiché", shown_text(e):find("[Général]", 1, true) ~= nil, true)
+check("Général : l'onglet est affiché", open_tab_is(e, "Général"), true)
 check(
 	"Général : le 1er réglage (la langue) est choisi, même si on était sur un autre réglage avant",
 	setting_line(e, "Langue"):find("▸", 1, true) ~= nil,
@@ -1449,7 +1314,7 @@ to_general(e)
 press(e, "l", e.pane)
 check("langue → : English est enregistré", read(e.path), '{\n  "lang": "en"\n}\n')
 check("langue → : appliqué tout de suite", e.cfg.lang, "en")
-check("langue → : la page est redessinée en anglais", shown_text(e):find("[General]", 1, true) ~= nil, true)
+check("langue → : la page est redessinée en anglais", open_tab_is(e, "General"), true)
 check("langue → : la langue garde son nom (English)", shown_text(e):find("◀ English ▶", 1, true) ~= nil, true)
 press(e, "d", e.pane)
 check(
@@ -1486,29 +1351,27 @@ check(
 )
 check(
 	"couleur écrite à la main : affichée telle quelle",
-	strip(
-		render({ tab = 2, row = 1, values = { border_color = "#123456" }, border_choices = choices, message = 0 })[12]
-	),
-	"  Couleur du trait              ◀ #123456 ╭─╮ ▶"
+	strip(list({ tab = 2, row = 1, values = { border_color = "#123456" }, border_choices = choices, message = 0 })[8]),
+	"   Couleur du trait              ◀ #123456 ╭─╮ ▶"
 )
 check(
 	"anglais : la couleur du trait",
-	strip(render({
+	strip(list({
 		tab = 2,
 		row = 1,
 		values = { border_color = "#8B8E99" },
 		border_choices = settings_page.border_choices(palette.COLORS, en.palette, en.settings_values.border_gray),
 		message = 0,
-	}, en)[12]),
-	"  Border color                  ◀ Gray ╭─╮ ▶"
+	}, en)[8]),
+	"   Border color                  ◀ Gray ╭─╮ ▶"
 )
 check(
-	"aucune ligne de l'onglet Calendrier ne dépasse 57 colonnes, même avec le plus long nom de couleur",
+	"aucune ligne de l'onglet Calendrier ne dépasse la largeur minimum du panneau, même avec le plus long nom de couleur",
 	(function()
 		local long = settings_page.border_choices(palette.COLORS, fr.palette_theme, "Gris")
 		for i = 1, #long.colors do
 			for _, line in
-				ipairs(render({
+				ipairs(list({
 					tab = 2,
 					row = 6,
 					values = { border_color = long.colors[i], border_style = "double" },
@@ -1516,7 +1379,7 @@ check(
 					message = 4,
 				}))
 			do
-				if utf8.len(strip(line)) > 57 then
+				if utf8.len(strip(line)) > settings_view.MIN_LEFT then
 					return strip(line)
 				end
 			end
@@ -1526,156 +1389,60 @@ check(
 	true
 )
 
--- ---- la page dans un cadre (avec les encadrés : les mêmes traits que le calendrier)
-local rounded = { tl = "╭", tr = "╮", bl = "╰", br = "╯", h = "─", v = "│", l = "├", r = "┤" }
-local framed_lines, framed_width = settings_page.frame({ "  titre", "  a", "" }, 10, rounded, "")
-check("frame : la largeur + 2", framed_width, 12)
+-- ============================================================
+-- toute la fenêtre est utilisée (le dessin lui-même : tests/pages/test_settings_view.lua)
+-- ============================================================
+local month_days = { ["2026-10-05"] = 8 * 3600, ["2026-10-06"] = 2 * 3600, ["2026-09-30"] = 4 * 3600 }
+e = open({ days = month_days, cols = 200, rows = 60 })
+local full = shown_lines(e.pane)
+check("plein écran : autant de lignes que la fenêtre", #full, 60)
 check(
-	"frame : le haut, le titre, la jonction, le reste, le bas",
-	strip(table.concat(framed_lines, "|")),
-	"╭──────────╮|│  titre   │|├──────────┤|│  a       │|│          │|╰──────────╯"
-)
-check(
-	"frame : la largeur visible, sans les codes de couleur",
-	strip(settings_page.frame({ "\27[1mab\27[0m" }, 4, rounded, "")[2]),
-	"│ab  │"
-)
-e = open({})
-e.cfg.borders = true
-e.page.on_resize(e.window, e.pane)
-local fl = shown_lines(e.pane)
-local first, last
-for i, line in ipairs(fl) do
-	if line:find("╭", 1, true) then
-		first = first or i
-	end
-	if line:find("╰", 1, true) then
-		last = i
-	end
-end
-check("encadrés : la page est dans un cadre de 26 lignes (23 + haut + jonction + bas)", last - first + 1, 26)
-check(
-	"encadrés : la barre d'onglets juste sous le haut",
-	fl[first + 1]:find("│  Personnalisation  [Couleurs]", 1, true) ~= nil,
-	true
-)
-check("encadrés : la jonction sous la barre d'onglets", fl[first + 2]:find("├─", 1, true) ~= nil, true)
-check(
-	"encadrés : chaque ligne du cadre fait 59 colonnes, la grille de couleurs comprise",
+	"plein écran : chaque ligne fait toute la largeur",
 	(function()
-		local left = #fl[first]:match("^( *)")
-		for i = first, last do
-			if utf8.len(fl[i]) - left ~= 59 then
-				return i .. " : " .. (utf8.len(fl[i]) - left)
+		for i, line in ipairs(full) do
+			if utf8.len(line) ~= 200 then
+				return i .. " : " .. utf8.len(line)
 			end
 		end
 		return true
 	end)(),
 	true
 )
-check("encadrés : la page a besoin de 59 x 26", select(3, e.page.build_lines({ cols = 59, rows = 26 })), true)
-check("encadrés : 58 colonnes, trop étroit", select(3, e.page.build_lines({ cols = 58, rows = 40 })), false)
-check("encadrés : 25 lignes, trop bas", select(3, e.page.build_lines({ cols = 120, rows = 25 })), false)
+check("plein écran : le cadre commence en haut à gauche", full[1]:sub(1, #"╭"), "╭")
+check("plein écran : et finit en bas à droite", full[60]:sub(-#"╯"), "╯")
 check(
-	"encadrés : le message dit 59 x 26",
-	strip(e.page.build_lines({ cols = 58, rows = 40 })[2]),
-	"Agrandis-la : il faut au moins 59 colonnes sur 26 lignes pour les réglages."
-)
-e.cfg.border_style = "double"
-e.cfg.border_color = "#3366CC"
-e.page.on_resize(e.window, e.pane)
-check(
-	"encadrés : le style et la couleur du calendrier",
-	frame_of(e.pane):find(convert.fg("#3366CC") .. "╔", 1, true) ~= nil,
+	"la barre d'onglets : le titre et les trois onglets, dans des cases séparées",
+	full[2]:find("│", 1, true) ~= nil
+		and full[2]:find("Personnalisation", 1, true) ~= nil
+		and full[2]:find("Couleurs", 1, true) ~= nil
+		and full[2]:find("Calendrier", 1, true) ~= nil
+		and full[2]:find("Général", 1, true) ~= nil,
 	true
 )
-press(e, "Tab", e.pane)
-for _ = 1, 3 do
-	press(e, "j", e.pane)
-end
-press(e, "h", e.pane)
--- (on cherche un long trait : la ligne « Style du trait » montre aussi un petit aperçu « ╔═╗ »)
+check("la barre d'onglets : plus de crochets", full[2]:find("[", 1, true), nil)
+local framed_text = frame_of(e.pane)
 check(
-	"encadrés « non » depuis la page : le cadre disparaît tout de suite",
-	frame_of(e.pane):find("╔══════", 1, true),
+	"l'onglet ouvert (Couleurs) sur fond coloré (la couleur enregistrée, ou l'or)",
+	framed_text:find(convert.bg(palette.COLORS[palette.DEFAULT_INDEX]), 1, true) ~= nil
+		and framed_text:find("Couleurs", 1, true) ~= nil,
+	true
+)
+check(
+	"l'aide est soulignée",
+	framed_text:find("\27[4m" .. fr.settings_help_top, 1, true) ~= nil
+		and framed_text:find("\27[4m" .. fr.settings_help_colors, 1, true) ~= nil,
+	true
+)
+check(
+	"aperçu à droite : le mois actuel, avec ses vraies heures",
+	table.concat(full, "\n"):find("Octobre 2026   Total du mois : 10h00 / Jours actifs : 2", 1, true) ~= nil,
+	true
+)
+check("aperçu : les vraies heures (le 5 : 8h00)", table.concat(full, "\n"):find("8h00", 1, true) ~= nil, true)
+check(
+	"aperçu : pas les jours d'un autre mois (le 30 septembre : 4h00)",
+	table.concat(full, "\n"):find("4h00", 1, true),
 	nil
-)
-press(e, "l", e.pane)
-check(
-	"encadrés « oui » depuis la page : le cadre revient tout de suite",
-	frame_of(e.pane):find("╔══════", 1, true) ~= nil,
-	true
-)
-e = open({})
-check("sans encadrés : pas de cadre autour de la page", frame_of(e.pane):find("╭", 1, true), nil)
-
--- ============================================================
--- l'aperçu du mois actuel, à côté des réglages
--- ============================================================
-local S = { "  réglage 1", "  réglage 2", "  réglage 3" } -- 3 lignes, largeur 10
-local P = { "mois 1", "mois 2", "mois 3", "mois 4" } -- 4 lignes, largeur 6 (plus haut que le message, comme un vrai mois)
-local placed, placed_width, mode = settings_page.place(S, 10, P, 6, 19, 4, fr)
-check("place : à droite, si 10 + 3 + 6 = 19 colonnes et 4 lignes", mode .. " " .. placed_width, "right 19")
-check(
-	"place : à droite, chaque ligne des réglages complétée puis l'aperçu ; sous les réglages, l'aperçu continue",
-	placed[1] .. "|" .. placed[4],
-	"  réglage 1   mois 1|             mois 4"
-)
-_, _, mode = settings_page.place(S, 10, P, 6, 18, 8, fr)
-check("place : 18 colonnes, assez haut (3 + 1 + 4 = 8) : dessous", mode, "below")
-placed, placed_width = settings_page.place(S, 10, P, 6, 18, 8, fr)
-check(
-	"place : dessous, une ligne vide entre les deux",
-	table.concat(placed, "|") .. " " .. placed_width,
-	"  réglage 1|  réglage 2|  réglage 3||mois 1|mois 2|mois 3|mois 4 10"
-)
-_, _, mode = settings_page.place(S, 10, P, 6, 18, 7, fr)
-check("place : 7 lignes, ni à droite ni dessous, mais la place du message (3 + 1 + 2) : le message", mode, "message")
-placed = settings_page.place(S, 10, P, 6, 18, 7, fr)
-check(
-	"place : le message juste sous les réglages",
-	placed[4] .. "|" .. placed[5],
-	"|  Aperçu du calendrier : fenêtre trop petite."
-)
-check(
-	"place : le message dit les deux tailles possibles",
-	placed[6],
-	"  Il faut 19 × 4 (à droite) ou 10 × 8 (dessous)."
-)
-_, _, mode = settings_page.place(S, 10, P, 6, 18, 6, fr)
-check("place : 6 lignes, juste la place du message", mode, "message")
-_, _, mode = settings_page.place(S, 10, P, 6, 18, 5, fr)
-check("place : 5 lignes, pas la place du message : les réglages seuls", mode, "alone")
-_, _, mode = settings_page.place(S, 10, P, 12, 11, 50, fr)
-check(
-	"place : assez large pour les réglages (10) mais pas pour l'aperçu (12), très haut : le message (jamais un aperçu coupé)",
-	mode,
-	"message"
-)
-_, _, mode = settings_page.place(S, 10, P, 6, 100, 2, fr)
-check("place : très large mais moins haut que les réglages : les réglages seuls (jamais coupés)", mode, "alone")
-
--- dans la page, avec de vraies heures
-local month_days = { ["2026-10-05"] = 8 * 3600, ["2026-10-06"] = 2 * 3600, ["2026-09-30"] = 4 * 3600 }
-e = open({ days = month_days, cols = 200, rows = 60 })
-local shown_text_now = shown_text(e)
-local title_row
-for _, line in ipairs(shown_lines(e.pane)) do
-	if line:find("Personnalisation", 1, true) then
-		title_row = line
-	end
-end
-check(
-	"aperçu à droite : sur la même ligne que le titre des réglages, le titre du mois actuel",
-	title_row:find("Octobre 2026   Total du mois : 10h00 / Jours actifs : 2", 1, true) ~= nil,
-	true
-)
-check("aperçu : les vraies heures (le 5 : 8h00)", shown_text_now:find("8h00", 1, true) ~= nil, true)
-check("aperçu : pas les jours d'un autre mois (le 30 septembre : 4h00)", shown_text_now:find("4h00", 1, true), nil)
-check(
-	"aperçu : la page est plus large (57 + 3 + 65 = 125)",
-	select(2, e.page.build_lines({ cols = 200, rows = 60 })),
-	125
 )
 -- l'onglet Couleurs : la couleur sous le curseur, avant Entrée
 local cursor_color = gradient.make({ color = palette.COLORS[4] }).color(8 * 3600)
@@ -1704,43 +1471,61 @@ check(
 	shown_text(e):find("├──Dim───┬──Lun", 1, true) ~= nil,
 	true
 )
--- les tailles de fenêtre
-e = open({ days = month_days, cols = 124, rows = 60 })
-local _, w124 = e.page.build_lines({ cols = 124, rows = 60 })
-check("124 colonnes, 60 lignes : l'aperçu passe dessous (largeur 65)", w124, 65)
-local below_lines = e.page.build_lines({ cols = 124, rows = 60 })
-check("dessous : les réglages (23 lignes), une ligne vide, puis le mois (21)", #below_lines, 23 + 1 + 21)
-local msg_lines = e.page.build_lines({ cols = 100, rows = 30 })
+-- le cadre de la page : toujours là, avec le style et la couleur du trait choisis (comme le calendrier)
+e = open({ cols = 120, rows = 40 })
+e.cfg.borders = false
+e.page.on_resize(e.window, e.pane)
 check(
-	"100 x 30 : les réglages entiers, puis le message",
-	strip(msg_lines[1]):find("Personnalisation", 1, true) ~= nil
-		and strip(msg_lines[25]) == "  Aperçu du calendrier : fenêtre trop petite.",
+	"le cadre de la page est toujours là, même sans les encadrés du calendrier",
+	shown_lines(e.pane)[1]:sub(1, #"╭"),
+	"╭"
+)
+e.cfg.border_style = "double"
+e.cfg.border_color = "#3366CC"
+e.page.on_resize(e.window, e.pane)
+check(
+	"le cadre suit le style et la couleur du trait",
+	frame_of(e.pane):find(convert.fg("#3366CC") .. "╔", 1, true) ~= nil,
 	true
 )
-check(
-	"100 x 30 : le message dit 125 × 23 ou 65 × 45",
-	strip(msg_lines[26]),
-	"  Il faut 125 × 23 (à droite) ou 65 × 45 (dessous)."
-)
-local narrow = e.page.build_lines({ cols = 60, rows = 80 })
-check(
-	"60 x 80 : les réglages tiennent (57), pas le mois (65) : le message, pas d'aperçu coupé",
-	strip(narrow[25]),
-	"  Aperçu du calendrier : fenêtre trop petite."
-)
-local alone = e.page.build_lines({ cols = 100, rows = 24 })
-check("100 x 24 : la place des réglages, pas du message : les réglages seuls", #alone, 23)
+-- les tailles de fenêtre
+e = open({ days = month_days, cols = 100, rows = 40 })
+local narrow = e.page.build_lines({ cols = 100, rows = 40 })
+check("100 colonnes : pas la place de l'aperçu, la page prend toute la largeur", utf8.len(strip(narrow[1])), 100)
+check("100 colonnes : pas d'aperçu", table.concat(narrow, "\n"):find("Octobre 2026", 1, true), nil)
 local tiny, _, tiny_fits = e.page.build_lines({ cols = 40, rows = 60 })
 check(
-	"40 colonnes : trop petit même pour les réglages : le message de la page",
+	"40 colonnes : trop petit : le message de la page",
 	tiny_fits == false and strip(tiny[1]) == "Fenêtre trop petite",
 	true
 )
-check("sans heures (ctx.days absent) : jamais d'aperçu", #open({}).page.build_lines({ cols = 200, rows = 60 }), 23)
+local short, _, short_fits = e.page.build_lines({ cols = 120, rows = 15 })
 check(
-	"anglais : le message de l'aperçu",
-	strip(settings_page.place(S, 10, P, 6, 18, 7, en)[5]),
-	"  Calendar preview: window too small."
+	"15 lignes : trop bas : le message de la page",
+	short_fits == false and strip(short[1]) == "Fenêtre trop petite",
+	true
+)
+check(
+	"trop petit : le message donne la taille qu'il faut",
+	strip(short[2]):find("il faut au moins %d+ colonnes sur %d+ lignes") ~= nil,
+	true
+)
+check(
+	"sans heures (ctx.days absent) : jamais d'aperçu, toute la largeur pour les réglages",
+	table.concat(open({}).page.build_lines({ cols = 200, rows = 60 }), "\n"):find("Total du mois", 1, true),
+	nil
+)
+-- Shift+Tab : l'onglet précédent
+e = open({})
+press(e, "Tab", e.pane)
+check("Tab : l'onglet suivant (Calendrier)", e.w.GLOBAL.logtime_settings_tab, settings_page.TAB.CALENDAR)
+press(e, "SHIFT-Tab", e.pane)
+check("Shift+Tab : l'onglet précédent (Couleurs)", e.w.GLOBAL.logtime_settings_tab, settings_page.TAB.COLORS)
+press(e, "SHIFT-Tab", e.pane)
+check(
+	"Shift+Tab depuis le premier : le dernier (Général)",
+	e.w.GLOBAL.logtime_settings_tab,
+	settings_page.TAB.GENERAL
 )
 
 -- rouvrir la page : on revient à l'onglet Couleurs
@@ -1751,13 +1536,31 @@ e.page.open(e.window, e.w.new_pane())
 check("rouvrir la page : l'onglet Couleurs est affiché", e.w.GLOBAL.logtime_settings_tab, settings_page.TAB.COLORS)
 
 -- ---- les touches de la page
-local expected_keys =
-	{ "h", "LeftArrow", "l", "RightArrow", "k", "UpArrow", "j", "DownArrow", "Enter", "d", "Tab", "q", "Escape" }
+local expected_keys = {
+	"h",
+	"LeftArrow",
+	"l",
+	"RightArrow",
+	"k",
+	"UpArrow",
+	"j",
+	"DownArrow",
+	"Enter",
+	"d",
+	"Tab",
+	"SHIFT+Tab",
+	"q",
+	"Escape",
+}
 local actual = {}
 for i, binding in ipairs(open({}).table) do
-	actual[i] = binding.key
+	actual[i] = (binding.mods and (binding.mods .. "+") or "") .. binding.key
 end
-check("treize touches, dans cet ordre", table.concat(actual, ","), table.concat(expected_keys, ","))
+check(
+	"quatorze touches, dans cet ordre (Shift+Tab compris)",
+	table.concat(actual, ","),
+	table.concat(expected_keys, ",")
+)
 check("les événements ont des noms fixes", open({}).table[9].action.name, "logtime-settings-Enter")
 check("préfixe des événements", settings_page.EVENT_PREFIX, "logtime-settings")
 check("nom de la table de touches", settings_page.TABLE_NAME, "logtime_settings")

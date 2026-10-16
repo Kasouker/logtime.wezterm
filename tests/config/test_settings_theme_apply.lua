@@ -245,6 +245,14 @@ local function has_colors(pane, list)
 	end
 	return true
 end
+-- Les couleurs classiques, sans l'or : l'or (la couleur enregistrée par défaut) colore aussi l'onglet ouvert et le
+-- bouton actif, il n'est donc pas un signe de la palette classique.
+local CLASSIC_BUT_GOLD = {}
+for i, color in ipairs(palette.COLORS) do
+	if i ~= palette.DEFAULT_INDEX then
+		CLASSIC_BUT_GOLD[#CLASSIC_BUT_GOLD + 1] = color
+	end
+end
 local function has_any(pane, list)
 	for _, color in ipairs(list) do
 		if last_frame(pane):find(convert.bg(color), 1, true) then
@@ -281,12 +289,13 @@ end
 -- ============================================================
 local e = new_env()
 local config = e.M.apply_to_config(theme_config())
-check("la table de touches a quinze touches (Tab, y et n compris)", #config.key_tables.logtime_settings, 15)
+check("la table de touches a seize touches (Tab, Shift+Tab, y et n compris)", #config.key_tables.logtime_settings, 16)
 open_key(e, config, "F4")
 local settings = e.w.spawned[1]
 check(
-	"la question est affichée",
-	plain(settings):find("Couleurs de ton thème ?   y : oui   n : non", 1, true) ~= nil,
+	"la question est affichée : le bouton, et comment garder la palette classique",
+	plain(settings):find("y : utiliser les couleurs de ton thème", 1, true) ~= nil
+		and plain(settings):find("n : garder la palette classique", 1, true) ~= nil,
 	true
 )
 check(
@@ -301,12 +310,12 @@ press(e, config, "y", settings)
 check("y : la réponse est enregistrée dans le fichier de réglages", read(e.path), '{\n  "theme_colors": true\n}\n')
 check(
 	"y : la palette du thème (celle de appearance.lua) est affichée",
-	has_colors(settings, THEME) and not has_any(settings, palette.COLORS),
+	has_colors(settings, THEME) and not has_any(settings, CLASSIC_BUT_GOLD),
 	true
 )
 check(
 	"y : la commande pour changer d'avis est affichée",
-	plain(settings):find("(n : palette classique)", 1, true) ~= nil,
+	plain(settings):find("n : revenir à la palette classique", 1, true) ~= nil,
 	true
 )
 check(
@@ -336,13 +345,14 @@ check(
 	'{\n  "gradient_color": "#CC3333",\n  "theme_colors": false\n}\n'
 )
 check(
-	"n : la palette classique revient",
-	has_colors(settings, palette.COLORS) and not has_any(settings, { THEME[2], THEME[5] }),
+	"n : la palette classique revient (le rouge du thème reste visible : c'est la couleur enregistrée, l'accent)",
+	has_colors(settings, palette.COLORS) and not has_any(settings, { THEME[5], THEME[6], THEME[7] }),
 	true
 )
 check(
-	"n : la commande pour changer d'avis est affichée",
-	plain(settings):find("(y : couleurs de ton thème)", 1, true) ~= nil,
+	"n : le bouton reste là pour changer d'avis (sans note : la palette classique est choisie)",
+	plain(settings):find("y : utiliser les couleurs de ton thème", 1, true) ~= nil
+		and plain(settings):find("n : revenir à la palette classique", 1, true) == nil,
 	true
 )
 check(
@@ -362,10 +372,14 @@ config = e.M.apply_to_config(theme_config())
 open_key(e, config, "F4")
 check(
 	"fichier avec theme_colors = true : la palette du thème dès l'ouverture",
-	has_colors(e.w.spawned[1], THEME) and not has_any(e.w.spawned[1], palette.COLORS),
+	has_colors(e.w.spawned[1], THEME) and not has_any(e.w.spawned[1], CLASSIC_BUT_GOLD),
 	true
 )
-check("... et la ligne dit oui", plain(e.w.spawned[1]):find("Couleurs de ton thème : oui", 1, true) ~= nil, true)
+check(
+	"... et la note du bouton dit comment revenir",
+	plain(e.w.spawned[1]):find("n : revenir à la palette classique", 1, true) ~= nil,
+	true
+)
 cleanup()
 
 e = new_env()
@@ -377,7 +391,12 @@ check(
 	has_colors(e.w.spawned[1], palette.COLORS) and not has_any(e.w.spawned[1], { THEME[2] }),
 	true
 )
-check("... et la ligne dit non", plain(e.w.spawned[1]):find("Palette classique", 1, true) ~= nil, true)
+check(
+	"... et le bouton est là, sans note (la palette classique est choisie)",
+	plain(e.w.spawned[1]):find("y : utiliser les couleurs de ton thème", 1, true) ~= nil
+		and plain(e.w.spawned[1]):find("n : ", 1, true) == nil,
+	true
+)
 cleanup()
 
 e = new_env()
@@ -393,7 +412,7 @@ config = e.M.apply_to_config(theme_config())
 open_key(e, config, "F4")
 check(
 	"theme_colors incorrect dans le fichier : ignoré, la question est posée",
-	plain(e.w.spawned[1]):find("Couleurs de ton thème ?", 1, true) ~= nil,
+	plain(e.w.spawned[1]):find("n : garder la palette classique", 1, true) ~= nil,
 	true
 )
 check("... et signalé dans les journaux", errors_with(e, '"theme_colors"'), 1)
@@ -563,12 +582,12 @@ check(
 )
 check(
 	"la page est en anglais : la ligne de réponse aussi",
-	plain(e.w.spawned[1]):find("Theme colors: on", 1, true) ~= nil,
+	plain(e.w.spawned[1]):find("n: back to the classic palette", 1, true) ~= nil,
 	true
 )
 check(
-	"... et les noms des couleurs du thème sont en anglais",
-	plain(e.w.spawned[1]):find("Lt Magenta", 1, true) ~= nil,
+	"... et le nom de la couleur choisie (dans la ligne « Choice ») est celui du thème, en anglais",
+	plain(e.w.spawned[1]):find("Choice: 4 Yellow", 1, true) ~= nil,
 	true
 )
 cleanup()

@@ -54,11 +54,11 @@ That's all: the counter appears in the tab bar, `F2` opens the calendar, `F4` th
 | `F2` | anywhere | open the calendar in a new tab (or bring it back) |
 | `F4` | anywhere | open the settings page |
 
-**In the calendar**: `←` `→` (or `h` `l`) previous / next day · `↑` `↓` (or `k` `j`) previous / next week · `PgUp` `PgDn` previous / next month · `Enter` details of the selected day · `a` year view (and back) · `t` today · `r` refresh · `q` or `Esc` close. In the year view, `←` `→` change the year.
+**In the calendar**: `←` `→` (or `h` `l`) previous / next day · `↑` `↓` (or `k` `j`) previous / next week · `Shift+Tab` `Tab` (or `PgUp` `PgDn`) previous / next month · `Enter` details of the selected day · `a` year view (and back) · `t` today · `r` refresh · `q` or `Esc` close. In the year view, `←` `→` change the year.
 
 **In the day detail**: `←` `→` `↑` `↓` move to another day · `Enter` or `Esc` back to the calendar.
 
-**In the settings page**: `Tab` next tab (Colors, Calendar, General) · arrows or `h j k l` choose · `Enter` save a color · `←` `→` change a value (saved right away) · `d` default value · `y` / `n` use (or not) your theme's colors · `q` or `Esc` close.
+**In the settings page** (it fills the whole window, with a preview of the month on the right when there is room): `Tab` / `Shift+Tab` next / previous tab (Colors, Calendar, General) · arrows or `h j k l` choose · `Enter` save a color · `←` `→` change a value (saved right away) · `d` default value · `y` / `n` use (or not) your theme's colors · `q` or `Esc` close.
 
 The page keys only act in the page's tab: a key pressed anywhere else goes to your shell as usual.
 

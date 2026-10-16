@@ -319,6 +319,47 @@ for i, key in ipairs({ "h", "LeftArrow", "q" }) do
 	check("build : " .. key .. " ailleurs : l'action de la page n'est pas exécutée", #ran, before)
 end
 
+-- une touche avec un modificateur (Shift+Tab) : un événement à part, et rendue avec son modificateur
+w = new_wezterm()
+local mods_page = w.new_pane(20)
+local mods_other = w.new_pane(21)
+local pressed = {}
+local mods_table = keytable.build(w, {
+	{
+		key = "Tab",
+		run = function()
+			pressed[#pressed + 1] = "Tab"
+		end,
+	},
+	{
+		key = "Tab",
+		mods = "SHIFT",
+		run = function()
+			pressed[#pressed + 1] = "Shift+Tab"
+		end,
+	},
+}, function(p)
+	return p == mods_page
+end, "essai")
+check("modificateur : Tab sans modificateur", tostring(mods_table[1].mods), "nil")
+check("modificateur : Shift+Tab garde son modificateur", mods_table[2].mods, "SHIFT")
+check(
+	"modificateur : deux événements différents",
+	mods_table[1].action.name .. " " .. mods_table[2].action.name,
+	"essai-Tab essai-SHIFT-Tab"
+)
+fire(mods_table[2].action, new_window(), mods_page)
+fire(mods_table[1].action, new_window(), mods_page)
+check("modificateur : chaque touche exécute la sienne", table.concat(pressed, ","), "Shift+Tab,Tab")
+win = new_window()
+fire(mods_table[2].action, win, mods_other)
+check("modificateur : Shift+Tab ailleurs est rendu à l'onglet", kinds(win), "PopKeyTable,SendKey")
+check(
+	"modificateur : rendu AVEC son modificateur (pas un simple Tab)",
+	win.performed[2].action.args.key .. "+" .. tostring(win.performed[2].action.args.mods),
+	"Tab+SHIFT"
+)
+
 w = new_wezterm()
 local boom_pane = w.new_pane(10)
 local boom = keytable.build(w, { {

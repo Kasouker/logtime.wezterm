@@ -263,11 +263,15 @@ check(
 	true
 )
 check(
-	"la table de touches de la personnalisation a quinze touches (dont Tab, y et n)",
+	"la table de touches de la personnalisation a seize touches (dont Tab, Shift+Tab, y et n)",
 	#config.key_tables.logtime_settings,
-	15
+	16
 )
-check("celle du calendrier est intacte (seize touches)", #config.key_tables.logtime_page, 16)
+check(
+	"celle du calendrier est intacte (dix-huit touches, Tab et Shift+Tab compris)",
+	#config.key_tables.logtime_page,
+	18
+)
 check("un gestionnaire pour l'ouverture de la personnalisation", #e.w.events["logtime-settings-open"], 1)
 check("un gestionnaire pour la touche Entrée", #e.w.events["logtime-settings-Enter"], 1)
 check("deux gestionnaires de redimensionnement (calendrier et personnalisation)", #e.w.events["window-resized"], 2)
@@ -280,7 +284,8 @@ check("F4 ouvre un onglet", open_key(e, config, "F4") and #e.w.spawned, 1)
 local settings_pane = e.w.spawned[1]
 check(
 	"la page de personnalisation est affichée",
-	plain_lines(settings_pane):find("Personnalisation  [Couleurs]", 1, true) ~= nil,
+	plain_lines(settings_pane):find("Personnalisation", 1, true) ~= nil
+		and plain_lines(settings_pane):find("Couleurs", 1, true) ~= nil,
 	true
 )
 check("le choix de départ est l'or", chosen(settings_pane), 3)
@@ -385,7 +390,9 @@ config = e.M.apply_to_config({})
 open_key(e, config, "F4")
 check(
 	"langue anglaise dans le fichier : la page est en anglais",
-	plain_lines(e.w.spawned[1]):find("Settings  [Colors]", 1, true) ~= nil,
+	plain_lines(e.w.spawned[1]):find("Settings", 1, true) ~= nil
+		and plain_lines(e.w.spawned[1]):find("Colors", 1, true) ~= nil
+		and plain_lines(e.w.spawned[1]):find("Couleurs", 1, true) == nil,
 	true
 )
 press(e, config, "Enter", e.w.spawned[1])
@@ -481,8 +488,7 @@ check(
 )
 check(
 	"échec : la page montre la raison (la fin du message du système), pas seulement « voir les journaux »",
-	plain_lines(failing):find("✗ Pas enregistré : …", 1, true) ~= nil
-		and plain_lines(failing):find("No such file or directory", 1, true) ~= nil
+	plain_lines(failing):find("✗ Pas enregistré : cannot write: No such file or directory", 1, true) ~= nil
 		and plain_lines(failing):find("dossier_inexistant", 1, true) == nil, -- le chemin n'est pas à l'écran
 	true
 )
