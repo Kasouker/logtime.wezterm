@@ -1447,9 +1447,9 @@ check(
 	true
 )
 check(
-	"aperçu : la frise de la semaine (les jours, pas les heures « 0h00 … 24h00 » d'un seul jour)",
-	table.concat(full, "\n"):find("24h00", 1, true),
-	nil
+	"aperçu : la frise reste celle du jour (« 0h00 … 24h00 »), même avec le détail de la semaine",
+	table.concat(full, "\n"):find("24h00", 1, true) ~= nil,
+	true
 )
 check("aperçu : les vraies heures (le 5 : 8h00)", table.concat(full, "\n"):find("8h00", 1, true) ~= nil, true)
 check(

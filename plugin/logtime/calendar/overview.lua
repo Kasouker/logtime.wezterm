@@ -560,7 +560,7 @@ function M.minimum(weeks)
 	return M.WEEK_LABEL_WIDTH + 9 + 7 * M.MIN_CELL, 3 + count * (M.MIN_ROW + 1) + M.MIN_DETAIL + M.TIMELINE_HEIGHT
 end
 
--- Toute la vue (la grille du mois, puis le détail du jour `o.day_key`, ou de sa semaine si `o.week`) : exactement `height` lignes de `width`
+-- Toute la vue (la grille du mois, puis le détail du jour `o.day_key`, ou de sa semaine si `o.week`, puis la frise du jour) : exactement `height` lignes de `width`
 -- colonnes, ou nil si la zone est trop petite. La grille ne prend pas plus de M.GRID_SHARE de la hauteur (sinon elle
 -- écrase le détail) ; le détail, juste dessous, prend tout le reste.
 --   o = { days, idle_days, projects, timeline, year, month, today_key, day_key, week, accent, cfg, labels, b, edge }
@@ -592,7 +592,8 @@ function M.render(o, width, height)
 	for _, line in ipairs(detail) do
 		out[#out + 1] = line
 	end
-	for _, line in ipairs(week and M.week_timeline(o, week, width) or M.timeline(o, key, width)) do
+	-- la frise reste celle du jour, même en semaine (plus lisible ; celle de la semaine servira à F2)
+	for _, line in ipairs(M.timeline(o, key, width)) do
 		out[#out + 1] = line
 	end
 	return out

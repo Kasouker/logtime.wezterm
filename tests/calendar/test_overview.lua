@@ -575,11 +575,10 @@ check(
 	true
 )
 check(
-	"toute la vue en semaine : la frise de la semaine",
-	strip(week_view[#week_view - 3]):find("Mercredi", 1, true) ~= nil,
+	"toute la vue en semaine : la frise reste celle du jour",
+	strip(week_view[#week_view - 3]):find("24h00", 1, true) ~= nil,
 	true
 )
-check("toute la vue en semaine : plus la frise du jour", week_view_text:find("24h00", 1, true), nil)
 
 print(string.format("\n%d vérifications réussies, %d échecs", passed, failed))
 os.exit(failed == 0 and 0 or 1)
