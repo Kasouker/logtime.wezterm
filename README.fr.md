@@ -139,6 +139,30 @@ Ouvre les journaux : `Ctrl+Shift+L` (fenêtre de débogage). Au chargement, tu d
 - **Un réglage n'est pas enregistré** (`✗ Pas enregistré : …` dans la page `F4`) : la raison est affichée en bas de la page, et en entier (avec le chemin du fichier) dans les journaux.
 - **Un `⚠` à côté du compteur** : la dernière sauvegarde a échoué (la raison est dans les journaux). Rien n'est perdu : le temps attend en mémoire et la sauvegarde est retentée 10 s plus tard.
 - **La notification ne s'affiche pas** : Windows peut masquer les notifications (assistant de concentration). Le `✓` du compteur le montre de toute façon.
+- **Les onglets des pages affichent `PING.EXE` ou un dossier au lieu de `Logtime` / `Logtime · Settings`** (avec [tabline.wez](https://github.com/michaelbrusegard/tabline.wez)) : le plugin nomme bien ses onglets, mais les sections d'onglets par défaut de tabline.wez montrent le dossier (onglet actif) ou le programme (les autres), jamais le nom de l'onglet. Pour afficher le nom quand un onglet en a un, et garder tout le reste comme avant, utilise ces sections (elles reprennent celles de tabline.wez par défaut) :
+
+```lua
+local function has_title(tab) return tab.tab_title ~= nil and tab.tab_title ~= "" end
+local function no_title(tab) return not has_title(tab) end
+
+tabline.setup({
+  sections = {
+    tab_active = {
+      "index",
+      { "tab", icons_enabled = false, padding = { left = 0, right = 1 }, cond = has_title },
+      { "parent", padding = 0, cond = no_title },
+      { "cwd", padding = { left = 0, right = 1 }, cond = no_title, fmt = function(s) return "/" .. s end },
+      { "zoomed", padding = 0 },
+    },
+    tab_inactive = {
+      "index",
+      { "tab", icons_enabled = false, padding = { left = 0, right = 1 }, cond = has_title },
+      { "process", padding = { left = 0, right = 1 }, cond = no_title },
+    },
+    -- ... tes autres sections
+  },
+})
+```
 
 ## Compatibilité
 

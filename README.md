@@ -138,6 +138,30 @@ Open the logs: `Ctrl+Shift+L` (debug overlay). On load you should see `logtime: 
 - **A setting is not saved** (`✗ Not saved: …` in the `F4` page): the reason is shown at the bottom of the page, and in full (with the file path) in the logs.
 - **A `⚠` next to the counter**: the last save failed (the reason is in the logs). Nothing is lost: the time waits in memory and the save is retried 10 s later.
 - **The notification doesn't show**: Windows can hide notifications (Focus assist). The `✓` in the counter shows it anyway.
+- **The pages' tabs show `PING.EXE` or a folder instead of `Logtime` / `Logtime · Settings`** (with [tabline.wez](https://github.com/michaelbrusegard/tabline.wez)): the plugin names its tabs, but tabline.wez's default tab sections show the folder (active tab) or the program (other tabs), never the tab's name. To show the name when a tab has one, and keep everything else as it is, use these sections (they rebuild tabline.wez's defaults):
+
+```lua
+local function has_title(tab) return tab.tab_title ~= nil and tab.tab_title ~= "" end
+local function no_title(tab) return not has_title(tab) end
+
+tabline.setup({
+  sections = {
+    tab_active = {
+      "index",
+      { "tab", icons_enabled = false, padding = { left = 0, right = 1 }, cond = has_title },
+      { "parent", padding = 0, cond = no_title },
+      { "cwd", padding = { left = 0, right = 1 }, cond = no_title, fmt = function(s) return "/" .. s end },
+      { "zoomed", padding = 0 },
+    },
+    tab_inactive = {
+      "index",
+      { "tab", icons_enabled = false, padding = { left = 0, right = 1 }, cond = has_title },
+      { "process", padding = { left = 0, right = 1 }, cond = no_title },
+    },
+    -- ... your other sections
+  },
+})
+```
 
 ## Compatibility
 
