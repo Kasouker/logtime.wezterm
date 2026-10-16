@@ -190,13 +190,20 @@ check("barre à 3/4 de ligne : ▆", bar_text(overview.vertical_bar(6 / 32, 4, "
 check("barre au-delà de 100 % : pleine (jamais plus)", bar_text(overview.vertical_bar(2, 2, "#FFFFFF", 1)), "█|█")
 check("barre : dans sa couleur", overview.vertical_bar(1, 1, "#123456", 1)[1]:find(convert.fg("#123456"), 1, true), 1)
 
--- ---- le détail du jour
-local detail = overview.detail(data(), "2026-10-15", 100, 9)
+-- ---- le détail du jour : un tableau encadré
+local detail = overview.detail(data(), "2026-10-15", 100, 16)
 local dplain = {}
 for i, line in ipairs(detail) do
 	dplain[i] = strip(line)
 end
-check("le détail : exactement la hauteur demandée", #detail, 9)
+local function line_with(text)
+	for i, line in ipairs(dplain) do
+		if line:find(text, 1, true) then
+			return i, line
+		end
+	end
+end
+check("le détail : exactement la hauteur demandée", #detail, 16)
 check(
 	"le détail : chaque ligne fait la largeur demandée",
 	(function()
@@ -209,54 +216,81 @@ check(
 	end)(),
 	true
 )
+check("le tableau : encadré (haut)", dplain[1]:sub(1, #"╭") .. dplain[1]:sub(-#"╮"), "╭╮")
+check("le tableau : encadré (bas)", dplain[16]:sub(1, #"╰") .. dplain[16]:sub(-#"╯"), "╰╯")
+check("le tableau : 4 colonnes (actif, inactif, la liste, les pourcentages)", select(2, dplain[1]:gsub("┬", "")), 3)
+local _, top_row = line_with("8h09")
+check("en haut des barres : l'actif et l'inactif (8h09, 1h55)", top_row:find("1h55", 1, true) ~= nil, true)
 check(
-	"en haut des barres : l'actif et l'inactif (8h09, 1h55)",
-	dplain[1]:find("8h09", 1, true) ~= nil and dplain[1]:find("1h55", 1, true) ~= nil,
+	"une délimitation entre les deux barres, et entre les barres et la liste",
+	select(2, top_row:gsub("│", "")) >= 4,
+	true
+)
+local _, names_row = line_with("Inactif")
+check(
+	"sous les barres : leurs noms, en entier (« Actif », « Inactif »)",
+	names_row:find("Actif", 1, true) ~= nil,
+	true
+)
+local _, percent_row = line_with("81%")
+check("tout en bas : les pourcentages (81 % actif, 19 % inactif)", percent_row:find("19%", 1, true) ~= nil, true)
+check("les pourcentages : juste au-dessus du bas du cadre", line_with("81%"), 15)
+check("les barres : l'actif est rempli", strip(detail[13]):find("█", 1, true) ~= nil, true)
+local total_index, total_row = line_with("Total")
+check("le total : sur la 1re ligne de la liste", total_index, 2)
+check(
+	"le total et l'objectif atteint",
+	total_row:find("Total  10h04", 1, true) ~= nil and total_row:find("✓ objectif 8h atteint", 1, true) ~= nil,
 	true
 )
 check(
-	"sous les barres : leurs noms, en entier (« Inactif »)",
-	dplain[8]:find("Actif", 1, true) ~= nil and dplain[8]:find("Inactif", 1, true) ~= nil,
+	"sous le total : un trait (├ … ┼ … ┤)",
+	dplain[3]:find("├", 1, true) ~= nil and dplain[3]:find("┼", 1, true) ~= nil,
 	true
 )
+local project_index, first_project = line_with("Bot Discord")
 check(
-	"tout en bas : les pourcentages (81 % actif, 19 % inactif)",
-	dplain[9]:find("81%", 1, true) ~= nil and dplain[9]:find("19%", 1, true) ~= nil,
-	true
+	"l'objectif est aligné sur le début des barres des projets",
+	utf8.len(total_row:sub(1, total_row:find("✓", 1, true) - 1)),
+	utf8.len(first_project:sub(1, first_project:find("█", 1, true) - 1))
 )
-check("la barre de l'actif plus haute que celle de l'inactif", dplain[3]:find("█", 1, true) ~= nil, true)
-check("le total et l'objectif atteint", dplain[1]:find("Total  10h04   ✓ objectif 8h atteint", 1, true) ~= nil, true)
+check("le plus gros projet d'abord, avec sa durée", first_project:find("4h00", 1, true) ~= nil, true)
+check("puis le suivant", line_with("Plug WT") > project_index, true)
+check("le pourcentage dans sa colonne, au bord droit", first_project:match("│ *40%% │$") ~= nil, true)
 check(
-	"le plus gros projet d'abord, avec sa durée",
-	dplain[2]:find("Bot Discord", 1, true) ~= nil and dplain[2]:find("4h00", 1, true) ~= nil,
+	"une barre par projet",
+	detail[project_index]:find("█", 1, true) ~= nil and detail[project_index]:find("░", 1, true) ~= nil,
 	true
 )
-check("puis le suivant", dplain[3]:find("Plug WT", 1, true) ~= nil, true)
-check("le pourcentage collé au bord droit", dplain[2]:sub(-4), " 40%")
-check("une barre par projet", detail[2]:find("█", 1, true) ~= nil and detail[2]:find("░", 1, true) ~= nil, true)
-check("un projet de moins d'une minute : caché", joined(dplain):find("tiny", 1, true), nil)
-local missing = strip(joined(overview.detail(data({ days = { ["2026-10-15"] = 3600 } }), "2026-10-15", 100, 9)))
+check("un trait entre deux projets (il y a la place)", dplain[project_index + 1]:find("┼", 1, true) ~= nil, true)
+check("un projet de moins d'une minute : caché", table.concat(dplain, "\n"):find("tiny", 1, true), nil)
+local tight = strip(joined(overview.detail(data(), "2026-10-15", 100, 8)))
+check("pas la place pour les traits entre les projets : la liste sans eux", select(2, tight:gsub("┼", "")), 1)
+check("pas la place : les projets sont quand même là", tight:find("RL", 1, true) ~= nil, true)
+local missing = strip(joined(overview.detail(data({ days = { ["2026-10-15"] = 3600 } }), "2026-10-15", 100, 12)))
 check(
 	"objectif pas encore atteint aujourd'hui : ce qu'il manque",
 	missing:find("objectif 8h : il manque 7h00", 1, true) ~= nil,
 	true
 )
-local past = strip(joined(overview.detail(data({ days = { ["2026-10-12"] = 3600 } }), "2026-10-12", 100, 9)))
+local past = strip(joined(overview.detail(data({ days = { ["2026-10-12"] = 3600 } }), "2026-10-12", 100, 12)))
 check("un jour passé sous l'objectif : manqué", past:find("non atteint", 1, true) ~= nil, true)
-local no_goal = strip(joined(overview.detail(data({ cfg = gradient.apply_to({}) }), "2026-10-15", 100, 9)))
+local no_goal = strip(joined(overview.detail(data({ cfg = gradient.apply_to({}) }), "2026-10-15", 100, 12)))
 check("sans objectif : juste le total", no_goal:find("objectif", 1, true), nil)
-local empty = strip(joined(overview.detail(data(), "2026-10-20", 100, 9)))
+local empty = strip(joined(overview.detail(data(), "2026-10-20", 100, 12)))
 check("un jour sans temps : le dit", empty:find(fr.detail_empty, 1, true) ~= nil, true)
 check("un jour sans temps : 0 % partout, pas de division par zéro", empty:find("0%", 1, true) ~= nil, true)
-local english = strip(joined(overview.detail(data({ labels = en }), "2026-10-15", 100, 9)))
+local english = strip(joined(overview.detail(data({ labels = en }), "2026-10-15", 100, 12)))
 check("anglais : Active / Idle", english:find("Active", 1, true) ~= nil and english:find("Idle", 1, true) ~= nil, true)
 local many = {}
 for i = 1, 12 do
 	many["p" .. i] = i * 600
 end
-local crowded = overview.detail(data({ projects = { ["2026-10-15"] = many } }), "2026-10-15", 100, 9)
-check("beaucoup de projets : jamais plus haut que la place", #crowded, 9)
+local crowded = overview.detail(data({ projects = { ["2026-10-15"] = many } }), "2026-10-15", 100, 16)
+check("beaucoup de projets : jamais plus haut que la place", #crowded, 16)
 check("beaucoup de projets : le reste dans « autres »", strip(joined(crowded)):find("autres", 1, true) ~= nil, true)
+local double_detail = strip(joined(overview.detail(data({ b = assemble.BORDER_STYLES.double }), "2026-10-15", 100, 12)))
+check("le tableau suit le style du trait (double)", double_detail:find("╔", 1, true) ~= nil, true)
 
 -- ---- toute la vue
 local view = overview.render(data(), 100, 40)
@@ -266,6 +300,25 @@ check(
 	strip(joined(view)):find("Semaine 5", 1, true) < strip(joined(view)):find("Total", 1, true),
 	true
 )
+local big = overview.render(data(), 100, 60)
+local grid_end
+for i, line in ipairs(big) do
+	if strip(line):sub(1, #"╰") == "╰" then
+		grid_end = grid_end or i
+	end
+end
+check("la grille ne grossit pas avec la place : au plus la moitié de la hauteur", grid_end <= 30, true)
+check("une semaine : au plus 3 lignes de haut", week_height(overview.grid(data(), 100, 60)), overview.MAX_ROW + 1)
+check("le détail commence juste sous la grille", strip(big[grid_end + 1]):sub(1, #"╭"), "╭")
+check("le détail prend tout le reste (jusqu'en bas)", strip(big[60]):sub(1, #"╰"), "╰")
+local mid = overview.render(data(), 100, 40)
+local mid_end
+for i, line in ipairs(mid) do
+	if strip(line):sub(1, #"╰") == "╰" then
+		mid_end = mid_end or i
+	end
+end
+check("40 lignes : la grille ne prend pas plus de la moitié (le détail garde sa place)", mid_end <= 20, true)
 local min_w, min_h = overview.minimum(5)
 check("la vue : pile au minimum, elle tient", overview.render(data(), min_w, min_h) ~= nil, true)
 check("la vue : une colonne de moins, nil", overview.render(data(), min_w - 1, min_h), nil)

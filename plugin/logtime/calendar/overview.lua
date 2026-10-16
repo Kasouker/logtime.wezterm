@@ -29,7 +29,8 @@ local M = {}
 M.DETAIL_HEIGHT = 10 -- les lignes du détail du jour, sous la grille (une ligne vide comprise)
 M.WEEK_LABEL_WIDTH = 10 -- la colonne « Week 1 »
 M.MIN_CELL = 6 -- un jour : au moins 6 colonnes (« 4h13 » et de l'air)
-M.MIN_ROW = 2 -- une semaine : au moins 2 lignes (le numéro, puis la durée)
+M.MIN_ROW = 2 -- une semaine : au moins 2 lignes (le numéro, puis la durée)...
+M.MAX_ROW = 3 -- ... et au plus 3 (une ligne d'air) : la grille ne grossit pas avec la fenêtre
 M.BAR_WIDTH = 4 -- une barre verticale (actif, inactif)
 M.PROJECTS = 5 -- les plus gros projets (le reste dans « autres »)
 M.IDLE_COLOR = "#8B8E99"
@@ -88,7 +89,7 @@ function M.grid(o, width, height)
 	local count = #weeks
 	local lw = M.WEEK_LABEL_WIDTH
 	local cell = (width - lw - 9) // 7 -- 9 traits verticaux
-	local row = (height - 3 - count) // count -- le haut, les noms, leur trait ; un trait sous chaque semaine
+	local row = math.min(M.MAX_ROW, (height - 3 - count) // count) -- le haut, les noms, leur trait ; un trait par semaine
 	if cell < M.MIN_CELL or row < M.MIN_ROW then
 		return nil
 	end
@@ -180,87 +181,158 @@ local function hbar(share, width, color)
 		.. convert.RESET
 end
 
--- Le détail du jour `key` : exactement `height` lignes de `width` colonnes.
---   o = { days, idle_days, projects, cfg, labels, today_key }
+-- Le texte de l'objectif du jour (atteint, ce qu'il manque, ou manqué pour un jour passé), ou "" sans objectif.
+local function goal_text(o, key, total)
+	if not stats.has_goal(o.cfg.goal_hours) then
+		return ""
+	end
+	local labels = o.labels
+	local goal = status.goal_short(o.cfg.goal_hours)
+	local missing = stats.hm(o.cfg.goal_hours * 3600 - total)
+	if total >= o.cfg.goal_hours * 3600 then
+		return string.format(labels.detail_goal_reached, goal)
+	elseif o.today_key and key < o.today_key then
+		return string.format(labels.detail_goal_failed, goal, missing)
+	end
+	return string.format(labels.detail_goal_missing, goal, missing)
+end
+
+M.PERCENT_WIDTH = 6 -- la colonne des pourcentages (« 100% » et de l'air)
+M.DURATION_WIDTH = 6 -- « 10h04 »
+
+-- Le détail du jour `key`, dans un tableau encadré : exactement `height` lignes de `width` colonnes.
+--   ╭─────┬─────┬─────────────────────────────────────┬──────╮
+--   │8h05 │1h55 │ Total  10h04       ✓ objectif atteint│      │   l'objectif aligné sur le début des barres
+--   │     │     ├──────────────────────────────────────┼──────┤
+--   │████ │     │ Bot Discord   5h00  ████████░░░░░░░░ │  40% │   un trait entre les projets s'il y a la place
+--   │████ │ ▆▆▆ │ …                                    │      │
+--   │Actif│Inact│                                      │      │
+--   │ 80% │ 20% │                                      │      │
+--   ╰─────┴─────┴──────────────────────────────────────┴──────╯
+--   o = { days, idle_days, projects, cfg, labels, today_key, b (les traits), edge (leur couleur) }
 function M.detail(o, key, width, height)
 	local labels = o.labels
+	local b, edge = o.b, o.edge or ""
+	local off = edge ~= "" and convert.RESET or ""
+	local function e(s)
+		return edge .. s .. off
+	end
 	local total = math.floor(math.max(0, o.days[key] or 0))
 	local idle_secs, idle_percent = idle.share(total, o.idle_days and o.idle_days[key])
 	local active = total - idle_secs
 	local color = assemble.day_color(total, o.cfg) or M.IDLE_COLOR
-	local bar_height = height - 3 -- les durées au-dessus, les noms et les pourcentages en dessous
-	local bw = M.BAR_WIDTH
-	-- la colonne de chaque barre : assez large pour son nom dans la langue choisie (« Inactif »), et pour « 100% »
-	local col = math.max(bw, vw(labels.detail_active), vw(labels.detail_idle), 6)
-	local left_width = 2 * col + 3
-	local function two(a, b)
-		return " " .. centered(a, col) .. " " .. centered(b, col) .. " "
-	end
-	local left = { fit(two(stats.hm(active), stats.hm(idle_secs)), left_width) }
-	local active_bar = M.vertical_bar(total > 0 and active / total or 0, bar_height, color, bw)
-	local idle_bar = M.vertical_bar(total > 0 and idle_secs / total or 0, bar_height, M.IDLE_COLOR, bw)
+	local inner = height - 2 -- sans le haut et le bas du cadre
+	-- à gauche : deux colonnes (actif, inactif), assez larges pour leur nom dans la langue choisie
+	local col = math.max(M.BAR_WIDTH + 2, vw(labels.detail_active) + 2, vw(labels.detail_idle) + 2, 6)
+	local bar_height = math.max(1, inner - 3) -- la durée au-dessus, le nom et le pourcentage en dessous
+	local active_bar = M.vertical_bar(total > 0 and active / total or 0, bar_height, color, M.BAR_WIDTH)
+	local idle_bar = M.vertical_bar(total > 0 and idle_secs / total or 0, bar_height, M.IDLE_COLOR, M.BAR_WIDTH)
+	local active_column = { centered(stats.hm(active), col) }
+	local idle_column = { centered(stats.hm(idle_secs), col) }
 	for i = 1, bar_height do
-		left[#left + 1] = fit(two(active_bar[i], idle_bar[i]), left_width)
+		active_column[#active_column + 1] = centered(active_bar[i], col)
+		idle_column[#idle_column + 1] = centered(idle_bar[i], col)
 	end
-	left[#left + 1] = fit(two(labels.detail_active, labels.detail_idle), left_width)
-	local active_percent = total > 0 and (100 - idle_percent) or 0
-	left[#left + 1] = fit(two(active_percent .. "%", (total > 0 and idle_percent or 0) .. "%"), left_width)
-	-- à droite : le total et l'objectif, puis les projets
-	local right_width = width - left_width - 2
-	local right = {}
-	local goal_text = ""
-	if stats.has_goal(o.cfg.goal_hours) then
-		local goal = status.goal_short(o.cfg.goal_hours)
-		local missing = stats.hm(o.cfg.goal_hours * 3600 - total)
-		if total >= o.cfg.goal_hours * 3600 then
-			goal_text = string.format(labels.detail_goal_reached, goal)
-		elseif o.today_key and key < o.today_key then
-			goal_text = string.format(labels.detail_goal_failed, goal, missing)
-		else
-			goal_text = string.format(labels.detail_goal_missing, goal, missing)
-		end
-	end
-	right[1] = fit(labels.detail_total .. "  " .. stats.hm(total) .. "   " .. goal_text, right_width)
-	local list = {}
+	active_column[#active_column + 1] = centered(labels.detail_active, col)
+	idle_column[#idle_column + 1] = centered(labels.detail_idle, col)
+	active_column[#active_column + 1] = centered((total > 0 and (100 - idle_percent) or 0) .. "%", col)
+	idle_column[#idle_column + 1] = centered((total > 0 and idle_percent or 0) .. "%", col)
+	-- à droite : la liste (le total, puis les projets) et la colonne des pourcentages
+	local list_width = width - 2 * col - 5 - M.PERCENT_WIDTH -- 5 traits verticaux
+	local name_width = math.min(24, math.max(10, list_width // 3))
+	local bar_start = 1 + name_width + 2 + M.DURATION_WIDTH + 2 -- là où commencent les barres des projets
+	local bar_width = math.max(4, list_width - bar_start - 1)
+	local projects = {}
 	for _, item in ipairs(activity.top(o.projects and o.projects[key], M.PROJECTS)) do
 		if item.secs >= 60 then
-			list[#list + 1] = item
+			projects[#projects + 1] = item
 		end
 	end
+	-- les lignes de droite : { texte de la liste, texte du pourcentage } ou "rule" (un trait entre deux lignes)
+	local total_text = " " .. labels.detail_total .. "  " .. stats.hm(total)
+	local rows = { { fit(total_text, bar_start) .. goal_text(o, key, total), "" }, "rule" }
 	if total == 0 then
-		right[2] = fit(labels.detail_empty, right_width)
+		rows[#rows + 1] = { " " .. labels.detail_empty, "" }
 	end
-	local name_width = math.min(24, math.max(10, right_width // 3))
-	for _, item in ipairs(list) do -- (s'il y en a plus que de lignes, les derniers ne sont simplement pas dessinés)
+	local spaced = #projects > 0 and (2 * #projects - 1) <= inner - 2 -- un trait entre les projets s'il y a la place
+	for n, item in ipairs(projects) do
 		local name = item.label == activity.OTHER and labels.detail_other or item.label
 		local secs = math.min(item.secs, total)
-		local percent = string.format("%3d%%", math.floor(secs * 100 / math.max(1, total) + 0.5))
 		local duration = stats.hm(secs)
-		local bar_width = math.max(4, right_width - name_width - 2 - 6 - 2 - 2 - vw(percent))
-		right[#right + 1] = fit(name, name_width)
-			.. "  "
-			.. string.rep(" ", 6 - vw(duration))
-			.. duration
-			.. "  "
-			.. hbar(secs / math.max(1, total), bar_width, color)
-			.. "  "
-			.. percent
+		rows[#rows + 1] = {
+			" "
+				.. fit(name, name_width)
+				.. "  "
+				.. string.rep(" ", M.DURATION_WIDTH - vw(duration))
+				.. duration
+				.. "  "
+				.. hbar(secs / math.max(1, total), bar_width, color),
+			string.format("%d%%", math.floor(secs * 100 / math.max(1, total) + 0.5)),
+		}
+		if spaced and n < #projects then
+			rows[#rows + 1] = "rule"
+		end
 	end
-	local out = {}
-	for i = 1, height do
-		out[i] = fit((left[i] or "") .. "  " .. fit(right[i] or "", right_width), width)
+	local out = {
+		e(
+			b.tl
+				.. string.rep(b.h, col)
+				.. b.t
+				.. string.rep(b.h, col)
+				.. b.t
+				.. string.rep(b.h, list_width)
+				.. b.t
+				.. string.rep(b.h, M.PERCENT_WIDTH)
+				.. b.tr
+		),
+	}
+	for i = 1, inner do
+		local left = e(b.v) .. fit(active_column[i] or "", col) .. e(b.v) .. fit(idle_column[i] or "", col)
+		local row = rows[i]
+		if row == "rule" then
+			out[#out + 1] = left
+				.. e(b.l .. string.rep(b.h, list_width) .. b.x .. string.rep(b.h, M.PERCENT_WIDTH) .. b.r)
+		else
+			row = row or { "", "" }
+			out[#out + 1] = left
+				.. e(b.v)
+				.. fit(row[1], list_width)
+				.. e(b.v)
+				.. string.rep(" ", math.max(0, M.PERCENT_WIDTH - 1 - vw(row[2])))
+				.. row[2]
+				.. " "
+				.. e(b.v)
+		end
+	end
+	out[#out + 1] = e(
+		b.bl
+			.. string.rep(b.h, col)
+			.. b.b
+			.. string.rep(b.h, col)
+			.. b.b
+			.. string.rep(b.h, list_width)
+			.. b.b
+			.. string.rep(b.h, M.PERCENT_WIDTH)
+			.. b.br
+	)
+	for k = 1, #out do
+		out[k] = fit(out[k], width)
 	end
 	return out
 end
 
--- La largeur et la hauteur minimum de la vue.
+M.GRID_SHARE = 0.5 -- la grille du mois prend au plus cette part de la hauteur ; le détail du jour, le reste
+M.MIN_DETAIL = 10 -- le détail : au moins 10 lignes (cadre compris)
+
+-- La largeur et la hauteur minimum de la vue (une grille de `weeks` semaines).
 function M.minimum(weeks)
 	local count = weeks or 6
-	return M.WEEK_LABEL_WIDTH + 9 + 7 * M.MIN_CELL, 3 + count * (M.MIN_ROW + 1) + M.DETAIL_HEIGHT
+	return M.WEEK_LABEL_WIDTH + 9 + 7 * M.MIN_CELL, 3 + count * (M.MIN_ROW + 1) + M.MIN_DETAIL
 end
 
 -- Toute la vue (la grille du mois, puis le détail du jour `o.day_key`) : exactement `height` lignes de `width`
--- colonnes, ou nil si la zone est trop petite.
+-- colonnes, ou nil si la zone est trop petite. La grille ne prend pas plus de M.GRID_SHARE de la hauteur (sinon elle
+-- écrase le détail) ; le détail, juste dessous, prend tout le reste.
 --   o = { days, idle_days, projects, year, month, today_key, day_key, cfg, labels, b, edge }
 function M.render(o, width, height)
 	local weeks = #M.weeks(o.year, o.month, o.cfg.week_starts_on)
@@ -268,7 +340,9 @@ function M.render(o, width, height)
 	if width < min_w or height < min_h then
 		return nil
 	end
-	local grid = M.grid(o, width, height - M.DETAIL_HEIGHT)
+	local smallest_grid = 3 + weeks * (M.MIN_ROW + 1)
+	local grid_height = math.max(smallest_grid, math.min(height - M.MIN_DETAIL, math.floor(height * M.GRID_SHARE)))
+	local grid = M.grid(o, width, grid_height)
 	if not grid then
 		return nil
 	end
@@ -280,12 +354,8 @@ function M.render(o, width, height)
 	while #out > 0 and out[#out]:match("^ *$") do
 		out[#out] = nil
 	end
-	out[#out + 1] = string.rep(" ", width)
-	for _, line in ipairs(M.detail(o, o.day_key or o.today_key, width, M.DETAIL_HEIGHT - 1)) do
+	for _, line in ipairs(M.detail(o, o.day_key or o.today_key, width, height - #out)) do
 		out[#out + 1] = line
-	end
-	while #out < height do
-		out[#out + 1] = string.rep(" ", width)
 	end
 	return out
 end
