@@ -1452,14 +1452,14 @@ check(
 	true
 )
 check(
-	"aperçu : le détail de la semaine en cours (le total et les barres actif / inactif)",
+	"aperçu : le détail du jour (le total et les barres actif / inactif)",
 	table.concat(full, "\n"):find("Total", 1, true) ~= nil
 		and table.concat(full, "\n"):find("Actif", 1, true) ~= nil
 		and table.concat(full, "\n"):find("Inactif", 1, true) ~= nil,
 	true
 )
 check(
-	"aperçu : la frise reste celle du jour (« 0h00 … 24h00 »), même avec le détail de la semaine",
+	"aperçu : la frise du jour (« 0h00 … 24h00 »)",
 	table.concat(full, "\n"):find("24h00", 1, true) ~= nil,
 	true
 )

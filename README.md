@@ -58,7 +58,7 @@ That's all: the counter appears in the tab bar, `F2` opens the calendar, `F4` th
 
 **In the day detail**: `←` `→` `↑` `↓` move to another day · `Enter` or `Esc` back to the calendar.
 
-**In the settings page** (it fills the whole window, with a preview on the right when there is room: the month, then the current week — active and idle time, time per project, goal days, and the timeline of today): `Tab` / `Shift+Tab` next / previous tab (Colors, Calendar, General) · arrows or `h j k l` choose · `Enter` save a color · `←` `→` change a value (saved right away) · `d` default value · `y` / `n` use (or not) your theme's colors · `q` or `Esc` close.
+**In the settings page** (it fills the whole window, with a preview on the right when there is room: the month, then today — active and idle time, time per project, and the timeline of the day): `Tab` / `Shift+Tab` next / previous tab (Colors, Calendar, General) · arrows or `h j k l` choose · `Enter` save a color · `←` `→` change a value (saved right away) · `d` default value · `y` / `n` use (or not) your theme's colors · `q` or `Esc` close.
 
 The page keys only act in the page's tab: a key pressed anywhere else goes to your shell as usual.
 
