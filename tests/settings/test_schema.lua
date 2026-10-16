@@ -53,7 +53,7 @@ local function rejects(name, key, value)
 end
 
 -- ---- la liste
-check("dix-sept réglages", #schema.keys(), 17)
+check("dix-huit réglages", #schema.keys(), 18)
 check("le premier est lang", schema.keys()[1], "lang")
 check("gradient_color est connu", schema.is_known("gradient_color"), true)
 check("un nom inconnu n'est pas connu", schema.is_known("gradiant"), false)
@@ -175,7 +175,7 @@ end
 check("toutes les valeurs par défaut sont acceptées par le schéma", all_valid, true)
 check("goal_hours n'a pas de valeur par défaut", defaults.goal_hours, nil)
 check(
-	"quinze valeurs par défaut",
+	"seize valeurs par défaut",
 	(function()
 		local n = 0
 		for _ in pairs(defaults) do
@@ -183,7 +183,7 @@ check(
 		end
 		return n
 	end)(),
-	15
+	16
 )
 check("border_color : gris par défaut", defaults.border_color, "#8B8E99")
 accepts("border_color en minuscules", "border_color", "#3366cc", "#3366CC")

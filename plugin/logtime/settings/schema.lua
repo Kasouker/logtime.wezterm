@@ -13,6 +13,7 @@ M.DEFINITIONS = {
 	{ key = "week_starts_on", kind = "enum", values = { "monday", "sunday" }, default = "monday" },
 	{ key = "goal_hours", kind = "number", min = 0.5, max = 24, default = nil, none = 0, step = 0.5 },
 	{ key = "goal_days", kind = "integer", min = 1, max = 7, default = 5 },
+	{ key = "count_idle", kind = "boolean", default = true },
 	{ key = "max_months", kind = "integer", min = 1, max = 12, default = 12 },
 	{ key = "months_anchor", kind = "enum", values = { "last", "first" }, default = "last" },
 	{ key = "center", kind = "boolean", default = true },

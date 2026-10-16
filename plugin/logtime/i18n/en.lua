@@ -70,6 +70,7 @@ return {
 		lang = "Language",
 		goal_hours = "Daily goal",
 		goal_days = "Goal days per week",
+		count_idle = "Count idle time",
 	},
 	settings_hints = {
 		max_months = "As many as the window can fit, up to this number.",
@@ -81,6 +82,7 @@ return {
 		lang = "The language of the calendar and of this page.",
 		goal_hours = 'The hours that make a day "done".',
 		goal_days = 'The done days that make a week "done".',
+		count_idle = "No: the counter shows active time only.",
 	},
 	settings_values = {
 		months_anchor = { last = "last", first = "first" },

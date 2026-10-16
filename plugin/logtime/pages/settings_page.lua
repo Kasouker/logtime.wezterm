@@ -32,7 +32,7 @@ M.TAB_COUNT = 3
 -- Pas de réglage du centrage : le calendrier est toujours centré (center = false reste possible dans wezterm.lua).
 M.CALENDAR_SETTINGS = { "max_months", "months_anchor", "week_starts_on", "borders", "border_style", "border_color" }
 -- Les réglages de l'onglet Général.
-M.GENERAL_SETTINGS = { "lang", "goal_hours", "goal_days" }
+M.GENERAL_SETTINGS = { "lang", "goal_hours", "goal_days", "count_idle" }
 
 -- Les onglets de réglages : leur liste de réglages et la clé (i18n) de leur intitulé. L'onglet Couleurs n'en fait pas partie.
 M.LISTS = {

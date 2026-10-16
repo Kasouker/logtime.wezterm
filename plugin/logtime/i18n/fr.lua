@@ -70,6 +70,7 @@ return {
 		lang = "Langue",
 		goal_hours = "Objectif par jour",
 		goal_days = "Jours d'objectif par semaine",
+		count_idle = "Compter le temps inactif",
 	},
 	settings_hints = {
 		max_months = "Selon la place dans la fenêtre, jusqu'à ce nombre.",
@@ -81,6 +82,7 @@ return {
 		lang = "La langue du calendrier et de cette page.",
 		goal_hours = "Les heures qui font un jour « réussi ».",
 		goal_days = "Les jours réussis qui font une semaine réussie.",
+		count_idle = "Non : le compteur ne montre que le temps actif.",
 	},
 	settings_values = {
 		months_anchor = { last = "à la fin", first = "au début" },

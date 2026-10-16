@@ -749,7 +749,8 @@ local function compute()
 	idle_file.maybe_save(now)
 	projects_file.maybe_save(now)
 	timeline_file.maybe_save(now)
-	return days[day.key(now, cfg.day_offset)] or 0
+	local key = day.key(now, cfg.day_offset)
+	return status.shown(days[key] or 0, get_idle()[key], cfg.count_idle)
 end
 
 -- Les secondes comptées aujourd'hui

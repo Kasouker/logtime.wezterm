@@ -1107,6 +1107,41 @@ local function scenarios()
 		'{"2026-10-13":4001}'
 	)
 	cleanup(e)
+	-- count_idle = false (onglet Général) : le compteur ne montre que le temps actif ; les fichiers gardent tout
+	for _, case in ipairs({
+		{ opts = { goal_hours = 1 }, shown = "01:11:00", reached = true },
+		{ opts = { goal_hours = 1, count_idle = false }, shown = "00:10:59", reached = false },
+	}) do
+		local name = case.opts.count_idle == false and "sans l'inactif" or "avec l'inactif (par défaut)"
+		clock.now = T0
+		e = new_env({ file = false })
+		e.M.apply_to_config({}, case.opts)
+		win = e.window()
+		screen = screen_pane(e)
+		live(e, win, screen, 0, 600, true) -- 10 min de travail
+		live(e, win, screen, 601, 4200, false) -- 1 h sans rien toucher
+		live(e, win, screen, 4201, 4260, true) -- reprise
+		check("compteur " .. name .. " : le temps affiché", win.right:find(case.shown, 1, true) ~= nil, true)
+		check("compteur " .. name .. " : l'objectif d'1h", win.right:find("✓", 1, true) ~= nil, case.reached)
+		check("compteur " .. name .. " : le fichier garde tout (1h11)", e.M.today_seconds(), 4260)
+		cleanup(e)
+	end
+	-- réglé dans F4 (le fichier de réglages) : pris en compte aussi
+	clock.now = T0
+	e = new_env({ file = false })
+	write(e.home .. "/.local/share/logtime/.logtime_settings.json", '{"count_idle": false}')
+	e.M.apply_to_config({})
+	win = e.window()
+	screen = screen_pane(e)
+	live(e, win, screen, 0, 600, true)
+	live(e, win, screen, 601, 4200, false)
+	live(e, win, screen, 4201, 4260, true)
+	check(
+		"compteur sans l'inactif, réglé dans F4 : le temps actif seulement",
+		win.right:find("00:10:59", 1, true) ~= nil,
+		true
+	)
+	cleanup(e)
 	-- un fichier d'inactif abîmé : mis de côté, jamais pris pour du vide en silence
 	clock.now = T0
 	e = new_env({ file = false })

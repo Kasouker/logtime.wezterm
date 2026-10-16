@@ -74,6 +74,7 @@ Options are read in this order (the last one wins): **plugin defaults → option
 | `week_starts_on` | `"monday"`, `"sunday"` | `"monday"` | first day of the week |
 | `goal_hours` | `0` (none), or 0.5 to 24 | none | hours per day that count as "goal reached" |
 | `goal_days` | 1 to 7 | `5` | days at the goal that make a validated week |
+| `count_idle` | `true` / `false` | `true` | `false`: the counter (and the daily goal) shows active time only; idle time is still saved and shown in the calendar |
 | `max_months` | 1 to 12 | `12` | most months shown (as many as fit in the window, up to this) |
 | `months_anchor` | `"last"`, `"first"` | `"last"` | the selected month is the last one shown, or the first |
 | `center` | `true`, `false` | `true` | center the calendar in the window |

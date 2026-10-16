@@ -18,6 +18,15 @@ function M.goal_short(hours)
 	return string.format("%dh%02d", minutes // 60, minutes % 60)
 end
 
+-- Les secondes que montre le compteur : tout le temps compté, ou (count_idle = false) seulement le temps actif, sans
+-- l'inactif du jour (jamais plus que le total). Les fichiers gardent toujours tout : seul l'affichage change.
+function M.shown(total, idle, count_idle)
+	if count_idle == false then
+		return total - math.min(total, math.max(0, tonumber(idle) or 0))
+	end
+	return total
+end
+
 -- L'objectif du jour est-il atteint ? (goal_hours : nil ou 0 = pas d'objectif)
 function M.reached(secs, goal_hours)
 	return type(goal_hours) == "number" and goal_hours > 0 and secs >= goal_hours * 3600

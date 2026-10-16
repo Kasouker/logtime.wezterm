@@ -1181,7 +1181,7 @@ local gen_plain = {}
 for i, line in ipairs(gen) do
 	gen_plain[i] = strip(line)
 end
-check("onglet Général : intitulé, ligne vide, 3 réglages, ligne vide, explication (7 lignes)", #gen, 7)
+check("onglet Général : intitulé, ligne vide, 4 réglages, ligne vide, explication (8 lignes)", #gen, 8)
 check("onglet Général : la langue, dans sa propre langue", gen_plain[3], "Langue = ◀ français ▶")
 check(
 	"onglet Général : l'objectif en heures et minutes, choisi",
@@ -1189,7 +1189,19 @@ check(
 	"▸ Objectif par jour = ◀ 7h30 ▶"
 )
 check("onglet Général : les jours par semaine", gen_plain[5], "Jours d'objectif par semaine = ◀ 4 sur 7 ▶")
-check("onglet Général : l'explication de l'objectif", gen_plain[7], fr.settings_hints.goal_hours)
+check(
+	"onglet Général : compter le temps inactif, oui par défaut",
+	gen_plain[6],
+	"Compter le temps inactif = ◀ oui ▶"
+)
+check("onglet Général : l'explication de l'objectif", gen_plain[8], fr.settings_hints.goal_hours)
+local gen_idle = list({ tab = settings_page.TAB.GENERAL, row = 4, values = { count_idle = false }, message = 0 })
+check(
+	"onglet Général : temps inactif non compté, choisi",
+	strip(gen_idle[6]),
+	"▸ Compter le temps inactif = ◀ non ▶"
+)
+check("onglet Général : l'explication du temps inactif", strip(gen_idle[8]), fr.settings_hints.count_idle)
 local gen_none = list({ tab = 3, row = 1, values = { goal_hours = 0 }, message = 0 })
 check("onglet Général : objectif 0 affiché « aucun »", strip(gen_none[4]), "Objectif par jour =   aucun ▶")
 check(

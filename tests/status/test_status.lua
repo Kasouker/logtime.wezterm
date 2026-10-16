@@ -35,6 +35,12 @@ check("text : commence par l'icône", status.text(0):sub(1, #utf8.char(0xF017)),
 
 -- ---- l'objectif dans la barre
 local clock = utf8.char(0xF017) .. " "
+check("shown : par défaut, tout le temps", status.shown(4260, 3601, nil), 4260)
+check("shown : count_idle = true, tout le temps", status.shown(4260, 3601, true), 4260)
+check("shown : count_idle = false, le temps actif", status.shown(4260, 3601, false), 659)
+check("shown : sans inactif noté", status.shown(4260, nil, false), 4260)
+check("shown : jamais en dessous de zéro", status.shown(100, 500, false), 0)
+check("shown : un inactif négatif est ignoré", status.shown(100, -50, false), 100)
 check("goal_short : 7 h", status.goal_short(7), "7h")
 check("goal_short : 7 h 30", status.goal_short(7.5), "7h30")
 check("goal_short : 30 min", status.goal_short(0.5), "0h30")
