@@ -290,6 +290,21 @@ local crowded = overview.detail(data({ projects = { ["2026-10-15"] = many } }), 
 check("beaucoup de projets : jamais plus haut que la place", #crowded, 16)
 check("beaucoup de projets : le reste dans « autres »", strip(joined(crowded)):find("autres", 1, true) ~= nil, true)
 local double_detail = strip(joined(overview.detail(data({ b = assemble.BORDER_STYLES.double }), "2026-10-15", 100, 12)))
+local hidden =
+	overview.detail(data({ cfg = gradient.apply_to({ goal_hours = 8, count_idle = false }) }), "2026-10-15", 100, 12)
+local hidden_text = strip(joined(hidden))
+check("inactif non compté : plus de colonne Inactif", hidden_text:find("Inactif", 1, true), nil)
+check("inactif non compté : la colonne Actif reste", hidden_text:find("Actif", 1, true) ~= nil, true)
+local _, hidden_cols = strip(hidden[1]):gsub("┬", "")
+check("inactif non compté : un trait vertical de moins en haut", hidden_cols, 2)
+local _, hidden_bottom = strip(hidden[#hidden]):gsub("┴", "")
+check("inactif non compté : et en bas", hidden_bottom, 2)
+local hidden_sizes = true
+for _, line in ipairs(hidden) do
+	hidden_sizes = hidden_sizes and layout.visible_width(line) == 100
+end
+check("inactif non compté : toutes les lignes font la largeur", hidden_sizes, true)
+check("inactif non compté : le cadre va jusqu'au bord droit (la liste prend la place)", strip(hidden[1]):sub(-3), "╮")
 check("le tableau suit le style du trait (double)", double_detail:find("╔", 1, true) ~= nil, true)
 
 -- ---- la frise

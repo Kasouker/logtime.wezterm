@@ -248,6 +248,8 @@ function M.detail(o, key, width, height, opts)
 	local bar_height = math.max(1, inner - 3) -- la durée au-dessus, le nom et le pourcentage en dessous
 	local active_bar = M.vertical_bar(total > 0 and active / total or 0, bar_height, color, M.BAR_WIDTH)
 	local idle_bar = M.vertical_bar(total > 0 and idle_secs / total or 0, bar_height, M.IDLE_COLOR, M.BAR_WIDTH)
+	-- count_idle = false : le temps inactif n'est pas compté, sa colonne disparaît (la place va à la liste)
+	local show_idle = o.cfg.count_idle ~= false
 	local active_column = { centered(stats.hm(active), col) }
 	local idle_column = { centered(stats.hm(idle_secs), col) }
 	for i = 1, bar_height do
@@ -259,7 +261,8 @@ function M.detail(o, key, width, height, opts)
 	active_column[#active_column + 1] = centered((total > 0 and (100 - idle_percent) or 0) .. "%", col)
 	idle_column[#idle_column + 1] = centered((total > 0 and idle_percent or 0) .. "%", col)
 	-- à droite : la liste (le total, puis les projets) et la colonne des pourcentages
-	local list_width = width - 2 * col - 5 - M.PERCENT_WIDTH -- 5 traits verticaux
+	local columns = show_idle and 2 or 1
+	local list_width = width - columns * col - columns - 3 - M.PERCENT_WIDTH -- les traits verticaux
 	local name_width = math.min(24, math.max(10, list_width // 3))
 	local bar_start = 1 + name_width + 2 + M.DURATION_WIDTH + 2 -- là où commencent les barres des projets
 	local bar_width = math.max(4, list_width - bar_start - 1)
@@ -294,13 +297,14 @@ function M.detail(o, key, width, height, opts)
 			rows[#rows + 1] = "rule"
 		end
 	end
+	local idle_top = show_idle and (string.rep(b.h, col) .. b.t) or ""
+	local idle_bottom = show_idle and (string.rep(b.h, col) .. b.b) or ""
 	local out = {
 		e(
 			b.tl
 				.. string.rep(b.h, col)
 				.. b.t
-				.. string.rep(b.h, col)
-				.. b.t
+				.. idle_top
 				.. string.rep(b.h, list_width)
 				.. b.t
 				.. string.rep(b.h, M.PERCENT_WIDTH)
@@ -308,7 +312,10 @@ function M.detail(o, key, width, height, opts)
 		),
 	}
 	for i = 1, inner do
-		local left = e(b.v) .. fit(active_column[i] or "", col) .. e(b.v) .. fit(idle_column[i] or "", col)
+		local left = e(b.v) .. fit(active_column[i] or "", col)
+		if show_idle then
+			left = left .. e(b.v) .. fit(idle_column[i] or "", col)
+		end
 		local row = rows[i]
 		if row == "rule" then
 			out[#out + 1] = left
@@ -329,8 +336,7 @@ function M.detail(o, key, width, height, opts)
 		b.bl
 			.. string.rep(b.h, col)
 			.. b.b
-			.. string.rep(b.h, col)
-			.. b.b
+			.. idle_bottom
 			.. string.rep(b.h, list_width)
 			.. b.b
 			.. string.rep(b.h, M.PERCENT_WIDTH)

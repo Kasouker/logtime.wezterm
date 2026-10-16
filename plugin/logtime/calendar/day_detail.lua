@@ -144,16 +144,18 @@ function M.render(days, idle_days, key, today_key, cfg, labels, projects)
 	content[#content + 1] = row(labels.detail_total, total) .. goal_text
 	if total > 0 then
 		local color = assemble.day_color(total, cfg) or M.IDLE_COLOR
-		content[#content + 1] = row(labels.detail_active, active)
-			.. "   "
-			.. bar(active, total, color)
-			.. "  "
-			.. string.format(labels.percent, 100 - idle_percent)
-		content[#content + 1] = row(labels.detail_idle, idle_secs)
-			.. "   "
-			.. bar(idle_secs, total, M.IDLE_COLOR)
-			.. "  "
-			.. string.format(labels.percent, idle_percent)
+		if cfg.count_idle ~= false then -- count_idle = false : l'inactif n'est pas compté, le total est le temps actif
+			content[#content + 1] = row(labels.detail_active, active)
+				.. "   "
+				.. bar(active, total, color)
+				.. "  "
+				.. string.format(labels.percent, 100 - idle_percent)
+			content[#content + 1] = row(labels.detail_idle, idle_secs)
+				.. "   "
+				.. bar(idle_secs, total, M.IDLE_COLOR)
+				.. "  "
+				.. string.format(labels.percent, idle_percent)
+		end
 		local by_project = project_lines(projects and projects[key], total, color, labels)
 		if #by_project > 0 then
 			content[#content + 1] = ""

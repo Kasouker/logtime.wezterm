@@ -42,4 +42,14 @@ function M.share(total, idle)
 	return idle, math.floor(idle * 100 / total + 0.5)
 end
 
+-- Les heures par jour sans le temps inactif (le réglage count_idle = false) : une copie, chaque jour moins son
+-- inactif (jamais en dessous de zéro). `days` n'est pas touché.
+function M.active_days(days, idle_days)
+	local out = {}
+	for key, secs in pairs(days or {}) do
+		out[key] = secs - M.share(secs, idle_days and idle_days[key])
+	end
+	return out
+end
+
 return M

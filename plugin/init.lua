@@ -912,6 +912,21 @@ local function days_for_page()
 	return get_days()
 end
 
+-- Ce que montrent les pages (F2, l'aperçu de F4) : avec count_idle = false, les heures sans l'inactif, et plus de
+-- temps inactif du tout (il n'est pas compté).
+local function page_days()
+	if cfg.count_idle == false then
+		return idle.active_days(days_for_page(), get_idle())
+	end
+	return days_for_page()
+end
+local function page_idle()
+	if cfg.count_idle == false then
+		return nil
+	end
+	return get_idle()
+end
+
 -- Une copie des heures par jour : { ["2026-10-12"] = secondes, ... }
 function M.days_snapshot()
 	local copy = {}
@@ -943,8 +958,8 @@ function M.apply_to_config(config, opts, ...)
 			wezterm = wezterm,
 			G = G,
 			num = num,
-			days = days_for_page,
-			idle_days = get_idle,
+			days = page_days,
+			idle_days = page_idle,
 			projects = get_projects,
 			today_key = function()
 				return day.key(os.time(), cfg.day_offset)
@@ -970,8 +985,8 @@ function M.apply_to_config(config, opts, ...)
 				return platform.blocker_args(platform.os_name(wezterm.target_triple))
 			end,
 			store = settings,
-			days = days_for_page, -- pour l'aperçu du mois actuel
-			idle_days = get_idle, -- et le détail du jour de l'aperçu
+			days = page_days, -- pour l'aperçu du mois actuel
+			idle_days = page_idle, -- et le détail du jour de l'aperçu
 			projects = get_projects,
 			timeline = get_timeline, -- et sa frise
 			today_key = function()

@@ -119,6 +119,15 @@ check("ligne vide", p[6], "")
 check("la semaine : 8h12 + 6h00 + 10h04", p[7], "  Semaine   24h16   2/5 jours à l'objectif")
 check("7 lignes", #p, 7)
 check("largeur : la plus longue ligne, au moins 46 + 2", width, 48)
+local no_idle = plain(
+	detail.render(week, nil, "2026-10-14", "2026-10-14", gradient.apply_to({ goal_hours = 8, count_idle = false }), fr)
+)
+check("inactif non compté : plus de lignes Actif / Inactif (5 lignes)", #no_idle, 5)
+check(
+	"inactif non compté : le total, puis la semaine",
+	no_idle[3] .. " | " .. no_idle[5],
+	"  Total     10h04   ✓ objectif 8h atteint | " .. p[7]
+)
 local raw = table.concat(lines, "\n")
 check(
 	"la barre active a la couleur du jour dans le calendrier",

@@ -71,6 +71,15 @@ check("share : jamais plus que le total", share(100, 500), "100 100")
 check("share : arrondi (1/3 = 33 %)", share(3, 1), "1 33")
 check("share : arrondi (2/3 = 67 %)", share(3, 2), "2 67")
 
+-- ---- active_days : les heures sans l'inactif (count_idle = false)
+local source = { ["2026-10-14"] = 36000, ["2026-10-13"] = 100, ["2026-10-12"] = 7200 }
+local act = idle.active_days(source, { ["2026-10-14"] = 5400, ["2026-10-13"] = 500 })
+check("active_days : 10h - 1h30", act["2026-10-14"], 30600)
+check("active_days : jamais en dessous de zéro", act["2026-10-13"], 0)
+check("active_days : un jour sans inactif reste entier", act["2026-10-12"], 7200)
+check("active_days : les heures d'origine ne sont pas touchées", source["2026-10-14"], 36000)
+check("active_days : sans inactif du tout", idle.active_days(source, nil)["2026-10-14"], 36000)
+
 -- ---- une journée simulée, comme dans le plugin : à chaque seconde, compter, noter l'inactif, puis l'activité
 local function simulate(script)
 	local days, idle_days = {}, {}

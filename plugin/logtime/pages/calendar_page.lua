@@ -82,15 +82,16 @@ function M.create(ctx)
 
 	-- Après la légende : « Aujourd'hui : 1h30 inactif sur 10h04 (15 %) » (rien si rien n'est compté aujourd'hui).
 	local function idle_today(labels)
-		if not ctx.idle_days then
-			return ""
+		local idle_days = ctx.idle_days and ctx.idle_days()
+		if not idle_days then
+			return "" -- pas de temps inactif (ou il n'est pas compté : réglage count_idle)
 		end
 		local today = ctx.today_key()
 		local total = ctx.days()[today] or 0
 		if total <= 0 then
 			return ""
 		end
-		local secs, percent = idle.share(total, ctx.idle_days()[today])
+		local secs, percent = idle.share(total, idle_days[today])
 		return "     " .. string.format(labels.idle_today, stats.hm(secs), stats.hm(total), percent)
 	end
 

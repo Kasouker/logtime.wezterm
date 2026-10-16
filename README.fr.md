@@ -75,7 +75,7 @@ Les options sont lues dans cet ordre (la dernière gagne) : **valeurs par défau
 | `week_starts_on` | `"monday"`, `"sunday"` | `"monday"` | premier jour de la semaine |
 | `goal_hours` | `0` (aucun), ou de 0,5 à 24 | aucun | heures par jour qui comptent pour « objectif atteint » |
 | `goal_days` | 1 à 7 | `5` | jours à l'objectif qui font une semaine validée |
-| `count_idle` | `true` / `false` | `true` | `false` : le compteur (et l'objectif du jour) ne montre que le temps actif ; l'inactif reste enregistré et affiché dans le calendrier |
+| `count_idle` | `true` / `false` | `true` | `false` : le temps inactif n'est pas compté — le compteur, l'objectif du jour, le calendrier et l'aperçu ne montrent que le temps actif (les fichiers gardent tout) |
 | `max_months` | 1 à 12 | `12` | nombre de mois maximum (autant que la fenêtre en contient, jusqu'à ce nombre) |
 | `months_anchor` | `"last"`, `"first"` | `"last"` | le mois choisi est le dernier affiché, ou le premier |
 | `center` | `true`, `false` | `true` | centrer le calendrier dans la fenêtre |

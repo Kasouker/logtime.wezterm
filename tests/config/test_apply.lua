@@ -1130,7 +1130,7 @@ local function scenarios()
 	clock.now = T0
 	e = new_env({ file = false })
 	write(e.home .. "/.local/share/logtime/.logtime_settings.json", '{"count_idle": false}')
-	e.M.apply_to_config({})
+	config = e.M.apply_to_config({})
 	win = e.window()
 	screen = screen_pane(e)
 	live(e, win, screen, 0, 600, true)
@@ -1140,6 +1140,19 @@ local function scenarios()
 		"compteur sans l'inactif, réglé dans F4 : le temps actif seulement",
 		win.right:find("00:10:59", 1, true) ~= nil,
 		true
+	)
+	open_binding(config, "F2")(win, screen)
+	local active_page = e.w.spawned[#e.w.spawned].pane
+	check(
+		"F2 sans l'inactif : la case du jour montre le temps actif (0h10)",
+		last_text(active_page):find("0h10", 1, true) ~= nil,
+		true
+	)
+	check("F2 sans l'inactif : plus le total (1h11)", last_text(active_page):find("1h11", 1, true), nil)
+	check(
+		"F2 sans l'inactif : plus la ligne « inactif » sous la légende",
+		last_text(active_page):find("inactif", 1, true),
+		nil
 	)
 	cleanup(e)
 	-- un fichier d'inactif abîmé : mis de côté, jamais pris pour du vide en silence
