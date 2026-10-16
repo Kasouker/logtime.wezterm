@@ -292,6 +292,86 @@ check("beaucoup de projets : le reste dans « autres »", strip(joined(crowded))
 local double_detail = strip(joined(overview.detail(data({ b = assemble.BORDER_STYLES.double }), "2026-10-15", 100, 12)))
 check("le tableau suit le style du trait (double)", double_detail:find("╔", 1, true) ~= nil, true)
 
+-- ---- la frise
+local palette = load_module("color/palette")
+local SEGS = { { 9 * 3600, 10 * 3600, "petit" }, { 10 * 3600, 14 * 3600, "gros" }, { 15 * 3600, 15 * 3600 + 600, "?" } }
+local colors = overview.timeline_colors(SEGS)
+check(
+	"couleurs : le plus gros projet du jour prend la 1re couleur",
+	colors.gros,
+	palette.COLORS[overview.TIMELINE_ORDER[1]]
+)
+check("couleurs : puis le suivant", colors.petit, palette.COLORS[overview.TIMELINE_ORDER[2]])
+check("couleurs : « autres » en gris", colors["?"], overview.OTHER_COLOR)
+check("couleurs : deux projets, deux couleurs différentes", colors.gros ~= colors.petit, true)
+local columns = overview.timeline_columns(SEGS, 24) -- une colonne par heure
+check("colonnes : rien avant 9h", tostring(columns[9]), "false")
+check("colonnes : 9h-10h : petit", columns[10], "petit")
+check("colonnes : 10h-14h : gros", columns[11] .. columns[14], "grosgros")
+check("colonnes : 14h-15h : rien", tostring(columns[15]), "false")
+check("colonnes : 15h-16h : 10 min d'autres, c'est le seul", columns[16], "?")
+check(
+	"colonnes : une colonne partagée va au projet qui y a passé le plus de temps",
+	overview.timeline_columns({ { 0, 1000, "a" }, { 1000, 3600, "b" } }, 24)[1],
+	"b"
+)
+local tl = overview.timeline(data({ timeline = { ["2026-10-15"] = SEGS } }), "2026-10-15", 98)
+check("la frise : 4 lignes", #tl, 4)
+check(
+	"la frise : chaque ligne fait la largeur",
+	layout.visible_width(tl[1]) == 98 and layout.visible_width(tl[3]) == 98,
+	true
+)
+check("au-dessus : 0h00 à gauche, 24h00 à droite", strip(tl[1]):match("^ 0h00 +24h00 $") ~= nil, true)
+check("la frise dans un cadre", strip(tl[2]):sub(1, #"╭") .. strip(tl[4]):sub(1, #"╰"), "╭╰")
+check("le nom du projet dans son morceau (s'il y tient)", strip(tl[3]):find("gros", 1, true) ~= nil, true)
+check(
+	"un morceau trop court pour son nom : coloré, sans aucune lettre (pas un nom coupé)",
+	(function()
+		local style = convert.bg(overview.OTHER_COLOR) .. convert.fg(convert.contrast(overview.OTHER_COLOR))
+		local s_ = tl[3]:find(style, 1, true)
+		local text = s_ and tl[3]:sub(s_ + #style, (tl[3]:find("\27[0m", s_, true) or 0) - 1)
+		return text ~= nil and #text > 0 and text:match("^ +$") ~= nil
+	end)(),
+	true
+)
+check(
+	"chaque projet dans sa couleur",
+	tl[3]:find(convert.bg(colors.gros), 1, true) ~= nil and tl[3]:find(convert.bg(colors.petit), 1, true) ~= nil,
+	true
+)
+check(
+	"le texte lisible sur sa couleur",
+	tl[3]:find(convert.bg(colors.gros) .. convert.fg(convert.contrast(colors.gros)), 1, true) ~= nil,
+	true
+)
+check(
+	"le morceau du gros projet à sa place (de 10h à 14h : à partir de 10/24 de la largeur)",
+	-- la colonne où commence sa couleur (après le trait de gauche du cadre)
+	math.abs(
+		layout.visible_width(tl[3]:sub(1, tl[3]:find(convert.bg(colors.gros), 1, true) - 1))
+			- 1
+			- math.floor(96 * 10 / 24)
+	) <= 1,
+	true
+)
+local shifted_tl = overview.timeline(data({ cfg = gradient.apply_to({ day_offset = -3600 }) }), "2026-10-15", 60)
+check("une journée qui commence à 1h00 : 1h00 … 1h00", strip(shifted_tl[1]):match("^ 1h00 +1h00 $") ~= nil, true)
+local empty_tl = overview.timeline(data({ timeline = {} }), "2026-10-15", 60)
+check("sans frise ce jour-là : le cadre vide", strip(empty_tl[3]):match("^│ +│$") ~= nil, true)
+local with_tl = overview.render(data({ timeline = { ["2026-10-15"] = SEGS } }), 100, 50)
+check(
+	"la vue : la frise tout en bas (son cadre, puis le bas)",
+	strip(with_tl[50]):sub(1, #"╰") == "╰" and strip(with_tl[49]):find("gros", 1, true) ~= nil,
+	true
+)
+check(
+	"la vue : les heures de la frise juste au-dessus d'elle",
+	strip(with_tl[47]):match("^ 0h00 +24h00 $") ~= nil,
+	true
+)
+check("la vue : le détail du jour au-dessus de la frise", strip(with_tl[46]):sub(1, #"╰"), "╰")
+
 -- ---- toute la vue
 local view = overview.render(data(), 100, 40)
 check("la vue : exactement la taille demandée", #view == 40 and layout.visible_width(view[40]) == 100, true)

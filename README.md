@@ -97,7 +97,7 @@ Options are read in this order (the last one wins): **plugin defaults → option
 | `day_offset` | `0` | when the day changes, in seconds after midnight |
 | `save_every` | `10` | save every 10 s (when something changed) |
 | `sleep_limit` | `3900` | sleep time counted per episode (65 min) |
-| `data_file`, `idle_file`, `projects_file`, `settings_file` | see below | where the files are written |
+| `data_file`, `idle_file`, `projects_file`, `timeline_file`, `settings_file` | see below | where the files are written |
 | `cell_color` | none | a function `seconds -> "#RRGGBB"` (or `nil`) that replaces the day colors |
 | `debug` | `false` | `true`: every key and every drawing of the pages is written to the logs |
 
@@ -119,6 +119,7 @@ Everything is stored in **`~/.local/share/logtime/`** (like WezTerm, which store
 | `.logtime.json` | hours per day: `{"2026-10-10":15231, ...}` (seconds) |
 | `.logtime_idle.json` | idle time per day |
 | `.logtime_projects.json` | active time per project and per day |
+| `.logtime_timeline.json` | at what time each project was used (the timeline in `F4`) |
 | `.logtime_settings.json` | the settings chosen in `F4` |
 | `.logtime_focus` | which WezTerm was used last (when several are open at the same time) |
 | `*.bak`, `*.corrupt-*` | a backup copy; an unreadable file set aside (never overwritten) |

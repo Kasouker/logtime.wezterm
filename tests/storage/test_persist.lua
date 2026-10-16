@@ -771,9 +771,9 @@ local function scenarios()
 		names[#names + 1] = n
 	end
 	check(
-		"dossier des fichiers : seulement le fichier d'heures, sa copie de sécurité et le temps par projet",
+		"dossier des fichiers : seulement le fichier d'heures, sa copie de sécurité, le temps par projet et la frise",
 		table.concat(names, ","),
-		FILE .. "," .. FILE .. ".bak,.logtime_projects.json"
+		FILE .. "," .. FILE .. ".bak,.logtime_projects.json,.logtime_timeline.json"
 	)
 	check("dossier personnel : rien d'autre que .local", table.concat(list(e.home), ","), ".local")
 	cleanup(e)

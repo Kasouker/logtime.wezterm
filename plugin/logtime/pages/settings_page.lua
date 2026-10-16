@@ -460,6 +460,7 @@ function M.create(ctx)
 			days = ctx.days(),
 			idle_days = ctx.idle_days and ctx.idle_days() or nil,
 			projects = ctx.projects and ctx.projects() or nil,
+			timeline = ctx.timeline and ctx.timeline() or nil,
 			year = tonumber(year),
 			month = tonumber(month),
 			today_key = key,

@@ -81,10 +81,12 @@ local day = load_module("core/day")
 local counter = load_module("core/counter")
 local idle = load_module("core/idle")
 local activity = load_module("core/activity")
+local timeline = load_module("core/timeline")
 local status = load_module("status/status")
 local auto = load_module("status/auto")
 local storage = load_module("storage/days")
 local projects_storage = load_module("storage/projects")
+local timeline_storage = load_module("storage/timeline")
 local platform = load_module("system/platform")
 local location = load_module("storage/location")
 local calendar_page = load_module("pages/calendar_page")
@@ -105,6 +107,7 @@ local cfg = {
 	idle_after = 300, -- rien ne bouge dans le terminal pendant 5 min : ce temps est noté comme inactif (il compte quand même)
 	idle_file = nil, -- nil : <dossier personnel>/.logtime_idle.json (le temps inactif par jour)
 	projects_file = nil, -- nil : <dossier personnel>/.logtime_projects.json (le temps actif par projet et par jour)
+	timeline_file = nil, -- nil : <dossier des fichiers>/.logtime_timeline.json (à quelle heure chaque projet a été utilisé)
 	week_starts_on = "monday", -- ou "sunday"
 	goal_hours = nil, -- nombre d'heures par jour qui comptent pour « objectif atteint » (nil : pas d'objectif)
 	lang = "en", -- "en" ou "fr"
@@ -124,6 +127,7 @@ local EXTRA_OPTIONS = {
 	"idle_after",
 	"idle_file",
 	"projects_file",
+	"timeline_file",
 	"settings_file",
 	"settings_key",
 	"open_key",
@@ -605,6 +609,19 @@ local projects_file = side_file({
 })
 local get_projects = projects_file.get
 
+-- La frise de la journée (core/timeline.lua) : à quelle heure chaque projet a été utilisé.
+local timeline_file = side_file({
+	prefix = "logtime_timeline",
+	what = "timeline",
+	path = function()
+		return cfg.timeline_file or (data_dir() .. sep .. ".logtime_timeline.json")
+	end,
+	decode = timeline_storage.decode,
+	encode = timeline_storage.encode,
+	merge = timeline.merge,
+})
+local get_timeline = timeline_file.get
+
 -- Le projet en cours (celui de l'onglet affiché à la dernière mise à jour).
 local function current_label()
 	local label = G.logtime_label
@@ -619,6 +636,7 @@ local function note_counted(from, to)
 	end
 	local label = current_label()
 	activity.add(get_projects(), label, from, to, cfg.day_offset)
+	timeline.add(get_timeline(), label, from, to, cfg.day_offset)
 	local last_activity = num(G.logtime_last_activity)
 	local start = idle.span(last_activity, num(G.logtime_idle_marked), from, to, cfg.idle_after)
 	if start then
@@ -626,8 +644,10 @@ local function note_counted(from, to)
 		day.add_interval(get_idle(), start, to, cfg.day_offset)
 		idle_file.changed()
 		activity.add(get_projects(), label, start, to, cfg.day_offset, -1)
+		timeline.remove(get_timeline(), start, to, cfg.day_offset) -- une pause n'est pas du travail sur la frise
 	end
 	projects_file.changed()
+	timeline_file.changed()
 end
 
 -- L'empreinte de ce qu'on voit dans un panneau : si elle change, il y a de l'activité. Chaque morceau est lu à part
@@ -728,6 +748,7 @@ local function compute()
 	end
 	idle_file.maybe_save(now)
 	projects_file.maybe_save(now)
+	timeline_file.maybe_save(now)
 	return days[day.key(now, cfg.day_offset)] or 0
 end
 
@@ -951,6 +972,7 @@ function M.apply_to_config(config, opts, ...)
 			days = days_for_page, -- pour l'aperçu du mois actuel
 			idle_days = get_idle, -- et le détail du jour de l'aperçu
 			projects = get_projects,
+			timeline = get_timeline, -- et sa frise
 			today_key = function()
 				return day.key(os.time(), cfg.day_offset)
 			end,

@@ -1448,8 +1448,8 @@ check(
 )
 check("aperçu : les vraies heures (le 5 : 8h00)", table.concat(full, "\n"):find("8h00", 1, true) ~= nil, true)
 check(
-	"aperçu : pas les jours d'un autre mois (le 30 septembre : 4h00)",
-	table.concat(full, "\n"):find("4h00", 1, true),
+	"aperçu : pas les jours d'un autre mois (le 30 septembre : 4h00 ; « 24h00 », le bout de la frise, ne compte pas)",
+	table.concat(full, "\n"):find("%f[%d]4h00"),
 	nil
 )
 -- l'onglet Couleurs : la couleur sous le curseur, avant Entrée

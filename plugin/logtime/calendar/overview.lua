@@ -23,6 +23,7 @@ local layout = load("calendar/layout")
 local idle = load("core/idle")
 local activity = load("core/activity")
 local status = load("status/status")
+local palette = load("color/palette")
 
 local M = {}
 
@@ -321,19 +322,131 @@ function M.detail(o, key, width, height)
 	return out
 end
 
+M.TIMELINE_HEIGHT = 4 -- la frise : les heures, puis la frise dans son cadre
+M.DAY_LENGTH = 24 * 3600
+-- Les couleurs des projets sur la frise, dans l'ordre (le plus gros projet du jour d'abord) : des teintes bien
+-- différentes à la suite. Le gris (16) est pour « autres ».
+M.TIMELINE_ORDER = { 3, 11, 1, 6, 13, 9, 2, 15, 5, 12, 7, 14, 10, 4, 8 }
+M.OTHER_COLOR = "#8B8E99"
+
+-- Les couleurs des projets d'un jour : { [projet] = "#RRGGBB" }, le plus gros projet du jour d'abord.
+function M.timeline_colors(segments)
+	local totals, labels = {}, {}
+	for _, seg in ipairs(segments or {}) do
+		if not totals[seg[3]] then
+			labels[#labels + 1] = seg[3]
+			totals[seg[3]] = 0
+		end
+		totals[seg[3]] = totals[seg[3]] + (seg[2] - seg[1])
+	end
+	table.sort(labels, function(a, b)
+		if totals[a] ~= totals[b] then
+			return totals[a] > totals[b]
+		end
+		return a < b
+	end)
+	local colors, n = {}, 0
+	for _, label in ipairs(labels) do
+		if label == activity.OTHER then
+			colors[label] = M.OTHER_COLOR
+		else
+			n = n + 1
+			colors[label] = palette.COLORS[M.TIMELINE_ORDER[(n - 1) % #M.TIMELINE_ORDER + 1]]
+		end
+	end
+	return colors
+end
+
+-- Le projet de chaque colonne de la frise : la journée découpée en `columns` parts égales ; dans chaque part, le projet
+-- qui y a passé le plus de temps (ou nil si personne). Renvoie une liste de `columns` projets (ou false).
+function M.timeline_columns(segments, columns)
+	local out = {}
+	local step = M.DAY_LENGTH / columns
+	for c = 1, columns do
+		local t0, t1 = (c - 1) * step, c * step
+		local best, best_time = false, 0
+		local time = {}
+		for _, seg in ipairs(segments or {}) do
+			local overlap = math.min(t1, seg[2]) - math.max(t0, seg[1])
+			if overlap > 0 then
+				time[seg[3]] = (time[seg[3]] or 0) + overlap
+				if time[seg[3]] > best_time then
+					best, best_time = seg[3], time[seg[3]]
+				end
+			end
+		end
+		out[c] = best
+	end
+	return out
+end
+
+-- « 0h00 », ou l'heure où la journée commence (`day_offset` : -3600 -> la journée commence à 1h00).
+local function clock(seconds)
+	seconds = seconds % (24 * 3600)
+	return string.format("%dh%02d", seconds // 3600, (seconds % 3600) // 60)
+end
+
+-- La frise du jour `key` : M.TIMELINE_HEIGHT lignes de `width` colonnes.
+--   0h00                                                       24h00
+--   ╭──────────────────────────────────────────────────────────────╮
+--   │   ▓Netflix▓  ▓▓plug WT▓▓▓ ▓▓▓Bot Discord▓▓▓  ▓RL▓            │   chaque projet dans sa couleur, son nom
+--   ╰──────────────────────────────────────────────────────────────╯   dedans s'il y tient
+function M.timeline(o, key, width)
+	local b, edge = o.b, o.edge or ""
+	local off = edge ~= "" and convert.RESET or ""
+	local function e(s)
+		return edge .. s .. off
+	end
+	local inner = width - 2
+	local segments = o.timeline and o.timeline[key] or {}
+	local colors = M.timeline_colors(segments)
+	local columns = M.timeline_columns(segments, inner)
+	local start = -(o.cfg.day_offset or 0)
+	-- la fin de la journée : « 24h00 » (et pas « 0h00 ») quand elle finit à minuit
+	local first = clock(start)
+	local last = (start % M.DAY_LENGTH == 0) and "24h00" or clock(start + M.DAY_LENGTH)
+	local hours = " " .. first .. string.rep(" ", math.max(1, width - 2 - vw(first) - vw(last))) .. last .. " "
+	-- les colonnes, par suites du même projet
+	local parts = {}
+	local c = 1
+	while c <= inner do
+		local label = columns[c]
+		local run = c
+		while run + 1 <= inner and columns[run + 1] == label do
+			run = run + 1
+		end
+		local length = run - c + 1
+		if label then
+			local name = label == activity.OTHER and o.labels.detail_other or label
+			local text = (vw(name) + 2 <= length) and centered(name, length) or string.rep(" ", length)
+			local color = colors[label] or M.OTHER_COLOR
+			parts[#parts + 1] = convert.bg(color) .. convert.fg(convert.contrast(color)) .. text .. convert.RESET
+		else
+			parts[#parts + 1] = string.rep(" ", length)
+		end
+		c = run + 1
+	end
+	return {
+		fit(hours, width),
+		e(b.tl .. string.rep(b.h, inner) .. b.tr),
+		e(b.v) .. table.concat(parts) .. e(b.v),
+		e(b.bl .. string.rep(b.h, inner) .. b.br),
+	}
+end
+
 M.GRID_SHARE = 0.5 -- la grille du mois prend au plus cette part de la hauteur ; le détail du jour, le reste
 M.MIN_DETAIL = 10 -- le détail : au moins 10 lignes (cadre compris)
 
 -- La largeur et la hauteur minimum de la vue (une grille de `weeks` semaines).
 function M.minimum(weeks)
 	local count = weeks or 6
-	return M.WEEK_LABEL_WIDTH + 9 + 7 * M.MIN_CELL, 3 + count * (M.MIN_ROW + 1) + M.MIN_DETAIL
+	return M.WEEK_LABEL_WIDTH + 9 + 7 * M.MIN_CELL, 3 + count * (M.MIN_ROW + 1) + M.MIN_DETAIL + M.TIMELINE_HEIGHT
 end
 
 -- Toute la vue (la grille du mois, puis le détail du jour `o.day_key`) : exactement `height` lignes de `width`
 -- colonnes, ou nil si la zone est trop petite. La grille ne prend pas plus de M.GRID_SHARE de la hauteur (sinon elle
 -- écrase le détail) ; le détail, juste dessous, prend tout le reste.
---   o = { days, idle_days, projects, year, month, today_key, day_key, cfg, labels, b, edge }
+--   o = { days, idle_days, projects, timeline, year, month, today_key, day_key, cfg, labels, b, edge }
 function M.render(o, width, height)
 	local weeks = #M.weeks(o.year, o.month, o.cfg.week_starts_on)
 	local min_w, min_h = M.minimum(weeks)
@@ -341,7 +454,8 @@ function M.render(o, width, height)
 		return nil
 	end
 	local smallest_grid = 3 + weeks * (M.MIN_ROW + 1)
-	local grid_height = math.max(smallest_grid, math.min(height - M.MIN_DETAIL, math.floor(height * M.GRID_SHARE)))
+	local grid_height =
+		math.max(smallest_grid, math.min(height - M.MIN_DETAIL - M.TIMELINE_HEIGHT, math.floor(height * M.GRID_SHARE)))
 	local grid = M.grid(o, width, grid_height)
 	if not grid then
 		return nil
@@ -354,7 +468,11 @@ function M.render(o, width, height)
 	while #out > 0 and out[#out]:match("^ *$") do
 		out[#out] = nil
 	end
-	for _, line in ipairs(M.detail(o, o.day_key or o.today_key, width, height - #out)) do
+	local key = o.day_key or o.today_key
+	for _, line in ipairs(M.detail(o, key, width, height - #out - M.TIMELINE_HEIGHT)) do
+		out[#out + 1] = line
+	end
+	for _, line in ipairs(M.timeline(o, key, width)) do
 		out[#out + 1] = line
 	end
 	return out

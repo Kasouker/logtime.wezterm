@@ -1181,6 +1181,37 @@ local function scenarios()
 		299 + 59 + 60 + 1
 	)
 	check("projets : rien pour la fenêtre sans le focus", p_day["autre/projet"], nil)
+	-- la frise : à quelle heure chaque projet a été utilisé (T0 = 12h00 : 43200 s depuis le début de la journée)
+	local tl_text = read(e.home .. "/.local/share/logtime/.logtime_timeline.json")
+	check("frise : le fichier est écrit", tl_text ~= nil, true)
+	local tl_day = module("storage/timeline").decode(tl_text or "{}")["2026-10-13"] or {}
+	check(
+		"frise : d'abord 42/C05, à partir de 12h00",
+		tl_day[1] and (tl_day[1][3] .. " " .. tl_day[1][1]),
+		"42/C05 43200"
+	)
+	check("frise : 42/C05 jusqu'au changement d'onglet (10 min)", tl_day[1] and tl_day[1][2], 43200 + 601)
+	check("frise : puis Claude Code", tl_day[2] and tl_day[2][3], "Claude Code")
+	check(
+		"frise : la pause d'une heure n'y est pas (Claude Code s'arrête 5 min avant le début de la pause)",
+		tl_day[2] and tl_day[2][2] <= 43200 + 901,
+		true
+	)
+	check(
+		"frise : la reprise, après la pause",
+		tl_day[3] and tl_day[3][3] == "Claude Code" and tl_day[3][1] >= 43200 + 4500,
+		true
+	)
+	check("frise : rien pour la fenêtre sans le focus", tl_text:find("autre/projet", 1, true), nil)
+	local tl_total = 0
+	for _, seg in ipairs(tl_day) do
+		tl_total = tl_total + seg[2] - seg[1]
+	end
+	local p_total = 0
+	for _, secs in pairs(p_day) do
+		p_total = p_total + secs
+	end
+	check("frise : autant de temps que le temps par projet (le temps actif)", math.abs(tl_total - p_total) <= 2, true)
 	check("projets : la page du calendrier compte pour logtime", p_day.logtime ~= nil and p_day.logtime >= 60, true)
 	check("projets : jamais pour PING", saved:find("PING", 1, true), nil)
 	-- la page de personnalisation aussi
@@ -1333,6 +1364,12 @@ local function scenarios()
 		591
 	)
 	check("deux WezTerm : rien pour le projet de B (il n'a pas le focus)", projects_now()["autre/projet"], nil)
+	check(
+		"deux WezTerm : la frise ne contient que A (B n'a pas le focus)",
+		(read(D .. ".logtime_timeline.json") or ""):find("42/C05", 1, true) ~= nil
+			and (read(D .. ".logtime_timeline.json") or ""):find("autre/projet", 1, true) == nil,
+		true
+	)
 	check(
 		"deux WezTerm : B ne compte pas d'inactif (il n'attribue rien : rien ne bougeait chez lui)",
 		read(D .. ".logtime_idle.json"),

@@ -98,7 +98,7 @@ Les options sont lues dans cet ordre (la dernière gagne) : **valeurs par défau
 | `day_offset` | `0` | moment où la journée change, en secondes après minuit |
 | `save_every` | `10` | sauvegarde toutes les 10 s (s'il y a du nouveau) |
 | `sleep_limit` | `3900` | veille comptée par épisode (65 min) |
-| `data_file`, `idle_file`, `projects_file`, `settings_file` | voir plus bas | emplacement des fichiers |
+| `data_file`, `idle_file`, `projects_file`, `timeline_file`, `settings_file` | voir plus bas | emplacement des fichiers |
 | `cell_color` | aucun | une fonction `secondes -> "#RRGGBB"` (ou `nil`) qui remplace les couleurs des jours |
 | `debug` | `false` | `true` : chaque touche et chaque dessin des pages sont écrits dans les journaux |
 
@@ -120,6 +120,7 @@ Tout est rangé dans **`~/.local/share/logtime/`** (comme WezTerm, qui range ses
 | `.logtime.json` | les heures par jour : `{"2026-10-10":15231, ...}` (en secondes) |
 | `.logtime_idle.json` | le temps inactif par jour |
 | `.logtime_projects.json` | le temps actif par projet et par jour |
+| `.logtime_timeline.json` | à quelle heure chaque projet a été utilisé (la frise de `F4`) |
 | `.logtime_settings.json` | les réglages choisis dans `F4` |
 | `.logtime_focus` | le WezTerm utilisé en dernier (quand plusieurs sont ouverts en même temps) |
 | `*.bak`, `*.corrupt-*` | une copie de secours ; un fichier illisible mis de côté (jamais écrasé) |
