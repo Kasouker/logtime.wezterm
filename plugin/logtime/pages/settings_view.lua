@@ -2,20 +2,23 @@
 -- Aucune dépendance à WezTerm : se teste avec un simple interpréteur Lua.
 --
 -- Toute la fenêtre est utilisée, dans un cadre :
---   ╭──────────┬────────┬──────────┬─────────┬────────────────────────────╮
---   │ Settings │ Colors │ Calendar │ General │                            │  l'onglet ouvert sur fond coloré
---   ├──────────┴────────┴──────────┴─────────┤                            │
---   │ d: default // q: close // …  (souligné) │          l'aperçu          │
---   │ Arrows or h j k l: … (souligné)         │   (centré dans sa zone)    │
+--   ╭──────────┬▄▄▄▄▄▄▄▄┬──────────┬─────────┬────────────────────────────╮
+--   │ Settings │ Colors │ Calendar │ General │                            │  l'onglet ouvert rempli de sa couleur,
+--   ├──────────┴▀▀▀▀▀▀▀▀┴──────────┴─────────┤                            │  du trait du haut à celui du bas
+--   │  d: default  //  q: close  //  Tab …    │          l'aperçu          │  chaque ligne d'aide divisée en parts
+--   │  Arrows …: choose  //  Enter: save      │   (centré dans sa zone)    │  égales ; seul le texte est souligné
 --   │ ╭──────────────────────────╮            │                            │
---   │ │ y: use your theme colors │            │                            │  coloré quand c'est actif
+--   │ │ y: use your theme colors │  note      │                            │  rempli de sa couleur quand c'est actif
 --   │ ╰──────────────────────────╯            │                            │
 --   ├────────────────────────────────────────┤                            │
---   │ Gradient color:  ╭ Preview: … ╮         │                            │
---   │  ██████  ██████  ██████  ██████         │                            │  les 16 couleurs, qui grandissent
---   │  …                                      │                            │  avec la fenêtre ; la choisie
---   │ Choice: … // Saved color: …  (soulignés) │                            │  dans un cadre blanc ou noir
+--   │ Gradient color:          ╭ Preview ╮   │                            │  l'aperçu du dégradé collé à droite
+--   │   ┌────────┐                            │                            │
+--   │   │████████│   ████████   ████████  …  │                            │  16 cases (2 lignes de haut), réparties
+--   │   └────────┘                            │                            │  sur la place ; la choisie encadrée
+--   │  Choice: …   //   Saved color: …        │                            │
 --   ╰────────────────────────────────────────┴────────────────────────────╯
+-- Onglets Calendrier et Général : les réglages répartis sur la hauteur (le nom à gauche, la valeur collée à droite), le
+-- réglage choisi rempli comme l'onglet ouvert, et son explication encadrée en bas.
 -- Si la fenêtre n'est pas assez large pour l'aperçu, le panneau de gauche prend toute la largeur.
 local load = ...
 local layout = load("calendar/layout")
@@ -26,11 +29,14 @@ local M = {}
 M.LEFT_SHARE = 0.42 -- la part de la largeur pour le panneau de gauche (quand l'aperçu est à droite)
 M.MIN_LEFT = 57 -- la largeur minimum du panneau de gauche (sans ses traits) : une explication de réglage fait 55 au plus
 M.COLUMNS, M.ROWS = 4, 4 -- les 16 couleurs
-M.MIN_SWATCH_HEIGHT = 2 -- une case de couleur : au moins 2 lignes (le cadre de la case choisie : haut et bas)
+M.SWATCH_WIDTH = 10 -- une case de couleur : 10 colonnes (moins si la place manque)...
 M.MIN_SWATCH_WIDTH = 6
-M.SWATCH_GAP_X, M.SWATCH_GAP_Y = 2, 1
+M.SWATCH_HEIGHT = 2 -- ... sur 2 lignes ; l'espace entre les cases grandit avec la fenêtre
+M.FRAME_COLOR = "#ECE6D9" -- le cadre de la case choisie (clair : il se voit autour de toutes les couleurs)
+M.SEPARATOR_TEXT = "//"
 
 M.UNDERLINE, M.UNDERLINE_OFF = "\27[4m", "\27[24m"
+local UPPER_HALF, LOWER_HALF = "▀", "▄"
 
 local vw = layout.visible_width
 
@@ -55,6 +61,66 @@ local function centered(text, width)
 	return fit(string.rep(" ", left) .. text, width)
 end
 
+-- Les morceaux d'une ligne d'aide écrite « a // b // c ».
+function M.parts(text)
+	local out = {}
+	for part in (tostring(text or "") .. " // "):gmatch("(.-)%s*//%s*") do
+		if part:match("%S") then
+			out[#out + 1] = part:match("^%s*(.-)%s*$")
+		end
+	end
+	return out
+end
+
+-- Une ligne divisée en autant de parts égales qu'il y a de morceaux : chaque morceau centré dans sa part, « // » entre
+-- les parts, seul le texte souligné (pas les espaces). Si un morceau ne tient pas dans sa part, les morceaux sont
+-- espacés régulièrement. Renvoie une ligne de `width` colonnes.
+function M.spread(parts, width, underline)
+	local n = #parts
+	if n == 0 then
+		return string.rep(" ", width)
+	end
+	local style = underline and M.underline or function(t)
+		return t
+	end
+	local sep = M.SEPARATOR_TEXT
+	local column = (width - #sep * (n - 1)) // n
+	local fits = true
+	for _, part in ipairs(parts) do
+		if vw(part) > column then
+			fits = false
+		end
+	end
+	local pieces = {}
+	if fits then
+		for i, part in ipairs(parts) do
+			local len = vw(part)
+			local left = (column - len) // 2
+			pieces[i] = string.rep(" ", left) .. style(part) .. string.rep(" ", column - len - left)
+		end
+		return fit(table.concat(pieces, sep), width)
+	end
+	-- pas la place pour des parts égales : un espacement régulier entre les morceaux
+	local total = #sep * (n - 1)
+	for _, part in ipairs(parts) do
+		total = total + vw(part)
+	end
+	local gap = math.max(1, (width - total) // (2 * n))
+	for i, part in ipairs(parts) do
+		pieces[i] = string.rep(" ", gap) .. style(part) .. string.rep(" ", gap)
+	end
+	return fit(table.concat(pieces, sep), width)
+end
+
+-- La largeur minimum d'une ligne divisée (les morceaux, les « // », une colonne de chaque côté de chacun).
+local function spread_width(parts)
+	local total = #M.SEPARATOR_TEXT * math.max(0, #parts - 1)
+	for _, part in ipairs(parts) do
+		total = total + vw(part) + 2
+	end
+	return total
+end
+
 -- Les largeurs des 4 cases d'onglets dans `width` colonnes (3 traits entre elles) : le reste va aux premières.
 function M.tab_widths(width)
 	local inner = width - 3
@@ -66,115 +132,173 @@ function M.tab_widths(width)
 	return widths
 end
 
--- Une case de couleur : `w` x `h`, sur le fond de la couleur ; la case choisie a un cadre blanc ou noir (le plus
--- visible sur cette couleur) dessiné DANS la case.
-function M.swatch(hex, selected, w, h)
-	local bg = convert.bg(hex)
-	local lines = {}
-	for row = 1, h do
-		local text
-		if selected and row == 1 then
-			text = "┌" .. string.rep("─", w - 2) .. "┐"
-		elseif selected and row == h then
-			text = "└" .. string.rep("─", w - 2) .. "┘"
-		elseif selected then
-			text = "│" .. string.rep(" ", w - 2) .. "│"
-		else
-			text = string.rep(" ", w)
-		end
-		local fg = selected and convert.fg(convert.contrast(hex)) or ""
-		lines[row] = bg .. fg .. text .. convert.RESET
-	end
-	return lines
+local function filled(accent)
+	return convert.bg(accent) .. convert.fg(convert.contrast(accent))
 end
 
--- La grille des 16 couleurs dans `width` x `height` (avec une marge d'une colonne à gauche). Les cases grandissent pour
--- remplir la place. Renvoie les lignes (exactement `height`).
-function M.grid(colors, index, width, height)
-	local gx, gy = M.SWATCH_GAP_X, M.SWATCH_GAP_Y
-	local w = math.max(M.MIN_SWATCH_WIDTH, (width - 2 - (M.COLUMNS - 1) * gx) // M.COLUMNS)
-	local h = math.max(M.MIN_SWATCH_HEIGHT, (height - (M.ROWS - 1) * gy) // M.ROWS)
-	local out = {}
-	for row = 0, M.ROWS - 1 do
-		local cells = {}
-		for col = 0, M.COLUMNS - 1 do
-			local i = row * M.COLUMNS + col + 1
-			cells[#cells + 1] = M.swatch(colors[i] or "#000000", i == index, w, h)
-		end
-		for line = 1, h do
-			local parts = {}
-			for col = 1, M.COLUMNS do
-				parts[#parts + 1] = cells[col][line]
-			end
-			out[#out + 1] = fit(" " .. table.concat(parts, string.rep(" ", gx)), width)
-		end
-		if row < M.ROWS - 1 then
-			for _ = 1, gy do
-				out[#out + 1] = string.rep(" ", width)
-			end
-		end
+-- Le bouton « y : utiliser les couleurs de ton thème » : 3 lignes. Inactif : encadré. Actif : rempli de la couleur
+-- `accent` sur ses 3 lignes (des demi-blocs en haut et en bas, à la place du cadre). `note` : un texte à sa droite.
+function M.button(text, active, accent, note, width)
+	local inner = " " .. text .. " "
+	local n = vw(inner)
+	local after = note and ("  " .. note) or ""
+	if active then
+		local half = convert.fg(accent)
+		return {
+			fit(" " .. half .. string.rep(LOWER_HALF, n + 2) .. convert.RESET, width),
+			fit(" " .. filled(accent) .. " " .. inner .. " " .. convert.RESET .. after, width),
+			fit(" " .. half .. string.rep(UPPER_HALF, n + 2) .. convert.RESET, width),
+		}
 	end
-	while #out < height do
-		out[#out + 1] = string.rep(" ", width)
+	return {
+		fit(" ╭" .. string.rep("─", n) .. "╮", width),
+		fit(" │" .. inner .. "│" .. after, width),
+		fit(" ╰" .. string.rep("─", n) .. "╯", width),
+	}
+end
+
+-- Le titre du dégradé (souligné) à gauche, et son aperçu encadré collé au bord droit : 3 lignes.
+local function gradient_box(title, preview_text, width)
+	local n = vw(preview_text) + 2
+	local box_width = n + 2
+	local label = " " .. M.underline(title)
+	local left = math.max(0, width - box_width - 1)
+	return {
+		fit(string.rep(" ", left) .. "╭" .. string.rep("─", n) .. "╮", width),
+		fit(fit(label, left) .. "│ " .. preview_text .. " │", width),
+		fit(string.rep(" ", left) .. "╰" .. string.rep("─", n) .. "╯", width),
+	}
+end
+
+-- Répartit `free` cases vides en `count` espaces (le reste aux premiers).
+local function share(free, count)
+	local out = {}
+	for i = 1, count do
+		out[i] = free // count + (i <= free % count and 1 or 0)
 	end
 	return out
 end
 
--- Le bouton « y : utiliser les couleurs de ton thème » : 3 lignes, encadré ; coloré (fond `accent`) quand c'est actif.
--- `note` (facultatif) : un texte à droite du bouton (l'état : thème introuvable, comment revenir…).
-function M.button(text, active, accent, note, width)
-	local inner = " " .. text .. " "
-	local n = vw(inner)
-	local style, off = "", ""
-	if active then
-		style, off = convert.bg(accent) .. convert.fg(convert.contrast(accent)), convert.RESET
+-- La grille des 16 couleurs dans `width` x `height` : des cases de M.SWATCH_HEIGHT lignes, réparties régulièrement
+-- (l'espace entre elles grandit avec la place) ; la case choisie a un cadre AUTOUR d'elle, dans cet espace.
+-- Renvoie les lignes (exactement `height`).
+function M.grid(colors, index, width, height)
+	local cols, rows = M.COLUMNS, M.ROWS
+	local sw = math.max(M.MIN_SWATCH_WIDTH, math.min(M.SWATCH_WIDTH, (width - 2 * (cols + 1)) // cols))
+	local sh = M.SWATCH_HEIGHT
+	local gaps_x = share(math.max(0, width - cols * sw), cols + 1)
+	local gaps_y = share(math.max(0, height - rows * sh), rows + 1)
+	-- la toile : une case par caractère (le texte affiché, avec ses codes de couleur)
+	local canvas = {}
+	for y = 1, height do
+		canvas[y] = {}
+		for x = 1, width do
+			canvas[y][x] = " "
+		end
 	end
-	local edge_style = active and convert.fg(accent) or ""
-	local edge_off = active and convert.RESET or ""
-	return {
-		fit(" " .. edge_style .. "╭" .. string.rep("─", n) .. "╮" .. edge_off, width),
-		fit(
-			" "
-				.. edge_style
-				.. "│"
-				.. edge_off
-				.. style
-				.. inner
-				.. off
-				.. edge_style
-				.. "│"
-				.. edge_off
-				.. (note and ("  " .. note) or ""),
-			width
-		),
-		fit(" " .. edge_style .. "╰" .. string.rep("─", n) .. "╯" .. edge_off, width),
-	}
+	local function put(x, y, text)
+		if canvas[y] and x >= 1 and x <= width then
+			canvas[y][x] = text
+		end
+	end
+	local frame = convert.fg(M.FRAME_COLOR)
+	local y = gaps_y[1]
+	for row = 0, rows - 1 do
+		local x = gaps_x[1]
+		for col = 0, cols - 1 do
+			local i = row * cols + col + 1
+			local fill = convert.bg(colors[i] or "#000000") .. " " .. convert.RESET
+			for dy = 1, sh do
+				for dx = 1, sw do
+					put(x + dx, y + dy, fill)
+				end
+			end
+			if i == index then
+				put(x, y, frame .. "┌" .. convert.RESET)
+				put(x + sw + 1, y, frame .. "┐" .. convert.RESET)
+				put(x, y + sh + 1, frame .. "└" .. convert.RESET)
+				put(x + sw + 1, y + sh + 1, frame .. "┘" .. convert.RESET)
+				for dx = 1, sw do
+					put(x + dx, y, frame .. "─" .. convert.RESET)
+					put(x + dx, y + sh + 1, frame .. "─" .. convert.RESET)
+				end
+				for dy = 1, sh do
+					put(x, y + dy, frame .. "│" .. convert.RESET)
+					put(x + sw + 1, y + dy, frame .. "│" .. convert.RESET)
+				end
+			end
+			x = x + sw + gaps_x[col + 2]
+		end
+		y = y + sh + gaps_y[row + 2]
+	end
+	local out = {}
+	for line = 1, height do
+		out[line] = table.concat(canvas[line])
+	end
+	return out
 end
 
--- L'aperçu du dégradé, encadré, précédé de son titre souligné : 3 lignes.
-local function gradient_box(title, preview_text, width)
-	local label = " " .. M.underline(title) .. "  "
-	local pad = string.rep(" ", vw(label))
-	local n = vw(preview_text) + 2
+-- Les réglages d'un onglet (Calendrier, Général) dans `width` x `height` : un par ligne, répartis sur la hauteur, le
+-- nom à gauche et la valeur collée à droite ; le réglage choisi est rempli de la couleur `accent` (avec des demi-blocs
+-- au-dessus et en dessous quand il y a la place). rows = { { name, value }, ... }, selected = son numéro.
+function M.settings_rows(rows, selected, accent, width, height)
+	local out = {}
+	for i = 1, height do
+		out[i] = string.rep(" ", width)
+	end
+	local count = #rows
+	if count == 0 then
+		return out
+	end
+	local gaps = share(math.max(0, height - count), count + 1)
+	local y = gaps[1]
+	local style = filled(accent)
+	for i, row in ipairs(rows) do
+		y = y + 1
+		local name, value = "   " .. row.name, row.value .. "   "
+		local room = width - vw(name)
+		local line = name .. string.rep(" ", math.max(1, room - vw(value))) .. value
+		if i == selected then
+			-- les couleurs de la valeur (l'aperçu du trait) ne doivent pas effacer le fond de la ligne
+			line = style
+				.. line:gsub("\27%[0m", convert.RESET .. style)
+				.. string.rep(" ", math.max(0, width - vw(line)))
+				.. convert.RESET
+			if gaps[i] >= 1 then
+				out[y - 1] = convert.fg(accent) .. string.rep(LOWER_HALF, width) .. convert.RESET
+			end
+			if gaps[i + 1] >= 1 and y + 1 <= height then
+				out[y + 1] = convert.fg(accent) .. string.rep(UPPER_HALF, width) .. convert.RESET
+			end
+		end
+		out[y] = fit(line, width)
+		y = y + gaps[i + 1]
+	end
+	return out
+end
+
+-- Un texte encadré sur toute la largeur (l'explication du réglage choisi) : 3 lignes.
+local function text_box(text, width)
+	local n = width - 4
 	return {
-		fit(pad .. "╭" .. string.rep("─", n) .. "╮", width),
-		fit(label .. "│ " .. preview_text .. " │", width),
-		fit(pad .. "╰" .. string.rep("─", n) .. "╯", width),
+		fit(" ╭" .. string.rep("─", n) .. "╮", width),
+		fit(" │ " .. fit(text or "", n - 2) .. " │", width),
+		fit(" ╰" .. string.rep("─", n) .. "╯", width),
 	}
 end
 
 local SEPARATOR = {} -- une ligne de séparation du panneau de gauche (├────┤)
 
 -- Le contenu du panneau de gauche, sous la barre d'onglets : une liste de lignes (ou SEPARATOR), exactement `height`.
---   o.help        : les deux lignes d'aide (soulignées)
+--   o.help        : les lignes d'aide, chacune écrite « a // b // c » (divisée en parts égales, soulignée)
 --   o.button      : { text, active, note } pour l'onglet Couleurs (sinon nil)
 --   o.colors_tab  : { colors, index, gradient_title, gradient_preview, choice, saved, gradient_off } (onglet Couleurs)
---   o.list        : les lignes d'un onglet de réglages (Calendrier, Général)
+--   o.list        : { rows = { { name, value }, ... }, selected, hint } (onglets Calendrier et Général)
 --   o.message     : le message du bas (« ✓ Enregistré », la raison d'un échec…) ou ""
 local function left_content(o, width, height)
 	local top = {}
 	for _, line in ipairs(o.help or {}) do
-		top[#top + 1] = fit(" " .. M.underline(line), width)
+		top[#top + 1] = M.spread(M.parts(line), width, true)
 	end
 	if o.button then
 		for _, line in ipairs(M.button(o.button.text, o.button.active, o.accent, o.button.note, width)) do
@@ -188,22 +312,26 @@ local function left_content(o, width, height)
 		for _, line in ipairs(gradient_box(c.gradient_title, c.gradient_preview, width)) do
 			top[#top + 1] = line
 		end
-		top[#top + 1] = string.rep(" ", width)
-		bottom[#bottom + 1] = string.rep(" ", width)
-		local saved = c.saved and (" // " .. M.underline(c.saved)) or ""
-		bottom[#bottom + 1] = fit(" " .. M.underline(c.choice) .. saved, width)
+		local choice = { c.choice }
+		if c.saved then
+			choice[2] = c.saved
+		end
+		bottom[#bottom + 1] = M.spread(choice, width, true)
 		bottom[#bottom + 1] = fit(c.gradient_off and (" " .. c.gradient_off) or "", width)
-	else
-		for _, line in ipairs(o.list or {}) do
-			top[#top + 1] = fit(line, width)
+	elseif o.list then
+		for _, line in ipairs(text_box(o.list.hint, width)) do
+			bottom[#bottom + 1] = line
 		end
 	end
 	bottom[#bottom + 1] = fit(o.message and o.message ~= "" and o.message or "", width)
 	local middle_height = height - #top - #bottom
-	local middle = {}
+	local middle
 	if c then
 		middle = M.grid(c.colors, c.index, width, middle_height)
+	elseif o.list then
+		middle = M.settings_rows(o.list.rows or {}, o.list.selected, o.accent, width, middle_height)
 	else
+		middle = {}
 		for _ = 1, middle_height do
 			middle[#middle + 1] = string.rep(" ", width)
 		end
@@ -217,27 +345,37 @@ local function left_content(o, width, height)
 	return out
 end
 
--- La hauteur minimum de la page (cadre compris) et la largeur minimum du panneau de gauche, pour ce contenu.
+-- La largeur minimum du panneau de gauche et la hauteur minimum de la page (cadre compris), pour ce contenu.
 function M.minimum(o)
-	local help_width = 0
+	local left = M.MIN_LEFT
 	for _, line in ipairs(o.help or {}) do
-		help_width = math.max(help_width, vw(line) + 2)
+		left = math.max(left, spread_width(M.parts(line)))
 	end
 	if o.button then
-		help_width = math.max(help_width, vw(o.button.text) + 6 + (o.button.note and vw(o.button.note) + 2 or 0))
+		left = math.max(left, vw(o.button.text) + 6 + (o.button.note and vw(o.button.note) + 2 or 0))
 	end
-	for _, line in ipairs(o.list or {}) do
-		help_width = math.max(help_width, vw(line) + 1)
+	local c = o.colors_tab
+	if c then
+		left = math.max(left, vw(c.gradient_title) + vw(c.gradient_preview) + 8)
+		left = math.max(left, spread_width({ c.choice, c.saved or "" }))
+		left = math.max(left, M.COLUMNS * M.MIN_SWATCH_WIDTH + 2 * (M.COLUMNS + 1))
 	end
-	local left = math.max(M.MIN_LEFT, help_width)
-	local rows = 3 + #(o.help or {}) + 1 + 1 -- cadre du haut, onglets, jonction ; aide ; séparation ; cadre du bas
+	if o.list then
+		for _, row in ipairs(o.list.rows or {}) do
+			left = math.max(left, vw(row.name) + vw(row.value) + 7)
+		end
+	end
+	-- le cadre du haut, les onglets et leur jonction ; l'aide ; la séparation ; le cadre du bas
+	local rows = 3 + #(o.help or {}) + 1 + 1
 	if o.button then
 		rows = rows + 3
 	end
-	if o.colors_tab then
-		rows = rows + 3 + 1 + (M.ROWS * M.MIN_SWATCH_HEIGHT + (M.ROWS - 1) * M.SWATCH_GAP_Y) + 3 + 1
+	if c then
+		rows = rows + 3 + (M.ROWS * M.SWATCH_HEIGHT + (M.ROWS + 1)) + 3
+	elseif o.list then
+		rows = rows + (2 * #(o.list.rows or {}) + 1) + 3 + 1
 	else
-		rows = rows + #(o.list or {}) + 1
+		rows = rows + 1
 	end
 	return left, rows
 end
@@ -245,7 +383,7 @@ end
 -- Dessine toute la page dans une fenêtre de `cols` x `rows`. Renvoie les lignes (exactement `rows`, chacune de `cols`
 -- colonnes) et true si l'aperçu est affiché ; ou nil, la largeur et la hauteur qu'il faudrait (fenêtre trop petite).
 --   o.b, o.edge  : les traits du cadre (assemble.BORDER_STYLES) et leur couleur (un code de couleur, ou "")
---   o.accent     : la couleur de l'onglet ouvert et du bouton actif ("#RRGGBB")
+--   o.accent     : la couleur de l'onglet ouvert, du bouton actif et du réglage choisi ("#RRGGBB")
 --   o.tabs       : les 4 noms de la barre d'onglets (le titre, puis les 3 onglets) ; o.tab : l'onglet ouvert (1 à 3)
 --   o.preview    : { lines, width } ou nil
 function M.draw(o, cols, rows)
@@ -267,11 +405,11 @@ function M.draw(o, cols, rows)
 		left, right = cols - 2, 0
 	end
 	local inner_rows = rows - 2
-	-- le panneau de droite : l'aperçu centré dans sa zone
+	-- le panneau de droite : l'aperçu centré dans sa zone (par sa largeur : les lignes d'un mois n'ont pas toutes la
+	-- même longueur)
 	local right_lines = {}
 	if show_preview then
 		local top = math.max(0, math.floor((inner_rows - #preview.lines) / 2))
-		-- centré par sa largeur (pas par chaque ligne : les lignes d'un mois n'ont pas toutes la même longueur)
 		local margin = math.max(0, math.floor((right - preview.width) / 2))
 		for i = 1, inner_rows do
 			right_lines[i] = fit(string.rep(" ", margin) .. (preview.lines[i - top] or ""), right)
@@ -283,22 +421,30 @@ function M.draw(o, cols, rows)
 		end
 		return line .. e(b.v) .. right_lines[i] .. e(b.v)
 	end
-	-- la barre d'onglets
+	-- la barre d'onglets : l'onglet ouvert rempli de sa couleur, du trait du haut à celui du bas (des demi-blocs à la
+	-- place des traits, au-dessus et en dessous de lui)
 	local widths = M.tab_widths(left)
-	local cells, tops = {}, {}
+	local open = (o.tab or 1) + 1
+	local cells, tops, bottoms = {}, {}, {}
 	for i = 1, 4 do
 		local name = centered(o.tabs[i] or "", widths[i])
-		if i == (o.tab or 1) + 1 then
-			name = convert.bg(o.accent) .. convert.fg(convert.contrast(o.accent)) .. name .. convert.RESET
+		if i == open then
+			cells[i] = filled(o.accent) .. name .. convert.RESET
+			tops[i] = convert.fg(o.accent) .. string.rep(LOWER_HALF, widths[i]) .. convert.RESET
+			bottoms[i] = convert.fg(o.accent) .. string.rep(UPPER_HALF, widths[i]) .. convert.RESET
+		else
+			cells[i] = name
+			tops[i] = e(string.rep(b.h, widths[i]))
+			bottoms[i] = e(string.rep(b.h, widths[i]))
 		end
-		cells[i] = name
-		tops[i] = string.rep(b.h, widths[i])
 	end
 	local out = {}
-	out[1] = e(b.tl .. table.concat(tops, b.t) .. (show_preview and (b.t .. string.rep(b.h, right)) or "") .. b.tr)
+	out[1] = e(b.tl)
+		.. table.concat(tops, e(b.t))
+		.. e((show_preview and (b.t .. string.rep(b.h, right)) or "") .. b.tr)
 	out[2] = with_right(1, e(b.v) .. table.concat(cells, e(b.v)))
 	-- la jonction sous les onglets (├──┴──┤) : à droite, elle touche le trait qui sépare l'aperçu
-	out[3] = e(b.l .. table.concat(tops, b.b) .. b.r) .. (show_preview and (right_lines[2] .. e(b.v)) or "")
+	out[3] = e(b.l) .. table.concat(bottoms, e(b.b)) .. e(b.r) .. (show_preview and (right_lines[2] .. e(b.v)) or "")
 	local content = left_content(o, left, inner_rows - 2)
 	for i, line in ipairs(content) do
 		local r = i + 2

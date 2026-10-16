@@ -23,8 +23,6 @@ local M = {}
 M.TABLE_NAME = "logtime_settings"
 M.EVENT_PREFIX = "logtime-settings"
 
-local NAME_WIDTH = 30 -- largeur du nom d'un réglage dans un onglet de réglages (les valeurs sont alignées après)
-
 -- Les onglets de la page (gardés dans wezterm.GLOBAL sous forme de nombres).
 M.TAB = { COLORS = 1, CALENDAR = 2, GENERAL = 3 }
 M.TAB_COUNT = 3
@@ -203,31 +201,27 @@ function M.message_line(message, labels, reason, width)
 	return ""
 end
 
--- Les lignes d'un onglet de réglages (Calendrier, Général) : son intitulé, un réglage par ligne (le réglage choisi
--- marqué par « ▸ »), puis l'explication du réglage choisi.
+-- Les réglages d'un onglet (Calendrier, Général), pour pages/settings_view.lua : { rows = { { name, value }, ... },
+-- selected = le numéro du réglage choisi, hint = son explication }.
 --   state = { tab = l'onglet, row = le numéro du réglage choisi, values = { max_months = 12, ... }, border_choices }
-function M.list_lines(state, labels)
+function M.list_rows(state, labels)
 	local list = M.LISTS[state.tab]
 	local names = labels.settings_names or {}
 	local hints = labels.settings_hints or {}
-	local lines = { " " .. (labels[list.heading] or ""), "" }
-	for i, key in ipairs(list.settings) do
+	local rows = {}
+	for _, key in ipairs(list.settings) do
 		local definition = schema.get(key)
 		local value = state.values[key]
 		if value == nil then -- pas « or » : avec un oui/non, false or true donnerait true
 			value = M.fallback(definition)
 		end
-		local name = names[key] or key
-		local padding = string.rep(" ", math.max(1, NAME_WIDTH - (utf8.len(name) or #name)))
-		lines[#lines + 1] = (i == state.row and " ▸ " or "   ")
-			.. name
-			.. padding
-			.. M.format_value(definition, value, value_text(key, value, labels, state))
+		rows[#rows + 1] = {
+			name = names[key] or key,
+			value = M.format_value(definition, value, value_text(key, value, labels, state)),
+		}
 	end
-	lines[#lines + 1] = ""
 	local selected = list.settings[state.row]
-	lines[#lines + 1] = (selected and hints[selected]) and (" " .. hints[selected]) or ""
-	return lines
+	return { rows = rows, selected = state.row, hint = selected and hints[selected] or "" }
 end
 
 -- ctx fournit ce que la page ne sait pas faire seule (days et today_key sont facultatifs : sans eux, pas d'aperçu) :
@@ -415,7 +409,7 @@ function M.create(ctx)
 					values[key] = setting_value(key)
 				end
 			end
-			o.list = M.list_lines(
+			o.list = M.list_rows(
 				{ tab = tab, row = current_row(), values = values, border_choices = border_choices() },
 				labels
 			)

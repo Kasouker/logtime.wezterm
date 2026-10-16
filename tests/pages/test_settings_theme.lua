@@ -350,7 +350,7 @@ end
 local function button_active(env, labels, accent)
 	accent = accent or palette.COLORS[palette.DEFAULT_INDEX]
 	return frame_of(env.pane):find(
-		convert.bg(accent) .. convert.fg(convert.contrast(accent)) .. " " .. (labels or fr).settings_theme_button,
+		convert.bg(accent) .. convert.fg(convert.contrast(accent)) .. "  " .. (labels or fr).settings_theme_button,
 		1,
 		true
 	) ~= nil
@@ -364,9 +364,22 @@ check(
 check("pas encore répondu : le bouton n'est pas coloré", button_active(e), false)
 e = open({ consent = true })
 check(
-	"répondu oui, thème lu : le bouton, et comment revenir",
+	"répondu oui, thème lu : le bouton (rempli : plus de traits), et comment revenir",
 	button_line(e),
-	"│ " .. fr.settings_theme_button .. " │  " .. fr.settings_theme_back
+	fr.settings_theme_button .. "    " .. fr.settings_theme_back
+)
+check(
+	"répondu oui : le bouton est rempli de haut en bas (demi-blocs au-dessus et en dessous)",
+	(function()
+		local ls = lines_of(shown(e.pane))
+		for i, line in ipairs(ls) do
+			if line:find(fr.settings_theme_button, 1, true) then
+				return ls[i - 1]:find("▄▄▄", 1, true) ~= nil and ls[i + 1]:find("▀▀▀", 1, true) ~= nil
+			end
+		end
+		return false
+	end)(),
+	true
 )
 check("répondu oui, thème lu : le bouton est coloré", button_active(e), true)
 e = open({ consent = false })
@@ -383,7 +396,7 @@ e = open({ labels = en, consent = true })
 check(
 	"en anglais : le bouton et la note",
 	button_line(e, en),
-	"│ y: use your theme colors │  n: back to the classic palette"
+	"y: use your theme colors    n: back to the classic palette"
 )
 check("en anglais : coloré", button_active(e, en), true)
 e = open({ no_consent = true })

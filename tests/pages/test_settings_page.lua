@@ -730,24 +730,32 @@ check("step : -1 au minimum reste au minimum", settings_page.step(max_def, 1, -1
 check("step : +1 au milieu", settings_page.step(max_def, 6, 1), 7)
 
 -- les lignes de l'onglet (fonction pure) ; le cadre, l'aide et le message : tests/pages/test_settings_view.lua
+-- Les réglages d'un onglet, lus comme des lignes « nom = valeur » (« ▸ » devant le réglage choisi), avec les numéros de
+-- ligne d'avant : 1 et 2 vides, les réglages à partir de 3, une ligne vide, puis l'explication (la dernière).
 local function list(state, labels)
-	return settings_page.list_lines(state, labels or fr)
+	local data = settings_page.list_rows(state, labels or fr)
+	local out = { "", "" }
+	for i, row in ipairs(data.rows) do
+		out[#out + 1] = (i == data.selected and "▸ " or "") .. row.name .. " = " .. row.value
+	end
+	out[#out + 1] = ""
+	out[#out + 1] = data.hint
+	return out
 end
 local cal = list({ tab = settings_page.TAB.CALENDAR, row = 1, values = { max_months = 12 } })
 local cal_plain = {}
 for i, line in ipairs(cal) do
 	cal_plain[i] = strip(line)
 end
-check("onglet Calendrier : l'intitulé", cal_plain[1], " Réglages du calendrier")
 check(
 	"onglet Calendrier : le réglage choisi et sa valeur alignée",
 	cal_plain[3],
-	" ▸ Mois affichés au maximum      ◀ 12"
+	"▸ Mois affichés au maximum = ◀ 12"
 )
 check(
 	"onglet Calendrier : l'explication du réglage choisi, en dernier",
 	cal_plain[#cal_plain],
-	" " .. fr.settings_hints.max_months
+	fr.settings_hints.max_months
 )
 check(
 	"onglet Calendrier : valeur absente, la valeur par défaut (12)",
@@ -784,6 +792,16 @@ local function months_line(env)
 			return panel_text(line)
 		end
 	end
+end
+-- Ce réglage est-il le réglage choisi ? Sa ligne est remplie de la couleur d'accent (la couleur enregistrée, ou l'or).
+local function row_selected(env, name)
+	local accent = palette.normalize(env.cfg.gradient_color) or palette.COLORS[palette.DEFAULT_INDEX]
+	for line in (frame_of(env.pane) .. "\n"):gmatch("(.-)\n") do
+		if strip(line):find(name, 1, true) then
+			return line:find(convert.bg(accent), 1, true) ~= nil
+		end
+	end
+	return false
 end
 -- L'onglet ouvert : son nom est dessiné sur le fond coloré de la barre d'onglets (la couleur enregistrée, ou l'or).
 local function open_tab_is(env, name)
@@ -850,7 +868,7 @@ check("au minimum : seulement la flèche de droite", months_line(e):match("  1 �
 local writes = #e.applied
 press(e, "j", e.pane)
 press(e, "k", e.pane)
-check("↓ ↑ : le 1er réglage est de nouveau choisi", months_line(e):find("▸ Mois", 1, true) ~= nil, true)
+check("↓ ↑ : le 1er réglage est de nouveau choisi", row_selected(e, "Mois affichés"), true)
 check("↑ ↓ : rien n'est écrit", #e.applied, writes)
 -- Entrée ne fait rien dans cet onglet (chaque changement y est déjà enregistré)
 press(e, "Enter", e.pane)
@@ -932,58 +950,50 @@ for i, line in ipairs(four) do
 	four_plain[i] = strip(line)
 end
 check("l'onglet Calendrier : intitulé, ligne vide, 6 réglages, ligne vide, explication (10 lignes)", #four, 10)
-check("onglet Calendrier : le nombre de mois", four_plain[3], "   Mois affichés au maximum      ◀ 6 ▶")
+check("onglet Calendrier : le nombre de mois", four_plain[3], "Mois affichés au maximum = ◀ 6 ▶")
 check(
 	"onglet Calendrier : la place du mois choisi (traduite)",
 	four_plain[4],
-	"   Place du mois choisi          ◀ au début ▶"
+	"Place du mois choisi = ◀ au début ▶"
 )
 check(
 	"onglet Calendrier : le début de la semaine, choisi (▸)",
 	four_plain[5],
-	" ▸ Début de la semaine           ◀ dimanche ▶"
+	"▸ Début de la semaine = ◀ dimanche ▶"
 )
-check(
-	"onglet Calendrier : les encadrés, « non » par défaut",
-	four_plain[6],
-	"   Encadrés                      ◀ non ▶"
-)
+check("onglet Calendrier : les encadrés, « non » par défaut", four_plain[6], "Encadrés = ◀ non ▶")
 check(
 	"onglet Calendrier : le style du trait, avec un aperçu",
 	four_plain[7],
-	"   Style du trait                ◀ arrondi ╭─╮ ▶"
+	"Style du trait = ◀ arrondi ╭─╮ ▶"
 )
 check("le centrage n'apparaît pas dans la page", table.concat(four_plain, "\n"):find("centr", 1, true), nil)
 check(
 	"onglet Calendrier : la couleur du trait, grise par défaut, avec un aperçu",
 	four_plain[8],
-	"   Couleur du trait              ◀ Gris ╭─╮ ▶"
+	"Couleur du trait = ◀ Gris ╭─╮ ▶"
 )
-check(
-	"onglet Calendrier : l'explication du réglage choisi (le 3e)",
-	four_plain[10],
-	" " .. fr.settings_hints.week_starts_on
-)
+check("onglet Calendrier : l'explication du réglage choisi (le 3e)", four_plain[10], fr.settings_hints.week_starts_on)
 local boxed = list({ tab = 2, row = 4, values = { borders = false, border_style = "heavy" }, message = 0 })
 check(
 	"encadrés « non » reste « non » (false n'est pas remplacé par la valeur par défaut)",
 	strip(boxed[6]),
-	" ▸ Encadrés                      ◀ non ▶"
+	"▸ Encadrés = ◀ non ▶"
 )
 check(
 	"encadrés « oui »",
 	strip(list({ tab = 2, row = 1, values = { borders = true }, message = 0 })[6]),
-	"   Encadrés                      ◀ oui ▶"
+	"Encadrés = ◀ oui ▶"
 )
-check("style épais : son aperçu", strip(boxed[7]), "   Style du trait                ◀ épais ┏━┓ ▶")
+check("style épais : son aperçu", strip(boxed[7]), "Style du trait = ◀ épais ┏━┓ ▶")
 check(
 	"anglais : le style double",
 	strip(list({ tab = 2, row = 1, values = { border_style = "double" }, message = 0 }, en)[7]),
-	"   Border style                  ◀ double ╔═╗ ▶"
+	"Border style = ◀ double ╔═╗ ▶"
 )
 local four_en =
 	list({ tab = 2, row = 1, values = { months_anchor = "last", week_starts_on = "monday" }, message = 0 }, en)
-check("anglais : le début de la semaine", strip(four_en[5]), "   Week starts on                ◀ Monday ▶")
+check("anglais : le début de la semaine", strip(four_en[5]), "Week starts on = ◀ Monday ▶")
 check(
 	"chaque réglage de l'onglet a un nom, une explication et (si choix) ses valeurs, en français et en anglais",
 	(function()
@@ -1021,8 +1031,8 @@ end
 e = open({})
 press(e, "Tab", e.pane)
 press(e, "j", e.pane)
-check("↓ : le 2e réglage est choisi", setting_line(e, "Place du mois choisi"):find("▸", 1, true) ~= nil, true)
-check("↓ : le 1er ne l'est plus", setting_line(e, "Mois affichés"):find("▸", 1, true), nil)
+check("↓ : le 2e réglage est choisi", row_selected(e, "Place du mois choisi"), true)
+check("↓ : le 1er ne l'est plus", row_selected(e, "Mois affichés"), false)
 check("↓ : son explication est affichée", shown_text(e):find(fr.settings_hints.months_anchor, 1, true) ~= nil, true)
 check("↓ : rien n'est écrit", read(e.path), nil)
 press(e, "DownArrow", e.pane)
@@ -1049,7 +1059,7 @@ check(
 	'{\n  "week_starts_on": "monday"\n}\n'
 )
 press(e, "j", e.pane)
-check("↓ : les encadrés", setting_line(e, "Encadrés  "):find("▸", 1, true) ~= nil, true)
+check("↓ : les encadrés", row_selected(e, "Encadrés  "), true)
 press(e, "l", e.pane)
 check(
 	"→ sur les encadrés : « oui » est enregistré",
@@ -1071,7 +1081,7 @@ check(
 	true
 )
 press(e, "j", e.pane)
-check("↓ : la couleur du trait", setting_line(e, "Couleur du trait"):find("▸", 1, true) ~= nil, true)
+check("↓ : la couleur du trait", row_selected(e, "Couleur du trait"), true)
 check(
 	"couleur : l'aperçu suit le style choisi (simple)",
 	setting_line(e, "Couleur du trait"):find("◀ Gris ┌─┐ ▶", 1, true) ~= nil,
@@ -1100,11 +1110,7 @@ check("← ← : du rouge au gris, puis au dernier choix (en boucle)", e.cfg.bor
 press(e, "d", e.pane)
 check("d sur la couleur : le gris", e.cfg.border_color, "#8B8E99")
 press(e, "j", e.pane)
-check(
-	"↓ au dernier réglage (la couleur) : il reste choisi",
-	setting_line(e, "Couleur du trait"):find("▸", 1, true) ~= nil,
-	true
-)
+check("↓ au dernier réglage (la couleur) : il reste choisi", row_selected(e, "Couleur du trait"), true)
 press(e, "k", e.pane)
 press(e, "k", e.pane)
 press(e, "d", e.pane)
@@ -1116,7 +1122,7 @@ check(
 for _ = 1, 5 do
 	press(e, "k", e.pane)
 end
-check("↑ cinq fois : bloqué au 1er réglage", setting_line(e, "Mois affichés"):find("▸", 1, true) ~= nil, true)
+check("↑ cinq fois : bloqué au 1er réglage", row_selected(e, "Mois affichés"), true)
 e = open({})
 e.cfg.week_starts_on = "sunday"
 press(e, "Tab", e.pane)
@@ -1176,38 +1182,29 @@ for i, line in ipairs(gen) do
 	gen_plain[i] = strip(line)
 end
 check("onglet Général : intitulé, ligne vide, 3 réglages, ligne vide, explication (7 lignes)", #gen, 7)
-check("onglet Général : l'intitulé", gen_plain[1], " Réglages généraux")
-check(
-	"onglet Général : la langue, dans sa propre langue",
-	gen_plain[3],
-	"   Langue                        ◀ français ▶"
-)
+check("onglet Général : la langue, dans sa propre langue", gen_plain[3], "Langue = ◀ français ▶")
 check(
 	"onglet Général : l'objectif en heures et minutes, choisi",
 	gen_plain[4],
-	" ▸ Objectif par jour             ◀ 7h30 ▶"
+	"▸ Objectif par jour = ◀ 7h30 ▶"
 )
-check("onglet Général : les jours par semaine", gen_plain[5], "   Jours d'objectif par semaine  ◀ 4 sur 7 ▶")
-check("onglet Général : l'explication de l'objectif", gen_plain[7], " " .. fr.settings_hints.goal_hours)
+check("onglet Général : les jours par semaine", gen_plain[5], "Jours d'objectif par semaine = ◀ 4 sur 7 ▶")
+check("onglet Général : l'explication de l'objectif", gen_plain[7], fr.settings_hints.goal_hours)
 local gen_none = list({ tab = 3, row = 1, values = { goal_hours = 0 }, message = 0 })
-check(
-	"onglet Général : objectif 0 affiché « aucun »",
-	strip(gen_none[4]),
-	"   Objectif par jour               aucun ▶"
-)
+check("onglet Général : objectif 0 affiché « aucun »", strip(gen_none[4]), "Objectif par jour =   aucun ▶")
 check(
 	"onglet Général : sans valeurs, objectif « aucun » et 5 jours par défaut",
 	strip(list({ tab = 3, row = 1, values = {}, message = 0 })[4])
 		.. "|"
 		.. strip(list({ tab = 3, row = 1, values = {}, message = 0 })[5]),
-	"   Objectif par jour               aucun ▶|   Jours d'objectif par semaine  ◀ 5 sur 7 ▶"
+	"Objectif par jour =   aucun ▶|Jours d'objectif par semaine = ◀ 5 sur 7 ▶"
 )
 check(
 	"onglet Général en anglais : English reste English, aucun devient none",
 	strip(list({ tab = 3, row = 1, values = { lang = "en" }, message = 0 }, en)[3])
 		.. "|"
 		.. strip(list({ tab = 3, row = 1, values = {}, message = 0 }, en)[4]),
-	" ▸ Language                      ◀ English ▶|   Daily goal                      none ▶"
+	"▸ Language = ◀ English ▶|Daily goal =   none ▶"
 )
 check(
 	"chaque réglage de l'onglet Général a un nom et une explication de 55 caractères au plus (français et anglais)",
@@ -1254,16 +1251,12 @@ e = open({})
 press(e, "Tab", e.pane)
 press(e, "j", e.pane)
 press(e, "j", e.pane)
-check(
-	"(avant : le 3e réglage de l'onglet Calendrier est choisi)",
-	setting_line(e, "Début de la semaine"):find("▸", 1, true) ~= nil,
-	true
-)
+check("(avant : le 3e réglage de l'onglet Calendrier est choisi)", row_selected(e, "Début de la semaine"), true)
 press(e, "Tab", e.pane)
 check("Général : l'onglet est affiché", open_tab_is(e, "Général"), true)
 check(
 	"Général : le 1er réglage (la langue) est choisi, même si on était sur un autre réglage avant",
-	setting_line(e, "Langue"):find("▸", 1, true) ~= nil,
+	row_selected(e, "Langue"),
 	true
 )
 press(e, "j", e.pane)
@@ -1352,7 +1345,7 @@ check(
 check(
 	"couleur écrite à la main : affichée telle quelle",
 	strip(list({ tab = 2, row = 1, values = { border_color = "#123456" }, border_choices = choices, message = 0 })[8]),
-	"   Couleur du trait              ◀ #123456 ╭─╮ ▶"
+	"Couleur du trait = ◀ #123456 ╭─╮ ▶"
 )
 check(
 	"anglais : la couleur du trait",
@@ -1363,7 +1356,7 @@ check(
 		border_choices = settings_page.border_choices(palette.COLORS, en.palette, en.settings_values.border_gray),
 		message = 0,
 	}, en)[8]),
-	"   Border color                  ◀ Gray ╭─╮ ▶"
+	"Border color = ◀ Gray ╭─╮ ▶"
 )
 check(
 	"aucune ligne de l'onglet Calendrier ne dépasse la largeur minimum du panneau, même avec le plus long nom de couleur",
@@ -1428,9 +1421,10 @@ check(
 	true
 )
 check(
-	"l'aide est soulignée",
-	framed_text:find("\27[4m" .. fr.settings_help_top, 1, true) ~= nil
-		and framed_text:find("\27[4m" .. fr.settings_help_colors, 1, true) ~= nil,
+	"l'aide est soulignée, morceau par morceau (pas les « // » ni les espaces)",
+	framed_text:find("\27[4md : défaut\27[24m", 1, true) ~= nil
+		and framed_text:find("\27[4mq : fermer\27[24m", 1, true) ~= nil
+		and framed_text:find("\27[4mEntrée : enregistrer\27[24m", 1, true) ~= nil,
 	true
 )
 check(
