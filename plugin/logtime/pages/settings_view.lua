@@ -34,6 +34,8 @@ M.MIN_SWATCH_WIDTH = 6
 M.SWATCH_HEIGHT = 2 -- ... sur 2 lignes ; l'espace entre les cases grandit avec la fenêtre
 M.FRAME_COLOR = "#ECE6D9" -- le cadre de la case choisie (clair : il se voit autour de toutes les couleurs)
 M.SEPARATOR_TEXT = "//"
+M.GRADIENT_GAP = 2 -- lignes vides entre la séparation et l'aperçu du dégradé
+M.CHOICE_GAP = 2 -- lignes vides entre le choix et le bas du panneau (les couleurs ont moins d'air autour d'elles)
 
 M.UNDERLINE, M.UNDERLINE_OFF = "\27[4m", "\27[24m"
 local UPPER_HALF, LOWER_HALF = "▀", "▄"
@@ -87,7 +89,7 @@ function M.spread(parts, width, underline)
 	local column = (width - #sep * (n - 1)) // n
 	local fits = true
 	for _, part in ipairs(parts) do
-		if vw(part) > column then
+		if vw(part) > column - 2 then -- au moins une colonne d'air de chaque côté (sinon il touche le « // » ou le cadre)
 			fits = false
 		end
 	end
@@ -109,7 +111,8 @@ function M.spread(parts, width, underline)
 	for i, part in ipairs(parts) do
 		pieces[i] = string.rep(" ", gap) .. style(part) .. string.rep(" ", gap)
 	end
-	return fit(table.concat(pieces, sep), width)
+	local line = table.concat(pieces, sep)
+	return fit(string.rep(" ", math.max(0, (width - vw(line)) // 2)) .. line, width) -- centrée
 end
 
 -- La largeur minimum d'une ligne divisée (les morceaux, les « // », une colonne de chaque côté de chacun).
@@ -296,9 +299,12 @@ local SEPARATOR = {} -- une ligne de séparation du panneau de gauche (├──
 --   o.list        : { rows = { { name, value }, ... }, selected, hint } (onglets Calendrier et Général)
 --   o.message     : le message du bas (« ✓ Enregistré », la raison d'un échec…) ou ""
 local function left_content(o, width, height)
-	local top = {}
+	local blank = string.rep(" ", width)
+	-- une ligne vide sous les onglets, entre les lignes d'aide, et après la dernière (avant le bouton ou la séparation)
+	local top = { blank }
 	for _, line in ipairs(o.help or {}) do
 		top[#top + 1] = M.spread(M.parts(line), width, true)
+		top[#top + 1] = blank
 	end
 	if o.button then
 		for _, line in ipairs(M.button(o.button.text, o.button.active, o.accent, o.button.note, width)) do
@@ -309,6 +315,9 @@ local function left_content(o, width, height)
 	local bottom = {}
 	local c = o.colors_tab
 	if c then
+		for _ = 1, M.GRADIENT_GAP do
+			top[#top + 1] = blank
+		end
 		for _, line in ipairs(gradient_box(c.gradient_title, c.gradient_preview, width)) do
 			top[#top + 1] = line
 		end
@@ -317,6 +326,9 @@ local function left_content(o, width, height)
 			choice[2] = c.saved
 		end
 		bottom[#bottom + 1] = M.spread(choice, width, true)
+		for _ = 1, M.CHOICE_GAP do
+			bottom[#bottom + 1] = blank
+		end
 		bottom[#bottom + 1] = fit(c.gradient_off and (" " .. c.gradient_off) or "", width)
 	elseif o.list then
 		for _, line in ipairs(text_box(o.list.hint, width)) do
@@ -365,13 +377,14 @@ function M.minimum(o)
 			left = math.max(left, vw(row.name) + vw(row.value) + 7)
 		end
 	end
-	-- le cadre du haut, les onglets et leur jonction ; l'aide ; la séparation ; le cadre du bas
-	local rows = 3 + #(o.help or {}) + 1 + 1
+	-- le cadre du haut, les onglets et leur jonction ; l'aide (une ligne vide avant chaque ligne d'aide, et après la
+	-- dernière) ; la séparation ; le cadre du bas
+	local rows = 3 + (2 * #(o.help or {}) + 1) + 1 + 1
 	if o.button then
 		rows = rows + 3
 	end
 	if c then
-		rows = rows + 3 + (M.ROWS * M.SWATCH_HEIGHT + (M.ROWS + 1)) + 3
+		rows = rows + (M.GRADIENT_GAP + 3) + (M.ROWS * M.SWATCH_HEIGHT + (M.ROWS + 1)) + (1 + M.CHOICE_GAP + 2)
 	elseif o.list then
 		rows = rows + (2 * #(o.list.rows or {}) + 1) + 3 + 1
 	else

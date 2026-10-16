@@ -180,7 +180,7 @@ check(
 )
 check("spread : rien", view.spread({}, 5, false), "     ")
 -- dans la page : l'aide divisée en 3 puis en 2, soulignée morceau par morceau
-local help_line = lines[4]
+local help_line = lines[5]
 check(
 	"l'aide (1re ligne) : « d: default » souligné seul",
 	help_line:find(U .. "d: default" .. U_OFF, 1, true) ~= nil,
@@ -201,9 +201,32 @@ check(
 	help_line:find(U .. "//", 1, true) == nil and help_line:find("//" .. U_OFF, 1, true) == nil,
 	true
 )
-check("l'aide (1re ligne) : deux « // »", select(2, plain[4]:gsub("//", "")), 2)
-check("l'aide (2e ligne) : un « // »", select(2, plain[5]:gsub("//", "")), 1)
-check("l'aide n'est plus collée à gauche (centrée dans sa part)", plain[4]:find("d: default", 1, true) > 4, true)
+check("l'aide (1re ligne) : deux « // »", select(2, plain[5]:gsub("//", "")), 2)
+check("l'aide (2e ligne) : un « // »", select(2, plain[7]:gsub("//", "")), 1)
+check("l'aide n'est plus collée à gauche (centrée dans sa part)", plain[5]:find("d: default", 1, true) > 4, true)
+-- de l'air : une ligne vide sous les onglets, entre les deux lignes d'aide, et avant le bouton
+local function empty_left(i)
+	return plain[i]:match("^│( *)│") ~= nil
+end
+check("une ligne vide sous les onglets", empty_left(4), true)
+check("une ligne vide entre les deux lignes d'aide", empty_left(6), true)
+check("une ligne vide avant le bouton", empty_left(8) and plain[9]:find("╭─", 1, true) ~= nil, true)
+check(
+	"spread : un morceau qui remplirait toute sa part n'y est pas collé (au moins une colonne d'air de chaque côté)",
+	view.spread({ "aaaa", "bbbb" }, 10, false):find("//bbbb", 1, true),
+	nil
+)
+check(
+	"spread : sans la place pour des parts égales, la ligne reste centrée",
+	(function()
+		-- 3 morceaux de 20 + 1 + 1, des « // » : il reste 2 colonnes à répartir des deux côtés
+		local line = view.spread({ string.rep("x", 20), "y", "z" }, 40, false)
+		local left = #line:match("^( *)")
+		local right = #line:match("( *)$")
+		return math.abs(left - right) <= 1
+	end)(),
+	true
+)
 
 -- ---- le bouton y : encadré ; actif, rempli de sa couleur sur 3 lignes
 local button_row
@@ -261,6 +284,17 @@ check(
 	"24h │ "
 )
 check("l'aperçu n'est plus juste après le titre", plain[gradient_row]:find("Gradient color:  │", 1, true), nil)
+local separator_row
+for i = 4, #plain do
+	if plain[i]:sub(1, #"├") == "├" then
+		separator_row = separator_row or i
+	end
+end
+check(
+	"« Gradient color » descend : 2 lignes vides sous la séparation, puis le cadre de l'aperçu",
+	gradient_row - separator_row,
+	4 -- 2 lignes vides, puis le haut du cadre de l'aperçu
+)
 check(
 	"le titre du dégradé souligné",
 	lines[gradient_row]:find(U .. "Gradient color:" .. U_OFF, 1, true) ~= nil,
@@ -361,6 +395,11 @@ check(
 	"le choix n'est plus collé à gauche (centré dans sa moitié)",
 	plain[choice_line]:find("Choice", 1, true) > 4,
 	true
+)
+check(
+	"« Choice » remonte : 2 lignes vides sous lui, puis l'avertissement, puis le message (et le bas du cadre)",
+	#plain - choice_line,
+	5 -- 2 lignes vides, l'avertissement, le message, le bas du cadre
 )
 
 -- ---- l'aperçu à droite : seulement s'il tient ; sinon le panneau prend toute la largeur
@@ -469,6 +508,27 @@ check("trop étroit : la largeur qu'il faudrait (le panneau + le cadre)", need_c
 check("trop bas : rien", view.draw(colors_page(), 200, min_rows - 1), nil)
 check("trop bas : la hauteur qu'il faudrait", select(3, view.draw(colors_page(), 200, min_rows - 1)), min_rows)
 check("pile à la taille minimum : dessiné", view.draw(colors_page(), min_left + 2, min_rows) ~= nil, true)
+local last_chosen = colors_page()
+last_chosen.colors_tab.index = 16
+local at_min_last = strip(table.concat(view.draw(last_chosen, min_left + 2, min_rows), "\n"))
+check(
+	"au minimum, la dernière case choisie : son cadre est entier (la place au-dessus et en dessous)",
+	select(2, at_min_last:gsub("┌", "")) == 1 and select(2, at_min_last:gsub("└", "")) == 1,
+	true
+)
+local at_min_colors = view.draw(colors_page({ message = " ✓ Saved." }), min_left + 2, min_rows)
+local at_min_text = strip(table.concat(at_min_colors, "\n"))
+check(
+	"au minimum (onglet Couleurs) : tout tient (le bouton, le dégradé, les 16 couleurs, le choix, le message)",
+	#at_min_colors == min_rows
+		and at_min_text:find("y: use your theme colors", 1, true) ~= nil
+		and at_min_text:find("Preview", 1, true) ~= nil
+		and at_min_text:find("Choice", 1, true) ~= nil
+		and at_min_text:find("✓ Saved.", 1, true) ~= nil
+		and select(2, table.concat(at_min_colors, "\n"):gsub(literal(convert.bg(palette.COLORS[16])) .. " ", ""))
+			== 2 * view.SWATCH_WIDTH,
+	true
+)
 local list_left, list_rows = view.minimum(list_page())
 check(
 	"pile à la taille minimum (onglet de réglages) : dessiné",
