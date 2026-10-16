@@ -1440,11 +1440,16 @@ check(
 	true
 )
 check(
-	"aperçu : le détail du jour (le total et les barres actif / inactif)",
+	"aperçu : le détail de la semaine en cours (le total et les barres actif / inactif)",
 	table.concat(full, "\n"):find("Total", 1, true) ~= nil
 		and table.concat(full, "\n"):find("Actif", 1, true) ~= nil
 		and table.concat(full, "\n"):find("Inactif", 1, true) ~= nil,
 	true
+)
+check(
+	"aperçu : la frise de la semaine (les jours, pas les heures « 0h00 … 24h00 » d'un seul jour)",
+	table.concat(full, "\n"):find("24h00", 1, true),
+	nil
 )
 check("aperçu : les vraies heures (le 5 : 8h00)", table.concat(full, "\n"):find("8h00", 1, true) ~= nil, true)
 check(

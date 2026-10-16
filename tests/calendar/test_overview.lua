@@ -413,5 +413,173 @@ check(
 	true
 )
 
+-- ---- la semaine (l'aperçu de F4 : le détail de la semaine en cours)
+check(
+	"les jours de la semaine (lundi d'abord)",
+	table.concat(overview.week_keys("2026-10-15", "monday"), " "),
+	"2026-10-12 2026-10-13 2026-10-14 2026-10-15 2026-10-16 2026-10-17 2026-10-18"
+)
+local edge_week = overview.week_keys("2026-10-01", "monday")
+check("la semaine du 1er : elle commence le mois d'avant", edge_week[1] .. " " .. edge_week[7], "2026-09-28 2026-10-04")
+local sun_week = overview.week_keys("2026-10-15", "sunday")
+check("la semaine qui commence le dimanche", sun_week[1] .. " " .. sun_week[7], "2026-10-11 2026-10-17")
+local WEEK = overview.week_keys("2026-10-15", "monday")
+local week_projects = {
+	["2026-10-12"] = { ["Bot Discord"] = 3600, X = 600 },
+	["2026-10-15"] = data().projects["2026-10-15"],
+}
+local wd, reached = overview.week_data(data({ projects = week_projects }), WEEK)
+check(
+	"la semaine réunie : le total des 7 jours",
+	wd.days[overview.WEEK_KEY],
+	DAYS["2026-10-12"] + DAYS["2026-10-14"] + DAYS["2026-10-15"]
+)
+check("la semaine réunie : le temps inactif des 7 jours", wd.idle_days[overview.WEEK_KEY], 1 * 3600 + 55 * 60)
+check(
+	"la semaine réunie : un projet de plusieurs jours additionné",
+	wd.projects[overview.WEEK_KEY]["Bot Discord"],
+	5 * 3600
+)
+check("la semaine réunie : un projet d'un seul jour", wd.projects[overview.WEEK_KEY].X, 600)
+check("la semaine réunie : les jours à l'objectif (8h : le 12, le 14, le 15)", reached, 3)
+check("la semaine réunie : les données d'origine ne sont pas touchées", data().days[overview.WEEK_KEY], nil)
+local week_text = strip(joined(overview.week_detail(data({ projects = week_projects }), WEEK, 100, 14)))
+check("le détail de la semaine : le total des 7 jours", week_text:find("Total  34h35", 1, true) ~= nil, true)
+check(
+	"le détail de la semaine : les jours à l'objectif (5 par défaut)",
+	week_text:find("3/5 jours à l'objectif", 1, true) ~= nil,
+	true
+)
+check("le détail de la semaine : pas l'objectif du jour", week_text:find("objectif 8h", 1, true), nil)
+check("le détail de la semaine : le projet additionné", week_text:find("5h00", 1, true) ~= nil, true)
+local validated = strip(
+	joined(overview.week_detail(data({ cfg = gradient.apply_to({ goal_hours = 8, goal_days = 3 }) }), WEEK, 100, 14))
+)
+check(
+	"le détail de la semaine : semaine validée",
+	validated:find("✓ semaine validée (3/3 jours)", 1, true) ~= nil,
+	true
+)
+local week_no_goal = strip(joined(overview.week_detail(data({ cfg = gradient.apply_to({}) }), WEEK, 100, 14)))
+check("le détail de la semaine sans objectif : rien sur l'objectif", week_no_goal:find("jours", 1, true), nil)
+local empty_week = strip(joined(overview.week_detail(data(), overview.week_keys("2026-10-26", "monday"), 100, 14)))
+check("une semaine vide : le dit", empty_week:find(fr.overview_week_empty, 1, true) ~= nil, true)
+check("une semaine vide : pas le texte du jour", empty_week:find(fr.detail_empty, 1, true), nil)
+local week_en = strip(joined(overview.week_detail(data({ labels = en }), WEEK, 100, 14)))
+check("le détail de la semaine en anglais", week_en:find("3/5 days at goal", 1, true) ~= nil, true)
+local week_sizes = true
+for _, line in ipairs(overview.week_detail(data(), WEEK, 100, 14)) do
+	week_sizes = week_sizes and layout.visible_width(line) == 100
+end
+check("le détail de la semaine : toutes les lignes font la largeur", week_sizes, true)
+
+-- la frise de la semaine
+local FULL = { { 0, 24 * 3600, "gros" } }
+local wtl = overview.week_timeline(
+	data({
+		timeline = {
+			["2026-10-12"] = FULL,
+			["2026-10-15"] = { { 0, 12 * 3600, "gros" } },
+			["2026-10-16"] = { { 0, 600, "petit" } },
+		},
+	}),
+	WEEK,
+	100
+)
+check("la frise de la semaine : 4 lignes", #wtl, overview.TIMELINE_HEIGHT)
+local wtl_sizes = true
+for _, line in ipairs(wtl) do
+	wtl_sizes = wtl_sizes and layout.visible_width(line) == 100
+end
+check("la frise de la semaine : toutes les lignes font la largeur", wtl_sizes, true)
+local _, separators = strip(wtl[2]):gsub("┬", "")
+check("la frise de la semaine : un trait entre chaque jour", separators, 6)
+local _, bottoms = strip(wtl[4]):gsub("┴", "")
+check("la frise de la semaine : en bas aussi", bottoms, 6)
+check(
+	"la frise de la semaine : les noms des jours au-dessus, dans l'ordre",
+	strip(wtl[1]):match("Lundi.*Mardi.*Mercredi.*Jeudi.*Vendredi.*Samedi.*Dimanche") ~= nil,
+	true
+)
+local day_parts = {}
+for part in strip(wtl[3]):gmatch("[^│]+") do
+	day_parts[#day_parts + 1] = part
+end
+check("la frise de la semaine : 7 parts", #day_parts, 7)
+check("la frise de la semaine : le nom dans le jour où il tient", day_parts[1]:find("gros", 1, true) ~= nil, true)
+check("la frise de la semaine : un jour vide reste vide", day_parts[2]:match("^ +$") ~= nil, true)
+local gros = convert.bg(overview.timeline_colors({ { 0, 1, "gros" }, { 0, 0.5, "petit" } }).gros)
+local raw_parts = {}
+for part in wtl[3]:gmatch("[^│]+") do
+	raw_parts[#raw_parts + 1] = part
+end
+check(
+	"la frise de la semaine : un projet garde sa couleur toute la semaine",
+	raw_parts[1]:find(gros, 1, true) ~= nil and raw_parts[4]:find(gros, 1, true) ~= nil,
+	true
+)
+check("la frise de la semaine : la moitié du jeudi seulement", day_parts[4]:sub(-3):match("^ +$") ~= nil, true)
+
+check(
+	"la frise de la semaine : le nom du jour centré au-dessus de sa part",
+	strip(wtl[1]):match("^   +Lundi") ~= nil,
+	true
+)
+local OTHER = load_module("core/activity").OTHER
+local other_tl =
+	overview.week_timeline(data({ timeline = { ["2026-10-12"] = { { 0, 24 * 3600, OTHER } } } }), WEEK, 100)
+check(
+	"la frise de la semaine : « autres » dans la langue choisie (pas « ? »)",
+	strip(other_tl[3]):find(fr.detail_other, 1, true) ~= nil,
+	true
+)
+local _, exact = overview.week_data(data({ days = { ["2026-10-12"] = 8 * 3600 } }), WEEK)
+check("la semaine réunie : un jour à 8h00 tout juste compte à l'objectif", exact, 1)
+
+-- la case « Semaine N » de la semaine choisie
+local ACCENT = "#C96969"
+local function week_cell_filled(g, n)
+	for _, line in ipairs(g) do
+		if strip(line):find("Semaine " .. n, 1, true) then
+			return line:find(convert.bg(ACCENT), 1, true) ~= nil
+		end
+	end
+end
+local week_grid = overview.grid(data({ week = true, accent = ACCENT }), 100, 30)
+check("la semaine choisie : sa case « Semaine 3 » est remplie", week_cell_filled(week_grid, 3), true)
+check("la semaine choisie : pas les autres", week_cell_filled(week_grid, 2), false)
+check(
+	"sans semaine choisie : aucune case remplie",
+	week_cell_filled(overview.grid(data({ accent = ACCENT }), 100, 30), 3),
+	false
+)
+check(
+	"un jour d'un autre mois : aucune case remplie",
+	week_cell_filled(overview.grid(data({ week = true, accent = ACCENT, day_key = "2026-11-12" }), 100, 30), 3),
+	false
+)
+local filled_lines = 0
+for _, line in ipairs(week_grid) do
+	if line:find(convert.bg(ACCENT), 1, true) then
+		filled_lines = filled_lines + 1
+	end
+end
+check("la semaine choisie : toute la hauteur de sa case (sans les traits)", filled_lines, week_height(week_grid) - 1)
+
+local week_view = overview.render(data({ week = true, accent = ACCENT }), 100, 40)
+check("toute la vue en semaine : la bonne hauteur", #week_view, 40)
+local week_view_text = strip(joined(week_view))
+check(
+	"toute la vue en semaine : le détail de la semaine",
+	week_view_text:find("3/5 jours à l'objectif", 1, true) ~= nil,
+	true
+)
+check(
+	"toute la vue en semaine : la frise de la semaine",
+	strip(week_view[#week_view - 3]):find("Mercredi", 1, true) ~= nil,
+	true
+)
+check("toute la vue en semaine : plus la frise du jour", week_view_text:find("24h00", 1, true), nil)
+
 print(string.format("\n%d vérifications réussies, %d échecs", passed, failed))
 os.exit(failed == 0 and 0 or 1)

@@ -40,6 +40,7 @@ return {
 	detail_today = "aujourd'hui",
 	detail_total = "Total",
 	overview_week = "Semaine %d",
+	overview_week_empty = "Aucun temps compté cette semaine.",
 	detail_active = "Actif",
 	detail_idle = "Inactif",
 	detail_week = "Semaine",

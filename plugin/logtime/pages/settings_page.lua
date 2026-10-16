@@ -465,6 +465,8 @@ function M.create(ctx)
 			month = tonumber(month),
 			today_key = key,
 			day_key = key,
+			week = true, -- le détail de la semaine en cours (celui du jour est dans F2)
+			accent = current_color() or DEFAULT_COLOR,
 			cfg = applied,
 			labels = labels,
 			b = b,

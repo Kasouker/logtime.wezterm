@@ -116,11 +116,29 @@ function M.grid(o, width, height)
 	end
 	out[#out + 1] = e(b.v) .. table.concat(header, e(b.v)) .. e(b.v)
 	out[#out + 1] = rule(b.l, b.x, b.r)
+	-- o.week : la semaine du jour o.day_key est choisie, sa case « Semaine N » est remplie de la couleur o.accent
+	local selected
+	if o.week and o.day_key then
+		local y, m, d = o.day_key:match("^(%d+)-(%d+)-(%d+)$")
+		if tonumber(y) == o.year and tonumber(m) == o.month then
+			for w, week in ipairs(weeks) do
+				for i = 1, 7 do
+					if week[i] == tonumber(d) then
+						selected = w
+					end
+				end
+			end
+		end
+	end
+	local accent = o.accent or M.IDLE_COLOR
 	for w, week in ipairs(weeks) do
 		for line = 1, row do
 			local label = line == math.max(1, (row + 1) // 2)
 					and centered(string.format(o.labels.overview_week or "Week %d", w), lw)
 				or string.rep(" ", lw)
+			if w == selected then
+				label = convert.bg(accent) .. convert.fg(convert.contrast(accent)) .. label .. convert.RESET
+			end
 			local parts = { label }
 			for i = 1, 7 do
 				local d = week[i]
@@ -211,7 +229,9 @@ M.DURATION_WIDTH = 6 -- « 10h04 »
 --   │ 80% │ 20% │                                      │      │
 --   ╰─────┴─────┴──────────────────────────────────────┴──────╯
 --   o = { days, idle_days, projects, cfg, labels, today_key, b (les traits), edge (leur couleur) }
-function M.detail(o, key, width, height)
+--   opts (facultatif) = { goal = le texte à la place de l'objectif du jour, empty = le texte quand rien n'est compté }
+function M.detail(o, key, width, height, opts)
+	opts = opts or {}
 	local labels = o.labels
 	local b, edge = o.b, o.edge or ""
 	local off = edge ~= "" and convert.RESET or ""
@@ -251,9 +271,9 @@ function M.detail(o, key, width, height)
 	end
 	-- les lignes de droite : { texte de la liste, texte du pourcentage } ou "rule" (un trait entre deux lignes)
 	local total_text = " " .. labels.detail_total .. "  " .. stats.hm(total)
-	local rows = { { fit(total_text, bar_start) .. goal_text(o, key, total), "" }, "rule" }
+	local rows = { { fit(total_text, bar_start) .. (opts.goal or goal_text(o, key, total)), "" }, "rule" }
 	if total == 0 then
-		rows[#rows + 1] = { " " .. labels.detail_empty, "" }
+		rows[#rows + 1] = { " " .. (opts.empty or labels.detail_empty), "" }
 	end
 	local spaced = #projects > 0 and (2 * #projects - 1) <= inner - 2 -- un trait entre les projets s'il y a la place
 	for n, item in ipairs(projects) do
@@ -380,6 +400,31 @@ function M.timeline_columns(segments, columns)
 	return out
 end
 
+-- Une ligne de frise : les colonnes (un projet ou false chacune), par suites du même projet, chacune dans sa couleur,
+-- avec le nom dedans s'il y tient en entier (jamais un nom coupé).
+local function band(columns, colors, labels)
+	local parts = {}
+	local c = 1
+	while c <= #columns do
+		local label = columns[c]
+		local run = c
+		while run + 1 <= #columns and columns[run + 1] == label do
+			run = run + 1
+		end
+		local length = run - c + 1
+		if label then
+			local name = label == activity.OTHER and labels.detail_other or label
+			local text = (vw(name) + 2 <= length) and centered(name, length) or string.rep(" ", length)
+			local color = colors[label] or M.OTHER_COLOR
+			parts[#parts + 1] = convert.bg(color) .. convert.fg(convert.contrast(color)) .. text .. convert.RESET
+		else
+			parts[#parts + 1] = string.rep(" ", length)
+		end
+		c = run + 1
+	end
+	return table.concat(parts)
+end
+
 -- « 0h00 », ou l'heure où la journée commence (`day_offset` : -3600 -> la journée commence à 1h00).
 local function clock(seconds)
 	seconds = seconds % (24 * 3600)
@@ -406,31 +451,103 @@ function M.timeline(o, key, width)
 	local first = clock(start)
 	local last = (start % M.DAY_LENGTH == 0) and "24h00" or clock(start + M.DAY_LENGTH)
 	local hours = " " .. first .. string.rep(" ", math.max(1, width - 2 - vw(first) - vw(last))) .. last .. " "
-	-- les colonnes, par suites du même projet
-	local parts = {}
-	local c = 1
-	while c <= inner do
-		local label = columns[c]
-		local run = c
-		while run + 1 <= inner and columns[run + 1] == label do
-			run = run + 1
-		end
-		local length = run - c + 1
-		if label then
-			local name = label == activity.OTHER and o.labels.detail_other or label
-			local text = (vw(name) + 2 <= length) and centered(name, length) or string.rep(" ", length)
-			local color = colors[label] or M.OTHER_COLOR
-			parts[#parts + 1] = convert.bg(color) .. convert.fg(convert.contrast(color)) .. text .. convert.RESET
-		else
-			parts[#parts + 1] = string.rep(" ", length)
-		end
-		c = run + 1
-	end
 	return {
 		fit(hours, width),
 		e(b.tl .. string.rep(b.h, inner) .. b.tr),
-		e(b.v) .. table.concat(parts) .. e(b.v),
+		e(b.v) .. band(columns, colors, o.labels) .. e(b.v),
 		e(b.bl .. string.rep(b.h, inner) .. b.br),
+	}
+end
+
+-- Les 7 jours de la semaine qui contient `key` ("AAAA-MM-JJ"), ceux des mois voisins compris, dans l'ordre de la
+-- semaine (lundi ou dimanche d'abord).
+function M.week_keys(key, week_starts_on)
+	local y, m, d = key:match("^(%d+)-(%d+)-(%d+)$")
+	y, m, d = tonumber(y), tonumber(m), tonumber(d)
+	local first = d - (dates.offset(y, m, week_starts_on) + d - 1) % 7
+	local keys = {}
+	for i = 0, 6 do
+		keys[#keys + 1] = dates.key_any(y, m, first + i)
+	end
+	return keys
+end
+
+M.WEEK_KEY = "week" -- la semaine réunie en un seul « jour » (pour le dessiner comme un jour)
+
+-- La semaine `keys` réunie : une copie de o où M.WEEK_KEY porte la somme des 7 jours (le total, l'inactif, les
+-- projets). Renvoie aussi le nombre de jours où l'objectif est atteint.
+function M.week_data(o, keys)
+	local total, idle_total, projects, reached = 0, 0, {}, 0
+	local goal = stats.has_goal(o.cfg.goal_hours) and o.cfg.goal_hours * 3600 or nil
+	for _, k in ipairs(keys) do
+		local secs = math.floor(math.max(0, o.days[k] or 0))
+		total = total + secs
+		idle_total = idle_total + idle.share(secs, o.idle_days and o.idle_days[k])
+		for label, p in pairs(o.projects and o.projects[k] or {}) do
+			projects[label] = (projects[label] or 0) + p
+		end
+		if goal and secs >= goal then
+			reached = reached + 1
+		end
+	end
+	local week = {}
+	for k, value in pairs(o) do
+		week[k] = value
+	end
+	week.days = { [M.WEEK_KEY] = total }
+	week.idle_days = { [M.WEEK_KEY] = idle_total }
+	week.projects = { [M.WEEK_KEY] = projects }
+	return week, reached
+end
+
+-- Le détail de la semaine `keys` : le même tableau que celui du jour, avec les 7 jours additionnés ; à la place de
+-- l'objectif du jour, combien de jours l'ont atteint (« 3/5 jours à l'objectif », « ✓ semaine validée »).
+function M.week_detail(o, keys, width, height)
+	local week, reached = M.week_data(o, keys)
+	local goal = ""
+	if stats.has_goal(o.cfg.goal_hours) then
+		local goal_days = math.floor(tonumber(o.cfg.goal_days) or 5)
+		local format = reached >= goal_days and o.labels.detail_week_validated or o.labels.detail_week_goal
+		goal = string.format(format, reached, goal_days)
+	end
+	return M.detail(week, M.WEEK_KEY, width, height, { goal = goal, empty = o.labels.overview_week_empty })
+end
+
+-- La frise de la semaine `keys` : M.TIMELINE_HEIGHT lignes de `width` colonnes, une part par jour (de 0h00 à 24h00
+-- chacune), séparées par un trait, le nom du jour au-dessus. Un projet garde la même couleur toute la semaine.
+--    Lundi    Mardi    Mercredi   …
+--   ╭────────┬────────┬────────┬ … ╮
+--   │▓Bot▓  ▓│  ▓▓▓▓  │        │   │
+--   ╰────────┴────────┴────────┴ … ╯
+function M.week_timeline(o, keys, width)
+	local b, edge = o.b, o.edge or ""
+	local off = edge ~= "" and convert.RESET or ""
+	local function e(s)
+		return edge .. s .. off
+	end
+	local inner = width - 8 -- 2 bords et 6 traits entre les jours
+	local base, extra = inner // 7, inner % 7
+	local all = {}
+	for _, k in ipairs(keys) do
+		for _, seg in ipairs(o.timeline and o.timeline[k] or {}) do
+			all[#all + 1] = seg
+		end
+	end
+	local colors = M.timeline_colors(all)
+	local names = day_names(o.labels, o.cfg.week_starts_on, base)
+	local head, top, middle, bottom = { " " }, {}, {}, {}
+	for i, k in ipairs(keys) do
+		local w = base + (i <= extra and 1 or 0)
+		head[#head + 1] = centered(names[i], w) .. " "
+		top[#top + 1] = string.rep(b.h, w)
+		bottom[#bottom + 1] = string.rep(b.h, w)
+		middle[#middle + 1] = band(M.timeline_columns(o.timeline and o.timeline[k] or {}, w), colors, o.labels)
+	end
+	return {
+		fit(table.concat(head), width),
+		e(b.tl .. table.concat(top, b.t) .. b.tr),
+		e(b.v) .. table.concat(middle, e(b.v)) .. e(b.v),
+		e(b.bl .. table.concat(bottom, b.b) .. b.br),
 	}
 end
 
@@ -443,10 +560,10 @@ function M.minimum(weeks)
 	return M.WEEK_LABEL_WIDTH + 9 + 7 * M.MIN_CELL, 3 + count * (M.MIN_ROW + 1) + M.MIN_DETAIL + M.TIMELINE_HEIGHT
 end
 
--- Toute la vue (la grille du mois, puis le détail du jour `o.day_key`) : exactement `height` lignes de `width`
+-- Toute la vue (la grille du mois, puis le détail du jour `o.day_key`, ou de sa semaine si `o.week`) : exactement `height` lignes de `width`
 -- colonnes, ou nil si la zone est trop petite. La grille ne prend pas plus de M.GRID_SHARE de la hauteur (sinon elle
 -- écrase le détail) ; le détail, juste dessous, prend tout le reste.
---   o = { days, idle_days, projects, timeline, year, month, today_key, day_key, cfg, labels, b, edge }
+--   o = { days, idle_days, projects, timeline, year, month, today_key, day_key, week, accent, cfg, labels, b, edge }
 function M.render(o, width, height)
 	local weeks = #M.weeks(o.year, o.month, o.cfg.week_starts_on)
 	local min_w, min_h = M.minimum(weeks)
@@ -469,10 +586,13 @@ function M.render(o, width, height)
 		out[#out] = nil
 	end
 	local key = o.day_key or o.today_key
-	for _, line in ipairs(M.detail(o, key, width, height - #out - M.TIMELINE_HEIGHT)) do
+	local week = o.week and M.week_keys(key, o.cfg.week_starts_on)
+	local detail = week and M.week_detail(o, week, width, height - #out - M.TIMELINE_HEIGHT)
+		or M.detail(o, key, width, height - #out - M.TIMELINE_HEIGHT)
+	for _, line in ipairs(detail) do
 		out[#out + 1] = line
 	end
-	for _, line in ipairs(M.timeline(o, key, width)) do
+	for _, line in ipairs(week and M.week_timeline(o, week, width) or M.timeline(o, key, width)) do
 		out[#out + 1] = line
 	end
 	return out
