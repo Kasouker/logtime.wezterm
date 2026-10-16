@@ -219,6 +219,17 @@ end
 M.PERCENT_WIDTH = 6 -- la colonne des pourcentages (« 100% » et de l'air)
 M.DURATION_WIDTH = 6 -- « 10h04 »
 
+-- Les projets du détail du jour `key` : les plus gros (au moins une minute), le reste dans « autres ».
+function M.day_projects(o, key)
+	local projects = {}
+	for _, item in ipairs(activity.top(o.projects and o.projects[key], M.PROJECTS)) do
+		if item.secs >= 60 then
+			projects[#projects + 1] = item
+		end
+	end
+	return projects
+end
+
 -- Le détail du jour `key`, dans un tableau encadré : exactement `height` lignes de `width` colonnes.
 --   ╭─────┬─────┬─────────────────────────────────────┬──────╮
 --   │8h05 │1h55 │ Total  10h04       ✓ objectif atteint│      │   l'objectif aligné sur le début des barres
@@ -266,12 +277,9 @@ function M.detail(o, key, width, height, opts)
 	local name_width = math.min(24, math.max(10, list_width // 3))
 	local bar_start = 1 + name_width + 2 + M.DURATION_WIDTH + 2 -- là où commencent les barres des projets
 	local bar_width = math.max(4, list_width - bar_start - 1)
-	local projects = {}
-	for _, item in ipairs(activity.top(o.projects and o.projects[key], M.PROJECTS)) do
-		if item.secs >= 60 then
-			projects[#projects + 1] = item
-		end
-	end
+	local projects = M.day_projects(o, key)
+	-- avec la frise, chaque projet a sa couleur (la même que sur la frise) ; sans elle, la couleur du jour
+	local project_colors = o.cfg.show_timeline ~= false and M.day_colors(o, key) or nil
 	-- les lignes de droite : { texte de la liste, texte du pourcentage } ou "rule" (un trait entre deux lignes)
 	local total_text = " " .. labels.detail_total .. "  " .. stats.hm(total)
 	local rows = { { fit(total_text, bar_start) .. (opts.goal or goal_text(o, key, total)), "" }, "rule" }
@@ -290,7 +298,7 @@ function M.detail(o, key, width, height, opts)
 				.. string.rep(" ", M.DURATION_WIDTH - vw(duration))
 				.. duration
 				.. "  "
-				.. hbar(secs / math.max(1, total), bar_width, color),
+				.. hbar(secs / math.max(1, total), bar_width, project_colors and project_colors[item.label] or color),
 			string.format("%d%%", math.floor(secs * 100 / math.max(1, total) + 0.5)),
 		}
 		if spaced and n < #projects then
@@ -383,6 +391,26 @@ function M.timeline_colors(segments)
 	return colors
 end
 
+-- Les couleurs des projets du jour `key`, les mêmes sur la frise et dans le détail : dans l'ordre des projets du détail
+-- (le plus gros d'abord), « autres » en gris. Un projet de la frise absent du détail (regroupé dans « autres ») est gris
+-- aussi. Sans temps par projet ce jour-là : les couleurs de la frise seule (M.timeline_colors).
+function M.day_colors(o, key)
+	local projects = M.day_projects(o, key)
+	if #projects == 0 then
+		return M.timeline_colors(o.timeline and o.timeline[key])
+	end
+	local colors, n = {}, 0
+	for _, item in ipairs(projects) do
+		if item.label == activity.OTHER then
+			colors[item.label] = M.OTHER_COLOR
+		else
+			n = n + 1
+			colors[item.label] = palette.COLORS[M.TIMELINE_ORDER[(n - 1) % #M.TIMELINE_ORDER + 1]]
+		end
+	end
+	return colors
+end
+
 -- Le projet de chaque colonne de la frise : la journée découpée en `columns` parts égales ; dans chaque part, le projet
 -- qui y a passé le plus de temps (ou nil si personne). Renvoie une liste de `columns` projets (ou false).
 function M.timeline_columns(segments, columns)
@@ -450,7 +478,7 @@ function M.timeline(o, key, width)
 	end
 	local inner = width - 2
 	local segments = o.timeline and o.timeline[key] or {}
-	local colors = M.timeline_colors(segments)
+	local colors = M.day_colors(o, key)
 	local columns = M.timeline_columns(segments, inner)
 	local start = -(o.cfg.day_offset or 0)
 	-- la fin de la journée : « 24h00 » (et pas « 0h00 ») quand elle finit à minuit

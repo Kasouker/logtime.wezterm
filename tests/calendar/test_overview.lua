@@ -334,7 +334,8 @@ check(
 	overview.timeline_columns({ { 0, 1000, "a" }, { 1000, 3600, "b" } }, 24)[1],
 	"b"
 )
-local tl = overview.timeline(data({ timeline = { ["2026-10-15"] = SEGS } }), "2026-10-15", 98)
+-- (sans temps par projet ce jour-là : les couleurs viennent de la frise seule)
+local tl = overview.timeline(data({ projects = {}, timeline = { ["2026-10-15"] = SEGS } }), "2026-10-15", 98)
 check("la frise : 4 lignes", #tl, 4)
 check(
 	"la frise : chaque ligne fait la largeur",
@@ -374,6 +375,83 @@ check(
 	) <= 1,
 	true
 )
+-- ---- les couleurs reliées : la frise et le détail, chaque projet dans la même couleur
+local LINKED = {
+	{ 9 * 3600, 13 * 3600, "Bot Discord" },
+	{ 13 * 3600, 15 * 3600, "Plug WT" },
+	{ 15 * 3600, 16 * 3600, "RL" },
+	{ 16 * 3600, 16 * 3600 + 30, "tiny" },
+}
+local linked = data({ timeline = { ["2026-10-15"] = LINKED } })
+local day_colors = overview.day_colors(linked, "2026-10-15")
+check(
+	"couleurs du jour : le plus gros projet du détail a la 1re couleur",
+	day_colors["Bot Discord"],
+	palette.COLORS[overview.TIMELINE_ORDER[1]]
+)
+check("couleurs du jour : le 2e la 2e", day_colors["Plug WT"], palette.COLORS[overview.TIMELINE_ORDER[2]])
+check("couleurs du jour : le 3e la 3e", day_colors.RL, palette.COLORS[overview.TIMELINE_ORDER[3]])
+check(
+	"couleurs du jour : un projet absent du détail (moins d'une minute) : pas de couleur à lui",
+	day_colors.tiny,
+	nil
+)
+check(
+	"couleurs du jour : « autres » en gris (comme sur la frise)",
+	overview.day_colors(data({ projects = { ["2026-10-15"] = { A = 3600, ["?"] = 600 } } }), "2026-10-15")["?"],
+	overview.OTHER_COLOR
+)
+local linked_tl = overview.timeline(linked, "2026-10-15", 98)
+local linked_detail = joined(overview.detail(linked, "2026-10-15", 100, 16))
+for _, name in ipairs({ "Bot Discord", "Plug WT", "RL" }) do
+	check(
+		"couleurs reliées : " .. name .. " a la même couleur sur la frise et dans le détail",
+		linked_tl[3]:find(convert.bg(day_colors[name]), 1, true) ~= nil
+			and linked_detail:find(convert.fg(day_colors[name]) .. "█", 1, true) ~= nil,
+		true
+	)
+end
+check(
+	"couleurs reliées : un projet sans couleur à lui est gris sur la frise (comme « autres »)",
+	linked_tl[3]:find(convert.bg(overview.OTHER_COLOR), 1, true) ~= nil,
+	true
+)
+local day_color = assemble.day_color(DAYS["2026-10-15"], linked.cfg)
+local function literal(text)
+	return (text:gsub("[%^%$%(%)%%%.%[%]%*%+%-%?]", "%%%0"))
+end
+-- une barre horizontale de projet : sa couleur, puis le gris du vide (les barres verticales n'en ont pas)
+local function project_bars(text, color)
+	return select(
+		2,
+		text:gsub(literal(convert.fg(color)) .. "[^\27]*" .. literal(convert.fg(overview.EMPTY_COLOR)), "")
+	)
+end
+check(
+	"couleurs reliées : plus aucune barre de projet dans la couleur du jour",
+	project_bars(linked_detail, day_color),
+	0
+)
+local unlinked = joined(overview.detail(
+	data({
+		cfg = gradient.apply_to({ goal_hours = 8, show_timeline = false }),
+		timeline = { ["2026-10-15"] = LINKED },
+	}),
+	"2026-10-15",
+	100,
+	16
+))
+check(
+	"sans la frise : les 3 barres de projets dans la couleur du jour (comme avant)",
+	project_bars(unlinked, day_color),
+	3
+)
+check(
+	"sans la frise : aucune couleur de projet",
+	unlinked:find(convert.fg(day_colors["Bot Discord"]) .. "█", 1, true),
+	nil
+)
+
 local shifted_tl = overview.timeline(data({ cfg = gradient.apply_to({ day_offset = -3600 }) }), "2026-10-15", 60)
 check("une journée qui commence à 1h00 : 1h00 … 1h00", strip(shifted_tl[1]):match("^ 1h00 +1h00 $") ~= nil, true)
 local empty_tl = overview.timeline(data({ timeline = {} }), "2026-10-15", 60)
