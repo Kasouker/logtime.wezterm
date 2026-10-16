@@ -39,6 +39,7 @@ return {
 	detail_date = "{weekday}, {month} {day}, {year}",
 	detail_today = "today",
 	detail_total = "Total",
+	overview_week = "Week %d",
 	detail_active = "Active",
 	detail_idle = "Idle",
 	detail_week = "Week",

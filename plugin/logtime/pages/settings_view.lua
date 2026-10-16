@@ -398,7 +398,8 @@ end
 --   o.b, o.edge  : les traits du cadre (assemble.BORDER_STYLES) et leur couleur (un code de couleur, ou "")
 --   o.accent     : la couleur de l'onglet ouvert, du bouton actif et du réglage choisi ("#RRGGBB")
 --   o.tabs       : les 4 noms de la barre d'onglets (le titre, puis les 3 onglets) ; o.tab : l'onglet ouvert (1 à 3)
---   o.preview    : { lines, width } ou nil
+--   o.preview    : { draw = function(largeur, hauteur) -> lignes ou nil, min_width, min_height } (il remplit la
+--                  zone de droite), ou { lines, width } (centré dans la zone), ou nil
 function M.draw(o, cols, rows)
 	local min_left, min_rows = M.minimum(o)
 	if cols < min_left + 2 or rows < min_rows then
@@ -413,7 +414,13 @@ function M.draw(o, cols, rows)
 	local left = math.max(min_left, math.floor((cols - 3) * M.LEFT_SHARE))
 	local right = cols - 3 - left
 	local preview = o.preview
-	local show_preview = preview ~= nil and right >= preview.width + 2 and rows - 2 >= #preview.lines
+	local show_preview
+	if preview and preview.draw then
+		-- un aperçu qui remplit toute la zone de droite, s'il y tient
+		show_preview = right >= (preview.min_width or 1) and rows - 2 >= (preview.min_height or 1)
+	else
+		show_preview = preview ~= nil and right >= preview.width + 2 and rows - 2 >= #preview.lines
+	end
 	if not show_preview then
 		left, right = cols - 2, 0
 	end
@@ -421,7 +428,17 @@ function M.draw(o, cols, rows)
 	-- le panneau de droite : l'aperçu centré dans sa zone (par sa largeur : les lignes d'un mois n'ont pas toutes la
 	-- même longueur)
 	local right_lines = {}
-	if show_preview then
+	if show_preview and preview.draw then
+		local drawn = preview.draw(right, inner_rows)
+		if drawn then
+			for i = 1, inner_rows do
+				right_lines[i] = fit(drawn[i] or "", right)
+			end
+		else
+			show_preview = false -- l'aperçu dit qu'il ne tient pas : le panneau de gauche prend toute la largeur
+			left, right = cols - 2, 0
+		end
+	elseif show_preview then
 		local top = math.max(0, math.floor((inner_rows - #preview.lines) / 2))
 		local margin = math.max(0, math.floor((right - preview.width) / 2))
 		for i = 1, inner_rows do

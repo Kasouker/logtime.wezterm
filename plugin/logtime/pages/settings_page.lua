@@ -17,6 +17,7 @@ local convert = load("color/convert")
 local schema = load("settings/schema")
 local assemble = load("calendar/assemble")
 local view = load("pages/settings_view")
+local overview = load("calendar/overview")
 
 local M = {}
 
@@ -226,6 +227,7 @@ end
 
 -- ctx fournit ce que la page ne sait pas faire seule (days et today_key sont facultatifs : sans eux, pas d'aperçu) :
 --   days()              les heures par jour { ["2026-10-12"] = secondes, ... }, pour l'aperçu du mois actuel
+--   idle_days(), projects()   facultatifs : le temps inactif et le temps par projet, pour le détail du jour de l'aperçu
 --   today_key()         la date du jour "AAAA-MM-JJ"
 --   wezterm, G (wezterm.GLOBAL), num(v)
 --   cfg()               les réglages en cours (gradient_color, gradient)
@@ -448,15 +450,35 @@ function M.create(ctx)
 		if current_tab() == M.TAB.COLORS then
 			cfg.gradient_color = (active or active_palette()).colors[selected_index()]
 		end
-		return assemble.month_block(
-			ctx.days(),
-			tonumber(year),
-			tonumber(month),
-			key,
-			gradient.apply_to(cfg),
-			labels,
-			false
-		)
+		local applied = gradient.apply_to(cfg)
+		local b = assemble.BORDER_STYLES[cfg.border_style] or assemble.BORDER_STYLES.rounded
+		local border = cfg.border_color
+		if type(border) ~= "string" or not border:match("^#%x%x%x%x%x%x$") then
+			border = assemble.BORDER_COLOR
+		end
+		local view_data = {
+			days = ctx.days(),
+			idle_days = ctx.idle_days and ctx.idle_days() or nil,
+			projects = ctx.projects and ctx.projects() or nil,
+			year = tonumber(year),
+			month = tonumber(month),
+			today_key = key,
+			day_key = key,
+			cfg = applied,
+			labels = labels,
+			b = b,
+			edge = convert.fg(border),
+		}
+		local min_width, min_height =
+			overview.minimum(#overview.weeks(view_data.year, view_data.month, applied.week_starts_on))
+		-- la vue du mois et du jour (calendar/overview.lua) : elle remplit toute la zone de droite
+		return {
+			min_width = min_width,
+			min_height = min_height,
+			draw = function(width, height)
+				return overview.render(view_data, width, height)
+			end,
+		}
 	end
 
 	local function redraw(pane, first)

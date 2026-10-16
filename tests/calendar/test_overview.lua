@@ -1,0 +1,284 @@
+-- tests/calendar/test_overview.lua : teste calendar/overview.lua (la vue du mois et du jour, l'aperçu de la page F4).
+-- Lancer :   lua5.4 tests/calendar/test_overview.lua
+local root = (arg and arg[0] or ""):match("^(.*)[/\\]tests[/\\]calendar[/\\]test_overview%.lua$") or "."
+local cache = {}
+local function load_module(name)
+	if not cache[name] then
+		cache[name] = assert(loadfile(root .. "/plugin/logtime/" .. name .. ".lua"))(load_module)
+	end
+	return cache[name]
+end
+local overview = load_module("calendar/overview")
+local assemble = load_module("calendar/assemble")
+local gradient = load_module("color/gradient")
+local convert = load_module("color/convert")
+local layout = load_module("calendar/layout")
+local fr = load_module("i18n/fr")
+local en = load_module("i18n/en")
+
+local passed, failed = 0, 0
+local function check(name, got, want)
+	if got == want then
+		passed = passed + 1
+	else
+		failed = failed + 1
+		print(
+			string.format(
+				"ÉCHEC  %s\n         attendu : %s\n         obtenu  : %s",
+				name,
+				tostring(want),
+				tostring(got)
+			)
+		)
+	end
+end
+local function strip(text)
+	return (text:gsub("\27%[[%d;]*m", ""))
+end
+local function joined(lines)
+	return table.concat(lines, "\n")
+end
+
+local DAYS = {
+	["2026-10-10"] = 4 * 3600 + 13 * 60,
+	["2026-10-12"] = 8 * 3600 + 56 * 60,
+	["2026-10-14"] = 15 * 3600 + 35 * 60,
+	["2026-10-15"] = 10 * 3600 + 4 * 60,
+}
+local function data(over)
+	local o = {
+		days = DAYS,
+		idle_days = { ["2026-10-15"] = 1 * 3600 + 55 * 60 },
+		projects = {
+			["2026-10-15"] = {
+				["Bot Discord"] = 4 * 3600,
+				["Plug WT"] = 2 * 3600,
+				RL = 3600,
+				tiny = 30, -- moins d'une minute : pas affiché
+			},
+		},
+		year = 2026,
+		month = 10,
+		today_key = "2026-10-15",
+		day_key = "2026-10-15",
+		cfg = gradient.apply_to({ goal_hours = 8, week_starts_on = "monday" }),
+		labels = fr,
+		b = assemble.BORDER_STYLES.rounded,
+		edge = "",
+	}
+	for k, v in pairs(over or {}) do
+		o[k] = v
+	end
+	return o
+end
+
+-- ---- les semaines du mois
+local weeks = overview.weeks(2026, 10, "monday")
+check("octobre 2026 (semaine du lundi) : 5 semaines", #weeks, 5)
+check("le 1er octobre 2026 est un jeudi (4e colonne)", tostring(weeks[1][4]), "1")
+check("avant le 1er : des cases vides", tostring(weeks[1][1]) .. tostring(weeks[1][3]), "falsefalse")
+check(
+	"la dernière semaine finit le 31, puis du vide",
+	tostring(weeks[5][6]) .. " " .. tostring(weeks[5][7]),
+	"31 false"
+)
+local sunday = overview.weeks(2026, 10, "sunday")
+check("semaine du dimanche : le jeudi 1er est en 5e colonne", tostring(sunday[1][5]), "1")
+check("février 2027 (semaine du lundi) : 4 semaines pile (le 1er est un lundi)", #overview.weeks(2027, 2, "monday"), 4)
+check("août 2026 (semaine du lundi) : 6 semaines", #overview.weeks(2026, 8, "monday"), 6)
+
+-- ---- la grille du mois
+local grid = overview.grid(data(), 100, 30)
+local plain = {}
+for i, line in ipairs(grid) do
+	plain[i] = strip(line)
+end
+check("la grille : exactement la hauteur demandée", #grid, 30)
+check(
+	"la grille : chaque ligne fait la largeur demandée",
+	(function()
+		for i, line in ipairs(grid) do
+			if layout.visible_width(line) ~= 100 then
+				return i
+			end
+		end
+		return true
+	end)(),
+	true
+)
+check("le nom du mois, en haut à gauche (au-dessus des semaines)", plain[2]:match("^│%s*(%S+)%s*│"), "Octobre")
+check("les jours en toutes lettres quand ils tiennent", plain[2]:find("Mercredi", 1, true) ~= nil, true)
+check("lundi d'abord", plain[2]:find("Lundi", 1, true) < plain[2]:find("Mardi", 1, true), true)
+check(
+	"une ligne par semaine : Semaine 1 à 5",
+	joined(plain):find("Semaine 1", 1, true) ~= nil
+		and joined(plain):find("Semaine 5", 1, true) ~= nil
+		and joined(plain):find("Semaine 6", 1, true) == nil,
+	true
+)
+check("aujourd'hui est marqué « * »", joined(plain):find("*15", 1, true) ~= nil, true)
+check("la durée sous le numéro du jour", joined(plain):find("15h35", 1, true) ~= nil, true)
+check("un jour sans temps : pas de durée", joined(plain):find("0h00", 1, true), nil)
+local color14 = assemble.day_color(DAYS["2026-10-14"], data().cfg)
+check(
+	"un jour avec du temps : sa case sur la couleur de sa durée",
+	joined(grid):find(convert.bg(color14), 1, true) ~= nil,
+	true
+)
+check(
+	"le texte d'une case lisible (contraste)",
+	joined(grid):find(convert.bg(color14) .. convert.fg(convert.contrast(color14)), 1, true) ~= nil,
+	true
+)
+check("le cadre de la grille : le style choisi", plain[1]:sub(1, #"╭"), "╭")
+local double = strip(joined(overview.grid(data({ b = assemble.BORDER_STYLES.double }), 100, 30)))
+check("le cadre de la grille : un autre style (double)", double:find("╬", 1, true) ~= nil, true)
+local narrow = strip(joined(overview.grid(data(), 70, 30)))
+check(
+	"étroit : les jours en abrégé, centrés dans leur case (pas un nom long coupé)",
+	narrow:find("│  Mer  │", 1, true) ~= nil and narrow:find("Mercre", 1, true) == nil,
+	true
+)
+local sun_grid = strip(overview.grid(data({ cfg = gradient.apply_to({ week_starts_on = "sunday" }) }), 100, 30)[2])
+check(
+	"semaine du dimanche : Dimanche d'abord",
+	sun_grid:find("Dimanche", 1, true) < sun_grid:find("Lundi", 1, true),
+	true
+)
+check(
+	"anglais : les noms anglais",
+	strip(overview.grid(data({ labels = en }), 100, 30)[2]):find("Wednesday", 1, true) ~= nil,
+	true
+)
+check("trop étroit pour une grille : nil", overview.grid(data(), 40, 30), nil)
+check("trop bas pour une grille : nil", overview.grid(data(), 100, 10), nil)
+-- les semaines prennent la hauteur disponible
+local tall = overview.grid(data(), 100, 60)
+local short = overview.grid(data(), 100, 20)
+local function week_height(g)
+	local rows = {}
+	for i, line in ipairs(g) do
+		if strip(line):sub(1, #"├") == "├" then
+			rows[#rows + 1] = i
+		end
+	end
+	return rows[3] - rows[2]
+end
+check("plus de place : des semaines plus hautes", week_height(tall) > week_height(short), true)
+
+-- ---- une barre verticale (au huitième de ligne près)
+local function bar_text(lines)
+	local out = {}
+	for i, line in ipairs(lines) do
+		out[i] = strip(line)
+	end
+	return table.concat(out, "|")
+end
+check(
+	"barre vide : seulement son sol (▁ en bas)",
+	bar_text(overview.vertical_bar(0, 3, "#FFFFFF", 2)),
+	"  |  |▁▁"
+)
+check("barre pleine : toute la hauteur", bar_text(overview.vertical_bar(1, 3, "#FFFFFF", 2)), "██|██|██")
+check(
+	"barre à moitié (4 lignes) : les 2 du bas",
+	bar_text(overview.vertical_bar(0.5, 4, "#FFFFFF", 1)),
+	" | |█|█"
+)
+check("barre à 1/8 de ligne : ▁", bar_text(overview.vertical_bar(1 / 32, 4, "#FFFFFF", 1)), " | | |▁")
+check("barre à 3/4 de ligne : ▆", bar_text(overview.vertical_bar(6 / 32, 4, "#FFFFFF", 1)), " | | |▆")
+check("barre au-delà de 100 % : pleine (jamais plus)", bar_text(overview.vertical_bar(2, 2, "#FFFFFF", 1)), "█|█")
+check("barre : dans sa couleur", overview.vertical_bar(1, 1, "#123456", 1)[1]:find(convert.fg("#123456"), 1, true), 1)
+
+-- ---- le détail du jour
+local detail = overview.detail(data(), "2026-10-15", 100, 9)
+local dplain = {}
+for i, line in ipairs(detail) do
+	dplain[i] = strip(line)
+end
+check("le détail : exactement la hauteur demandée", #detail, 9)
+check(
+	"le détail : chaque ligne fait la largeur demandée",
+	(function()
+		for i, line in ipairs(detail) do
+			if layout.visible_width(line) ~= 100 then
+				return i
+			end
+		end
+		return true
+	end)(),
+	true
+)
+check(
+	"en haut des barres : l'actif et l'inactif (8h09, 1h55)",
+	dplain[1]:find("8h09", 1, true) ~= nil and dplain[1]:find("1h55", 1, true) ~= nil,
+	true
+)
+check(
+	"sous les barres : leurs noms, en entier (« Inactif »)",
+	dplain[8]:find("Actif", 1, true) ~= nil and dplain[8]:find("Inactif", 1, true) ~= nil,
+	true
+)
+check(
+	"tout en bas : les pourcentages (81 % actif, 19 % inactif)",
+	dplain[9]:find("81%", 1, true) ~= nil and dplain[9]:find("19%", 1, true) ~= nil,
+	true
+)
+check("la barre de l'actif plus haute que celle de l'inactif", dplain[3]:find("█", 1, true) ~= nil, true)
+check("le total et l'objectif atteint", dplain[1]:find("Total  10h04   ✓ objectif 8h atteint", 1, true) ~= nil, true)
+check(
+	"le plus gros projet d'abord, avec sa durée",
+	dplain[2]:find("Bot Discord", 1, true) ~= nil and dplain[2]:find("4h00", 1, true) ~= nil,
+	true
+)
+check("puis le suivant", dplain[3]:find("Plug WT", 1, true) ~= nil, true)
+check("le pourcentage collé au bord droit", dplain[2]:sub(-4), " 40%")
+check("une barre par projet", detail[2]:find("█", 1, true) ~= nil and detail[2]:find("░", 1, true) ~= nil, true)
+check("un projet de moins d'une minute : caché", joined(dplain):find("tiny", 1, true), nil)
+local missing = strip(joined(overview.detail(data({ days = { ["2026-10-15"] = 3600 } }), "2026-10-15", 100, 9)))
+check(
+	"objectif pas encore atteint aujourd'hui : ce qu'il manque",
+	missing:find("objectif 8h : il manque 7h00", 1, true) ~= nil,
+	true
+)
+local past = strip(joined(overview.detail(data({ days = { ["2026-10-12"] = 3600 } }), "2026-10-12", 100, 9)))
+check("un jour passé sous l'objectif : manqué", past:find("non atteint", 1, true) ~= nil, true)
+local no_goal = strip(joined(overview.detail(data({ cfg = gradient.apply_to({}) }), "2026-10-15", 100, 9)))
+check("sans objectif : juste le total", no_goal:find("objectif", 1, true), nil)
+local empty = strip(joined(overview.detail(data(), "2026-10-20", 100, 9)))
+check("un jour sans temps : le dit", empty:find(fr.detail_empty, 1, true) ~= nil, true)
+check("un jour sans temps : 0 % partout, pas de division par zéro", empty:find("0%", 1, true) ~= nil, true)
+local english = strip(joined(overview.detail(data({ labels = en }), "2026-10-15", 100, 9)))
+check("anglais : Active / Idle", english:find("Active", 1, true) ~= nil and english:find("Idle", 1, true) ~= nil, true)
+local many = {}
+for i = 1, 12 do
+	many["p" .. i] = i * 600
+end
+local crowded = overview.detail(data({ projects = { ["2026-10-15"] = many } }), "2026-10-15", 100, 9)
+check("beaucoup de projets : jamais plus haut que la place", #crowded, 9)
+check("beaucoup de projets : le reste dans « autres »", strip(joined(crowded)):find("autres", 1, true) ~= nil, true)
+
+-- ---- toute la vue
+local view = overview.render(data(), 100, 40)
+check("la vue : exactement la taille demandée", #view == 40 and layout.visible_width(view[40]) == 100, true)
+check(
+	"la vue : la grille puis le détail",
+	strip(joined(view)):find("Semaine 5", 1, true) < strip(joined(view)):find("Total", 1, true),
+	true
+)
+local min_w, min_h = overview.minimum(5)
+check("la vue : pile au minimum, elle tient", overview.render(data(), min_w, min_h) ~= nil, true)
+check("la vue : une colonne de moins, nil", overview.render(data(), min_w - 1, min_h), nil)
+check("la vue : une ligne de moins, nil", overview.render(data(), min_w, min_h - 1), nil)
+check("le minimum pour 6 semaines est plus haut", select(2, overview.minimum(6)) > min_h, true)
+local at_min = overview.render(data(), min_w, min_h)
+check("au minimum : le détail est là", strip(joined(at_min)):find("Total", 1, true) ~= nil, true)
+check("au minimum : la grille entière (Semaine 5)", strip(joined(at_min)):find("Semaine 5", 1, true) ~= nil, true)
+check(
+	"le jour du détail : un autre jour que aujourd'hui",
+	strip(joined(overview.render(data({ day_key = "2026-10-14" }), 100, 40))):find("Total  15h35", 1, true) ~= nil,
+	true
+)
+
+print(string.format("\n%d vérifications réussies, %d échecs", passed, failed))
+os.exit(failed == 0 and 0 or 1)

@@ -949,6 +949,8 @@ function M.apply_to_config(config, opts, ...)
 			end,
 			store = settings,
 			days = days_for_page, -- pour l'aperçu du mois actuel
+			idle_days = get_idle, -- et le détail du jour de l'aperçu
+			projects = get_projects,
 			today_key = function()
 				return day.key(os.time(), cfg.day_offset)
 			end,

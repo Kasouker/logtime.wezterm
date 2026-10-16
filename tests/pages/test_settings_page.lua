@@ -1428,8 +1428,22 @@ check(
 	true
 )
 check(
-	"aperçu à droite : le mois actuel, avec ses vraies heures",
-	table.concat(full, "\n"):find("Octobre 2026   Total du mois : 10h00 / Jours actifs : 2", 1, true) ~= nil,
+	"aperçu à droite : le mois actuel (son nom en haut à gauche de la grille), avec les jours de la semaine",
+	table.concat(full, "\n"):find("Octobre", 1, true) ~= nil
+		and table.concat(full, "\n"):find("Mercredi", 1, true) ~= nil,
+	true
+)
+check(
+	"aperçu : une ligne par semaine (« Semaine 1 » à « Semaine 5 » pour octobre 2026)",
+	table.concat(full, "\n"):find("Semaine 1", 1, true) ~= nil
+		and table.concat(full, "\n"):find("Semaine 5", 1, true) ~= nil,
+	true
+)
+check(
+	"aperçu : le détail du jour (le total et les barres actif / inactif)",
+	table.concat(full, "\n"):find("Total", 1, true) ~= nil
+		and table.concat(full, "\n"):find("Actif", 1, true) ~= nil
+		and table.concat(full, "\n"):find("Inactif", 1, true) ~= nil,
 	true
 )
 check("aperçu : les vraies heures (le 5 : 8h00)", table.concat(full, "\n"):find("8h00", 1, true) ~= nil, true)
@@ -1449,20 +1463,26 @@ check(
 check("aperçu : rien n'est enregistré pour autant", read(e.path), nil)
 -- les réglages du calendrier changent l'aperçu tout de suite
 press(e, "Tab", e.pane)
-for _ = 1, 3 do
+for _ = 1, 4 do
 	press(e, "j", e.pane)
 end
 press(e, "l", e.pane)
+press(e, "l", e.pane)
 check(
-	"aperçu : les encadrés apparaissent dans l'aperçu dès qu'on les active",
-	shown_text(e):find("╭─ Octobre 2026", 1, true) ~= nil,
+	"aperçu : le style du trait (double) se voit tout de suite dans la grille de l'aperçu",
+	shown_text(e):find("╬", 1, true) ~= nil,
 	true
 )
+press(e, "k", e.pane)
 press(e, "k", e.pane)
 press(e, "l", e.pane)
 check(
 	"aperçu : le début de la semaine suit (dimanche d'abord)",
-	shown_text(e):find("├──Dim───┬──Lun", 1, true) ~= nil,
+	(function()
+		local text = shown_text(e)
+		local sunday, monday = text:find("Dimanche", 1, true), text:find("Lundi", 1, true)
+		return sunday ~= nil and monday ~= nil and sunday < monday
+	end)(),
 	true
 )
 -- le cadre de la page : toujours là, avec le style et la couleur du trait choisis (comme le calendrier)
