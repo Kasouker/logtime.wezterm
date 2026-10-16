@@ -244,6 +244,16 @@ end
 -- Les réglages d'un onglet (Calendrier, Général) dans `width` x `height` : un par ligne, répartis sur la hauteur, le
 -- nom à gauche et la valeur collée à droite ; le réglage choisi est rempli de la couleur `accent` (avec des demi-blocs
 -- au-dessus et en dessous quand il y a la place). rows = { { name, value }, ... }, selected = son numéro.
+function M.section_lines(rows)
+	local n = 0
+	for _, row in ipairs(rows) do
+		if row.heading then
+			n = n + 2 + (row.rule and 2 or 0)
+		end
+	end
+	return n
+end
+
 function M.settings_rows(rows, selected, accent, width, height)
 	local out = {}
 	for i = 1, height do
@@ -253,11 +263,20 @@ function M.settings_rows(rows, selected, accent, width, height)
 	if count == 0 then
 		return out
 	end
-	local gaps = share(math.max(0, height - count), count + 1)
+	local gaps = share(math.max(0, height - count - M.section_lines(rows)), count + 1)
 	local y = gaps[1]
 	local style = filled(accent)
 	for i, row in ipairs(rows) do
 		y = y + 1
+		-- le début d'un bloc : un trait (sauf le premier) et une ligne vide, puis son titre souligné et une ligne vide
+		if row.heading then
+			if row.rule then
+				out[y] = fit(" " .. string.rep("─", width - 2), width)
+				y = y + 2
+			end
+			out[y] = fit("   " .. M.underline(row.heading), width)
+			y = y + 2
+		end
 		local name, value = "   " .. row.name, row.value .. "   "
 		local room = width - vw(name)
 		local line = name .. string.rep(" ", math.max(1, room - vw(value))) .. value
@@ -267,7 +286,7 @@ function M.settings_rows(rows, selected, accent, width, height)
 				.. line:gsub("\27%[0m", convert.RESET .. style)
 				.. string.rep(" ", math.max(0, width - vw(line)))
 				.. convert.RESET
-			if gaps[i] >= 1 then
+			if gaps[i] >= 1 or row.heading then
 				out[y - 1] = convert.fg(accent) .. string.rep(LOWER_HALF, width) .. convert.RESET
 			end
 			if gaps[i + 1] >= 1 and y + 1 <= height then
@@ -386,7 +405,7 @@ function M.minimum(o)
 	if c then
 		rows = rows + (M.GRADIENT_GAP + 3) + (M.ROWS * M.SWATCH_HEIGHT + (M.ROWS + 1)) + (1 + M.CHOICE_GAP + 2)
 	elseif o.list then
-		rows = rows + (2 * #(o.list.rows or {}) + 1) + 3 + 1
+		rows = rows + (2 * #(o.list.rows or {}) + 1) + M.section_lines(o.list.rows or {}) + 3 + 1
 	else
 		rows = rows + 1
 	end

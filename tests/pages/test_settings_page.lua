@@ -949,7 +949,7 @@ local four_plain = {}
 for i, line in ipairs(four) do
 	four_plain[i] = strip(line)
 end
-check("l'onglet Calendrier : intitulé, ligne vide, 6 réglages, ligne vide, explication (10 lignes)", #four, 10)
+check("l'onglet Calendrier : intitulé, ligne vide, 7 réglages, ligne vide, explication (11 lignes)", #four, 11)
 check("onglet Calendrier : le nombre de mois", four_plain[3], "Mois affichés au maximum = ◀ 6 ▶")
 check(
 	"onglet Calendrier : la place du mois choisi (traduite)",
@@ -973,7 +973,28 @@ check(
 	four_plain[8],
 	"Couleur du trait = ◀ Gris ╭─╮ ▶"
 )
-check("onglet Calendrier : l'explication du réglage choisi (le 3e)", four_plain[10], fr.settings_hints.week_starts_on)
+check(
+	"onglet Calendrier, bloc Aperçu : la frise, « oui » par défaut",
+	four_plain[9],
+	"Frise de la journée = ◀ oui ▶"
+)
+check("onglet Calendrier : l'explication du réglage choisi (le 3e)", four_plain[11], fr.settings_hints.week_starts_on)
+local blocks = settings_page.list_rows({ tab = 2, row = 1, values = {} }, fr).rows
+check("onglet Calendrier : le bloc Calendrier commence au 1er réglage", blocks[1].heading, "Calendrier")
+check("onglet Calendrier : pas de trait au-dessus du premier bloc", blocks[1].rule, false)
+check("onglet Calendrier : le bloc Aperçu commence à la frise", blocks[7].heading, "Aperçu")
+check("onglet Calendrier : un trait au-dessus du bloc Aperçu", blocks[7].rule, true)
+check("onglet Calendrier : pas de titre ailleurs", blocks[2].heading, nil)
+check(
+	"onglet Calendrier : les titres en anglais",
+	settings_page.list_rows({ tab = 2, row = 1, values = {} }, en).rows[7].heading,
+	"Preview"
+)
+check(
+	"onglet Général : pas de blocs",
+	settings_page.list_rows({ tab = 3, row = 1, values = {} }, fr).rows[1].heading,
+	nil
+)
 local boxed = list({ tab = 2, row = 4, values = { borders = false, border_style = "heavy" }, message = 0 })
 check(
 	"encadrés « non » reste « non » (false n'est pas remplacé par la valeur par défaut)",
@@ -1110,7 +1131,10 @@ check("← ← : du rouge au gris, puis au dernier choix (en boucle)", e.cfg.bor
 press(e, "d", e.pane)
 check("d sur la couleur : le gris", e.cfg.border_color, "#8B8E99")
 press(e, "j", e.pane)
-check("↓ au dernier réglage (la couleur) : il reste choisi", row_selected(e, "Couleur du trait"), true)
+check("↓ depuis la couleur : la frise (bloc Aperçu)", row_selected(e, "Frise de la journée"), true)
+press(e, "j", e.pane)
+check("↓ au dernier réglage (la frise) : il reste choisi", row_selected(e, "Frise de la journée"), true)
+press(e, "k", e.pane)
 press(e, "k", e.pane)
 press(e, "k", e.pane)
 press(e, "d", e.pane)
@@ -1458,11 +1482,7 @@ check(
 		and table.concat(full, "\n"):find("Inactif", 1, true) ~= nil,
 	true
 )
-check(
-	"aperçu : la frise du jour (« 0h00 … 24h00 »)",
-	table.concat(full, "\n"):find("24h00", 1, true) ~= nil,
-	true
-)
+check("aperçu : la frise du jour (« 0h00 … 24h00 »)", table.concat(full, "\n"):find("24h00", 1, true) ~= nil, true)
 check("aperçu : les vraies heures (le 5 : 8h00)", table.concat(full, "\n"):find("8h00", 1, true) ~= nil, true)
 check(
 	"aperçu : pas les jours d'un autre mois (le 30 septembre : 4h00 ; « 24h00 », le bout de la frise, ne compte pas)",

@@ -304,7 +304,11 @@ for _, line in ipairs(hidden) do
 	hidden_sizes = hidden_sizes and layout.visible_width(line) == 100
 end
 check("inactif non compté : toutes les lignes font la largeur", hidden_sizes, true)
-check("inactif non compté : le cadre va jusqu'au bord droit (la liste prend la place)", strip(hidden[1]):sub(-3), "╮")
+check(
+	"inactif non compté : le cadre va jusqu'au bord droit (la liste prend la place)",
+	strip(hidden[1]):sub(-3),
+	"╮"
+)
 check("le tableau suit le style du trait (double)", double_detail:find("╔", 1, true) ~= nil, true)
 
 -- ---- la frise
@@ -386,6 +390,18 @@ check(
 	true
 )
 check("la vue : le détail du jour au-dessus de la frise", strip(with_tl[46]):sub(1, #"╰"), "╰")
+
+-- ---- sans la frise (show_timeline = false) : le détail prend sa place
+local no_tl = overview.render(
+	data({ cfg = gradient.apply_to({ goal_hours = 8, show_timeline = false }), timeline = { ["2026-10-15"] = SEGS } }),
+	100,
+	50
+)
+check("sans la frise : la bonne hauteur", #no_tl, 50)
+check("sans la frise : plus les heures de la frise", strip(joined(no_tl)):find("24h00", 1, true), nil)
+check("sans la frise : le détail descend jusqu'en bas", strip(no_tl[#no_tl]):sub(1, 3), "╰")
+local with_tl_view = overview.render(data({ timeline = { ["2026-10-15"] = SEGS } }), 100, 50)
+check("avec la frise (par défaut) : elle est là", strip(joined(with_tl_view)):find("24h00", 1, true) ~= nil, true)
 
 -- ---- toute la vue
 local view = overview.render(data(), 100, 40)

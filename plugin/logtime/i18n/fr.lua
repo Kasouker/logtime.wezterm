@@ -60,6 +60,7 @@ return {
 	settings_help_list = "↑↓ ou j k : choisir // ←→ ou h l : changer",
 	settings_calendar = "Réglages du calendrier",
 	settings_general = "Réglages généraux",
+	settings_sections = { calendar = "Calendrier", preview = "Aperçu" },
 	settings_names = {
 		max_months = "Mois affichés au maximum",
 		months_anchor = "Place du mois choisi",
@@ -71,6 +72,7 @@ return {
 		goal_hours = "Objectif par jour",
 		goal_days = "Jours d'objectif par semaine",
 		count_idle = "Compter le temps inactif",
+		show_timeline = "Frise de la journée",
 	},
 	settings_hints = {
 		max_months = "Selon la place dans la fenêtre, jusqu'à ce nombre.",
@@ -83,6 +85,7 @@ return {
 		goal_hours = "Les heures qui font un jour « réussi ».",
 		goal_days = "Les jours réussis qui font une semaine réussie.",
 		count_idle = "Non : le compteur ne montre que le temps actif.",
+		show_timeline = "En bas de l'aperçu : quand chaque projet a servi.",
 	},
 	settings_values = {
 		months_anchor = { last = "à la fin", first = "au début" },

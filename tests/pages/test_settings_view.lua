@@ -496,6 +496,62 @@ check(
 	true
 )
 
+-- ---- des blocs titrés (l'onglet Calendrier : Calendrier, puis Aperçu)
+local SECTIONED = {
+	{ name = "Max months", value = "◀ 12", heading = "Calendar", rule = false },
+	{ name = "Anchor", value = "◀ last ▶" },
+	{ name = "Timeline", value = "◀ yes ▶", heading = "Preview", rule = true },
+}
+check("blocs : les lignes en plus (titre et ligne vide ; trait et ligne vide)", view.section_lines(SECTIONED), 6)
+check("blocs : sans titres, rien en plus", view.section_lines({ { name = "a", value = "1" } }), 0)
+local sec = view.settings_rows(SECTIONED, 3, GOLD, 40, 15)
+local sec_plain = {}
+for i, line in ipairs(sec) do
+	sec_plain[i] = strip(line)
+end
+local function sec_row(text)
+	for i, line in ipairs(sec_plain) do
+		if line:find(text, 1, true) then
+			return i
+		end
+	end
+end
+check("blocs : la hauteur demandée", #sec, 15)
+check("blocs : le titre souligné", sec[sec_row("Calendar")]:find(view.underline("Calendar"), 1, true) ~= nil, true)
+check("blocs : le titre, une ligne vide, puis le premier réglage", sec_row("Max months") - sec_row("Calendar"), 2)
+check(
+	"blocs : le trait avant le second bloc, une ligne vide, puis son titre",
+	sec_row("Preview") - sec_row("──"),
+	2
+)
+local rule_lines = 0
+for _, line in ipairs(sec_plain) do
+	if line:find("──", 1, true) then
+		rule_lines = rule_lines + 1
+	end
+end
+check("blocs : un seul trait (pas au-dessus du premier bloc)", rule_lines, 1)
+check("blocs : le trait sous les réglages du premier bloc", sec_row("──") > sec_row("Anchor"), true)
+check(
+	"blocs : le réglage choisi sous un titre a son demi-bloc au-dessus (sur la ligne vide, pas sur le titre)",
+	sec[sec_row("Timeline") - 1]:find(convert.fg(GOLD) .. "▄", 1, true) ~= nil
+		and sec_plain[sec_row("Preview")]:find("Preview", 1, true) ~= nil,
+	true
+)
+local tight_sec = view.settings_rows(SECTIONED, 3, GOLD, 40, 3 + view.section_lines(SECTIONED))
+check(
+	"blocs : sans aucune place en plus, le demi-bloc au-dessus du choisi reste (sur la ligne vide sous le titre)",
+	tight_sec[#tight_sec - 1]:find(convert.fg(GOLD) .. "▄", 1, true) ~= nil,
+	true
+)
+local sec_left, sec_rows = view.minimum(list_page({ list = { rows = SECTIONED, selected = 1, hint = "x" } }))
+check("blocs : la hauteur minimum compte les titres et le trait", sec_rows, select(2, view.minimum(list_page())) + 6)
+check(
+	"blocs : au minimum, tout est dessiné",
+	view.draw(list_page({ list = { rows = SECTIONED, selected = 1, hint = "x" } }), sec_left + 2, sec_rows) ~= nil,
+	true
+)
+
 -- ---- le message, en bas du panneau
 local with_message = view.draw(colors_page({ message = " ✓ Saved." }), 120, 42)
 check("le message : sur la dernière ligne du panneau", strip(with_message[41]):find("│ ✓ Saved.", 1, true), 1)

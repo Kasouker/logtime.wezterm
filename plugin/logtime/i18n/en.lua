@@ -60,6 +60,7 @@ return {
 	settings_help_list = "↑↓ or j k: choose // ←→ or h l: change",
 	settings_calendar = "Calendar settings",
 	settings_general = "General settings",
+	settings_sections = { calendar = "Calendar", preview = "Preview" },
 	settings_names = {
 		max_months = "Maximum months shown",
 		months_anchor = "Selected month position",
@@ -71,6 +72,7 @@ return {
 		goal_hours = "Daily goal",
 		goal_days = "Goal days per week",
 		count_idle = "Count idle time",
+		show_timeline = "Day timeline",
 	},
 	settings_hints = {
 		max_months = "As many as the window can fit, up to this number.",
@@ -83,6 +85,7 @@ return {
 		goal_hours = 'The hours that make a day "done".',
 		goal_days = 'The done days that make a week "done".',
 		count_idle = "No: the counter shows active time only.",
+		show_timeline = "Bottom of the preview: when each project was used.",
 	},
 	settings_values = {
 		months_anchor = { last = "last", first = "first" },

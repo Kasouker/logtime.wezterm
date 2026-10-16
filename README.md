@@ -75,6 +75,7 @@ Options are read in this order (the last one wins): **plugin defaults → option
 | `goal_hours` | `0` (none), or 0.5 to 24 | none | hours per day that count as "goal reached" |
 | `goal_days` | 1 to 7 | `5` | days at the goal that make a validated week |
 | `count_idle` | `true` / `false` | `true` | `false`: idle time is not counted — the counter, the daily goal, the calendar and the preview show active time only (the files still keep everything) |
+| `show_timeline` | `true` / `false` | `true` | the timeline at the bottom of the preview in `F4` (Calendar tab, Preview block) |
 | `max_months` | 1 to 12 | `12` | most months shown (as many as fit in the window, up to this) |
 | `months_anchor` | `"last"`, `"first"` | `"last"` | the selected month is the last one shown, or the first |
 | `center` | `true`, `false` | `true` | center the calendar in the window |

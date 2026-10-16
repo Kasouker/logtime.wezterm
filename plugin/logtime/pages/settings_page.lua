@@ -30,13 +30,20 @@ M.TAB_COUNT = 3
 
 -- Les réglages de l'onglet Calendrier, dans l'ordre d'affichage (leurs limites viennent de settings/schema.lua).
 -- Pas de réglage du centrage : le calendrier est toujours centré (center = false reste possible dans wezterm.lua).
-M.CALENDAR_SETTINGS = { "max_months", "months_anchor", "week_starts_on", "borders", "border_style", "border_color" }
+-- Deux blocs : le calendrier (F2), puis l'aperçu de cette page (M.SECTIONS).
+M.CALENDAR_SETTINGS =
+	{ "max_months", "months_anchor", "week_starts_on", "borders", "border_style", "border_color", "show_timeline" }
 -- Les réglages de l'onglet Général.
 M.GENERAL_SETTINGS = { "lang", "goal_hours", "goal_days", "count_idle" }
 
 -- Les onglets de réglages : leur liste de réglages et la clé (i18n) de leur intitulé. L'onglet Couleurs n'en fait pas partie.
 M.LISTS = {
-	[M.TAB.CALENDAR] = { settings = M.CALENDAR_SETTINGS, heading = "settings_calendar" },
+	-- sections : le titre (clé de labels.settings_sections) au-dessus du réglage de ce rang
+	[M.TAB.CALENDAR] = {
+		settings = M.CALENDAR_SETTINGS,
+		heading = "settings_calendar",
+		sections = { [1] = "calendar", [7] = "preview" },
+	},
 	[M.TAB.GENERAL] = { settings = M.GENERAL_SETTINGS, heading = "settings_general" },
 }
 
@@ -216,9 +223,12 @@ function M.list_rows(state, labels)
 		if value == nil then -- pas « or » : avec un oui/non, false or true donnerait true
 			value = M.fallback(definition)
 		end
+		local section = list.sections and list.sections[#rows + 1]
 		rows[#rows + 1] = {
 			name = names[key] or key,
 			value = M.format_value(definition, value, value_text(key, value, labels, state)),
+			heading = section and ((labels.settings_sections or {})[section] or section) or nil,
+			rule = section ~= nil and #rows > 0, -- un trait entre deux blocs
 		}
 	end
 	local selected = list.settings[state.row]

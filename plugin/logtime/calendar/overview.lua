@@ -593,13 +593,15 @@ function M.render(o, width, height)
 	end
 	local key = o.day_key or o.today_key
 	local week = o.week and M.week_keys(key, o.cfg.week_starts_on)
-	local detail = week and M.week_detail(o, week, width, height - #out - M.TIMELINE_HEIGHT)
-		or M.detail(o, key, width, height - #out - M.TIMELINE_HEIGHT)
+	local show_timeline = o.cfg.show_timeline ~= false -- show_timeline = false : pas de frise, le détail prend sa place
+	local below = show_timeline and M.TIMELINE_HEIGHT or 0
+	local detail = week and M.week_detail(o, week, width, height - #out - below)
+		or M.detail(o, key, width, height - #out - below)
 	for _, line in ipairs(detail) do
 		out[#out + 1] = line
 	end
 	-- la frise reste celle du jour, même en semaine (plus lisible ; celle de la semaine servira à F2)
-	for _, line in ipairs(M.timeline(o, key, width)) do
+	for _, line in ipairs(show_timeline and M.timeline(o, key, width) or {}) do
 		out[#out + 1] = line
 	end
 	return out
