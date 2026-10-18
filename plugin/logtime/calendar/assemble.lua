@@ -308,24 +308,31 @@ local STRIKE, NO_STRIKE = "\27[9m", "\27[29m"
 --   pas atteint, jour déjà passé  : la durée est rayée (seulement le texte, pas les espaces autour) ;
 --   pas atteint, aujourd'hui ou plus tard : rien de spécial (la journée n'est pas finie).
 -- Un jour sans rien garde son « · ». Les dates "AAAA-MM-JJ" se comparent comme du texte : l'ordre est le bon.
+-- La durée d'un jour avec son objectif, sans espaces autour : « ✓ 8h02 », la durée rayée, ou la durée seule (aussi
+-- pour l'aperçu de la page F4, calendar/overview.lua). Un jour sans rien : "".
+function M.goal_duration(secs, key, today_key, goal_secs)
+	if secs <= 0 then
+		return ""
+	end
+	local text = stats.hm(secs)
+	if goal_secs and secs >= goal_secs then
+		return M.GOAL_MARK .. " " .. text
+	end
+	if goal_secs and today_key and key < today_key then
+		return STRIKE .. text .. NO_STRIKE
+	end
+	return text
+end
+
 local function duration_text(secs, key, today_key, goal_secs)
 	if secs <= 0 then
 		return center("·", 8)
 	end
-	local text = stats.hm(secs)
-	if not goal_secs then
-		return center(text, 8)
-	end
-	if secs >= goal_secs then
-		return center(M.GOAL_MARK .. " " .. text, 8)
-	end
-	if today_key and key < today_key then
-		local padded = center(text, 8)
-		local left = padded:match("^( *)")
-		local right = string.rep(" ", 8 - #left - (utf8.len(text) or #text))
-		return left .. STRIKE .. text .. NO_STRIKE .. right
-	end
-	return center(text, 8)
+	local text = M.goal_duration(secs, key, today_key, goal_secs)
+	local plain = text:gsub("\27%[%d+m", "")
+	local padded = center(plain, 8)
+	local left = padded:match("^( *)")
+	return left .. text .. string.rep(" ", 8 - #left - (utf8.len(plain) or #plain))
 end
 
 -- Une semaine est validée si l'objectif est atteint au moins goal_days jours sur ses 7 jours (ceux des mois voisins
@@ -368,7 +375,9 @@ local function totals_text(s, labels)
 end
 
 -- En bas : « Semaines validées : 3/5 / Jours validés : 12/30 » (sur le nombre de jours du mois). Sans objectif : nil.
-local function validated_text(days, year, month, cfg, s, labels)
+-- (s : les statistiques du mois ; sans elles, elles sont calculées : pour l'aperçu de la page F4)
+function M.validated_text(days, year, month, cfg, s, labels)
+	s = s or stats.month_stats(days, year, month, cfg.goal_hours)
 	local weeks, total_weeks = M.validated_weeks(days, year, month, cfg)
 	if not weeks then
 		return nil
@@ -534,7 +543,7 @@ function M.render_month(days, year, month, today_key, cfg, labels)
 	line[#line + 1] =
 		string.format("%s%s%d %s", labels.streak, labels.colon, stats.streak(days, today_key), labels.streak_unit)
 	text("  " .. table.concat(line, "   "))
-	local validated = validated_text(days, year, month, cfg, s, labels)
+	local validated = M.validated_text(days, year, month, cfg, s, labels)
 	if b then
 		add(edge_with_text(edge_chars(b.bl, b.br, b), validated, color)) -- les validés sur le bas du cadre
 	elseif validated then
@@ -556,7 +565,7 @@ function M.month_block(days, year, month, today_key, cfg, labels, selected)
 		title = "\27[1m" .. title .. convert.RESET
 	end
 	title = title .. "   " .. totals_text(s, labels)
-	local validated = validated_text(days, year, month, cfg, s, labels)
+	local validated = M.validated_text(days, year, month, cfg, s, labels)
 	local b, color = M.border_of(cfg)
 	if b then
 		-- Le mois dans son cadre, en 20 lignes : le titre sur le haut du cadre, les jours de la semaine sur la jonction,

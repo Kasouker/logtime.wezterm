@@ -131,6 +131,7 @@ function M.grid(o, width, height)
 		end
 	end
 	local accent = o.accent or M.IDLE_COLOR
+	local goal_secs = stats.has_goal(o.cfg.goal_hours) and o.cfg.goal_hours * 3600 or nil
 	for w, week in ipairs(weeks) do
 		for line = 1, row do
 			local label = line == math.max(1, (row + 1) // 2)
@@ -150,7 +151,8 @@ function M.grid(o, width, height)
 					if line == 1 then
 						text = " " .. (key == o.today_key and ("*" .. d) or tostring(d))
 					elseif line == 2 and secs > 0 then
-						text = " " .. stats.hm(secs)
+						-- comme dans le calendrier F2 : « ✓ 8h02 » si l'objectif est atteint, rayée pour un jour passé manqué
+						text = " " .. assemble.goal_duration(secs, key, o.today_key, goal_secs)
 					end
 					text = fit(text, cell)
 					if color then
@@ -164,6 +166,15 @@ function M.grid(o, width, height)
 			out[#out + 1] = e(b.v) .. table.concat(parts, e(b.v)) .. e(b.v)
 		end
 		out[#out + 1] = w < count and rule(b.l, b.x, b.r) or rule(b.bl, b.b, b.br)
+	end
+	-- avec un objectif, comme dans le calendrier F2 : « Semaines validées : 1/5 / Jours validés : 6/31 » sur le bas du
+	-- cadre (s'il y tient)
+	local validated = assemble.validated_text(o.days, o.year, o.month, o.cfg, nil, o.labels)
+	if validated and vw(validated) + 4 <= width - 2 then
+		local bottom = rule(b.bl, b.b, b.br)
+		local plain = bottom:gsub("\27%[[%d;]*m", "")
+		local rest = plain:sub((utf8.offset(plain, vw(validated) + 5) or (#plain + 1)))
+		out[#out] = e(b.bl .. b.h) .. " " .. validated .. " " .. e(rest)
 	end
 	while #out < height do
 		out[#out + 1] = string.rep(" ", width)

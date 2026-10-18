@@ -166,6 +166,58 @@ local function week_height(g)
 end
 check("plus de place : des semaines plus hautes", week_height(tall) > week_height(short), true)
 
+-- ---- l'objectif dans la grille (comme dans le calendrier F2)
+-- le bas du cadre de la grille (la grille peut finir par des lignes vides)
+local function bottom_of(g)
+	for k = #g, 1, -1 do
+		if strip(g[k]):find("^╰") then
+			return g[k]
+		end
+	end
+end
+local goal_grid = overview.grid(data(), 100, 30)
+local goal_text_ = strip(joined(goal_grid))
+check("objectif atteint : « ✓ » devant la durée", goal_text_:find("✓ 8h56", 1, true) ~= nil, true)
+check("objectif atteint aujourd'hui aussi", goal_text_:find("✓ 10h04", 1, true) ~= nil, true)
+check(
+	"objectif manqué un jour passé : la durée rayée",
+	joined(goal_grid):find("\27[9m4h13\27[29m", 1, true) ~= nil,
+	true
+)
+check(
+	"en bas du cadre : les semaines et les jours validés",
+	strip(bottom_of(goal_grid)):find("^╰─ Semaines validées : 0/5 / Jours validés : 3/31 ─┴") ~= nil,
+	true
+)
+local _, goal_bottom_joins = strip(bottom_of(goal_grid)):gsub("┴", "")
+check(
+	"en bas du cadre : le texte cache seulement les jonctions sous lui",
+	goal_bottom_joins > 0 and goal_bottom_joins < 7,
+	true
+)
+check("en bas du cadre : la largeur reste la même", layout.visible_width(bottom_of(goal_grid)), 100)
+local no_goal_grid = overview.grid(data({ cfg = gradient.apply_to({}) }), 100, 30)
+check("sans objectif : pas de « ✓ »", strip(joined(no_goal_grid)):find("✓", 1, true), nil)
+check("sans objectif : pas de durée rayée", joined(no_goal_grid):find("\27[9m", 1, true), nil)
+check("sans objectif : le bas du cadre sans texte", strip(bottom_of(no_goal_grid)):find("Semaines", 1, true), nil)
+check(
+	"en anglais",
+	strip(bottom_of(overview.grid(data({ labels = en }), 100, 30))):find(en.validated_weeks, 1, true) ~= nil,
+	true
+)
+local long_labels = {}
+for k, v in pairs(fr) do
+	long_labels[k] = v
+end
+long_labels.validated_weeks = string.rep("x", 60) -- un texte qui ne tient pas sur le bas du cadre
+local narrow_goal = overview.grid(data({ labels = long_labels }), 70, 30)
+check(
+	"trop étroit pour le texte : le bas du cadre reste un trait",
+	strip(bottom_of(narrow_goal)):find("xxx", 1, true) == nil
+		and select(2, strip(bottom_of(narrow_goal)):gsub("┴", "")) == 7,
+	true
+)
+
 -- ---- une barre verticale (au huitième de ligne près)
 local function bar_text(lines)
 	local out = {}
