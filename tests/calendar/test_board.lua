@@ -34,6 +34,26 @@ end
 local function literal(text)
 	return (text:gsub("[%^%$%(%)%%%.%[%]%*%+%-%?]", "%%%0"))
 end
+-- les morceaux d'une ligne entre ses « │ » (caractère par caractère : un motif « [^│] » couperait aussi « ░ », qui
+-- commence par le même octet)
+local function split_bars(line)
+	local parts, current = {}, {}
+	for _, code in utf8.codes(line) do
+		local ch = utf8.char(code)
+		if ch == "│" then
+			if #current > 0 then
+				parts[#parts + 1] = table.concat(current)
+			end
+			current = {}
+		else
+			current[#current + 1] = ch
+		end
+	end
+	if #current > 0 then
+		parts[#parts + 1] = table.concat(current)
+	end
+	return parts
+end
 local function strip(text)
 	return (text:gsub("\27%[[%d;]*m", ""))
 end
@@ -706,32 +726,28 @@ check(
 )
 local wl = board.week_lines(data({ accent = "#C96969" }), 120, 16)
 check("la semaine : exactement la hauteur demandée", #wl, 16)
--- deux barres par jour, partout : sur la dernière ligne des barres, chaque barre a au moins son « sol » (▁)
--- les barres d'une ligne : chacune est posée sur sa teinte foncée (board.TRACK)
--- (le jour choisi a sa propre teinte : la teinte claire posée sur sa couleur)
-local function bars_on(line)
-	local selected = convert.bg(convert.mix(board.TRACK_LIGHT, board.ACCENT, board.TRACK_ALPHA))
-	return select(2, line:gsub(literal(convert.bg(board.TRACK)), "")) + select(2, line:gsub(literal(selected), ""))
+-- les barres d'une ligne : chaque barre est une suite de caractères (pleins, ou « ░ » pour sa partie vide)
+local BAR_CHARS = {}
+for _, ch in ipairs({ "░", "▁", "▂", "▃", "▄", "▅", "▆", "▇", "█" }) do
+	BAR_CHARS[ch] = true
 end
--- pour chaque colonne visible d'une ligne : true si elle est sur la teinte d'une barre, et le caractère
-local function track_map(line)
-	local map, i, bg = {}, 1, false
-	while i <= #line do
-		local code = line:match("^\27%[[%d;]*m", i)
-		if code then
-			if code == convert.RESET then
-				bg = false
-			elseif code == convert.bg(board.TRACK) then
-				bg = true
-			elseif code:find("^\27%[48;") then
-				bg = false
-			end
-			i = i + #code
-		else
-			local ch = line:match("^[%z\1-\127\194-\244][\128-\191]*", i)
-			map[#map + 1] = { track = bg, ch = ch }
-			i = i + #ch
+local function bars_on(line)
+	local n, inside = 0, false
+	for _, code in utf8.codes(strip(line)) do
+		local bar = BAR_CHARS[utf8.char(code)] == true
+		if bar and not inside then
+			n = n + 1
 		end
+		inside = bar
+	end
+	return n
+end
+-- pour chaque colonne visible d'une ligne : true si c'est la place d'une barre, et le caractère
+local function track_map(line)
+	local map = {}
+	for _, code in utf8.codes(strip(line)) do
+		local ch = utf8.char(code)
+		map[#map + 1] = { track = BAR_CHARS[ch] == true, ch = ch }
 	end
 	return map
 end
@@ -781,7 +797,7 @@ check(
 	true
 )
 local parts2 = {}
-for part in strip(wl[2]):gmatch("[^│]+") do
+for _, part in ipairs(split_bars(strip(wl[2]))) do
 	parts2[#parts2 + 1] = part
 end
 check("un jour sans temps (samedi 17) : rien au-dessus de ses barres", parts2[7]:match("^ +$") ~= nil, true)
@@ -804,38 +820,24 @@ for k = 2, 15 do
 end
 check("le jour choisi : sa colonne remplie de la couleur, sur toute la hauteur", filled_rows, 14)
 check(
-	"le jour choisi : la teinte des barres reste visible sur sa couleur",
+	"le jour choisi : la place des barres (« ░ ») reste visible sur sa couleur",
 	(function()
-		local line = wl[8]
+		local line = wl[3]
 		local at = line:find(convert.bg("#C96969"), 1, true)
-		local selected_track = convert.bg(convert.mix(board.TRACK_LIGHT, "#C96969", board.TRACK_ALPHA))
-		return at ~= nil and line:find(selected_track, at, true) ~= nil
+		return at ~= nil and line:find(convert.fg(board.TRACK) .. "░", at, true) ~= nil
 	end)(),
 	true
 )
 check(
-	"la teinte : beaucoup plus claire que le fond",
-	(function()
-		local r, g, b_ = convert.rgb(board.TRACK)
-		local r2, g2, b2 = convert.rgb(board.BACKGROUND)
-		return r + g + b_ > r2 + g2 + b2 + 3 * 60
-	end)(),
+	"une barre vide : sa place en « ░ » (comme le détail d'un jour)",
+	select(2, strip(wl[3]):gsub("░", "")) >= 12,
 	true
 )
+check("la partie vide : en gris foncé", table.concat(wl):find(convert.fg(board.TRACK) .. "░", 1, true) ~= nil, true)
 check(
-	"la teinte du jour choisi : la teinte claire posée sur sa couleur (plus claire que la couleur)",
-	(function()
-		local r, g, b_ = convert.rgb(convert.mix(board.TRACK_LIGHT, "#C96969", board.TRACK_ALPHA))
-		local r2, g2, b2 = convert.rgb("#C96969")
-		return r + g + b_ > r2 + g2 + b2
-	end)(),
-	true
-)
-check(
-	"une barre vide : sa place reste visible (la teinte, sans rien dessus)",
-	select(2, wl[3]:gsub(literal(convert.bg(board.TRACK)), ""))
-		+ select(2, wl[3]:gsub(literal(convert.bg(convert.mix(board.TRACK_LIGHT, "#C96969", board.TRACK_ALPHA))), "")),
-	14
+	"la même couleur que les barres du détail d'un jour",
+	board.TRACK,
+	load_module("calendar/day_detail").BAR_EMPTY_COLOR
 )
 check(
 	"la semaine : l'inactif avant l'actif (13 % puis 87 %)",
@@ -846,10 +848,11 @@ check(
 	"l'échelle : un jour plus court (le 13, 5h sur 9h) ne remplit pas sa barre",
 	(function()
 		local parts = {}
-		for part in strip(wl[3]):gmatch("[^│]+") do
+		for _, part in ipairs(split_bars(strip(wl[3]))) do
 			parts[#parts + 1] = part
 		end
-		return parts[3]:match("^ +$") ~= nil -- (la 1re part : l'air avant le cadre ; le mardi 13 est la 3e)
+		-- (la 1re part : l'air avant le cadre ; le mardi 13 est la 3e) : en haut, seulement sa place vide
+		return parts[3]:find("█", 1, true) == nil and parts[3]:find("░", 1, true) ~= nil
 	end)(),
 	true
 )
@@ -863,7 +866,7 @@ check(
 	"étroit : toujours deux barres par jour (l'inactif du 12 en gris, son actif en couleur)",
 	(function()
 		local parts = {}
-		for part in table.concat(narrow_wl, "", 2, 14):gmatch("[^│]+") do
+		for _, part in ipairs(split_bars(table.concat(narrow_wl, "", 2, 14))) do
 			parts[#parts + 1] = part
 		end
 		local text = table.concat(narrow_wl)

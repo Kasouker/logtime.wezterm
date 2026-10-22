@@ -25,18 +25,6 @@ function M.bg(hex)
 	return string.format("\27[48;2;%d;%d;%dm", r, g, b)
 end
 
--- Le mélange de deux couleurs : `top` posée sur `under` avec l'opacité `alpha` (0 : seulement under, 1 : seulement
--- top). Sert à imiter la transparence (un terminal ne la connaît pas). Renvoie "#RRGGBB".
-function M.mix(top, under, alpha)
-	alpha = math.max(0, math.min(1, alpha))
-	local r1, g1, b1 = M.rgb(top)
-	local r2, g2, b2 = M.rgb(under)
-	local function blend(a, b_)
-		return math.floor(a * alpha + b_ * (1 - alpha) + 0.5)
-	end
-	return string.format("#%02X%02X%02X", blend(r1, r2), blend(g1, g2), blend(b1, b2))
-end
-
 -- Couleur de texte lisible (sombre ou claire) sur un fond donné
 function M.contrast(hex)
 	local r, g, b = M.rgb(hex)
