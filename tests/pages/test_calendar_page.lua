@@ -790,7 +790,7 @@ local function scenarios()
 	press("Enter")
 	check(
 		"Entrée : la vue d'ensemble, sur aujourd'hui",
-		strip(drawn_raw()):find("Mardi 13 octobre 2026", 1, true) ~= nil,
+		strip(drawn_raw()):find("Mar 13 octobre 2026", 1, true) ~= nil,
 		true
 	)
 	press("RightArrow")
@@ -823,7 +823,7 @@ local function scenarios()
 	w.GLOBAL.logtime_page_year, w.GLOBAL.logtime_page_month, w.GLOBAL.logtime_page_day = 2026, 2, 31
 	check(
 		"un jour trop grand dans GLOBAL : ramené à la fin du mois",
-		strip(page.build_text()):find("Samedi 28 février 2026", 1, true) ~= nil,
+		strip(page.build_text()):find("Sam 28 février 2026", 1, true) ~= nil,
 		true
 	)
 	press("t")
@@ -832,13 +832,13 @@ local function scenarios()
 	w.GLOBAL.logtime_page_day = nil
 	check(
 		"pas de jour enregistré, mois en cours : aujourd'hui",
-		strip(page.build_text()):find("Mardi 13 octobre 2026", 1, true) ~= nil,
+		strip(page.build_text()):find("Mar 13 octobre 2026", 1, true) ~= nil,
 		true
 	)
 	w.GLOBAL.logtime_page_month = 9
 	check(
 		"pas de jour enregistré, autre mois : le 1er",
-		strip(page.build_text()):find("Mardi 1 septembre 2026", 1, true) ~= nil,
+		strip(page.build_text()):find("Mar 1 septembre 2026", 1, true) ~= nil,
 		true
 	)
 	press("t")
@@ -859,7 +859,7 @@ local function scenarios()
 	press("Enter")
 	check(
 		"Entrée : rouvre sur le jour où l'on était",
-		strip(drawn_raw()):find("Dimanche 13 septembre", 1, true) ~= nil,
+		strip(drawn_raw()):find("Dim 13 septembre", 1, true) ~= nil,
 		true
 	)
 	press("Enter")

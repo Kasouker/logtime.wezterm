@@ -53,13 +53,14 @@ local function centered(text, width)
 	return fit(string.rep(" ", math.max(0, (width - vw(text)) // 2)) .. text, width)
 end
 
--- Le jour en toutes lettres, selon le modèle de la langue (labels.detail_date) : « Mercredi 14 octobre 2026 ».
+-- Le jour, selon le modèle de la langue (labels.detail_date), le jour de la semaine en trois lettres : « Mer 14 octobre
+-- 2026 » (la date la plus longue tient dans la colonne des chiffres de la semaine, M.WEEK_SIDE).
 function M.day_title(key, labels)
 	local y, m, d = key:match("^(%d+)-(%d+)-(%d+)$")
 	y, m, d = tonumber(y), tonumber(m), tonumber(d)
 	local wday = os.date("*t", os.time({ year = y, month = m, day = d, hour = 12 })).wday -- 1 = dimanche
 	local fields = {
-		weekday = labels.weekdays_long[(wday + 5) % 7 + 1], -- la liste commence au lundi
+		weekday = labels.weekdays[(wday + 5) % 7 + 1], -- la liste commence au lundi
 		day = tostring(d),
 		month = labels.months[m],
 		month_lower = labels.months[m]:lower(), -- les accents (é, û) ne sont pas touchés, seulement A-Z

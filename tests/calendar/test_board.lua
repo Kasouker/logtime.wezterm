@@ -87,17 +87,36 @@ local function data(over)
 end
 
 -- ---- le jour en toutes lettres (« Jour choisi : » à droite de la semaine)
-check("titre : mercredi", board.day_title("2026-10-14", fr), "Mercredi 14 octobre 2026")
+check("titre : mercredi", board.day_title("2026-10-14", fr), "Mer 14 octobre 2026")
 check(
 	"titre : dimanche (le 7e de la liste, qui commence au lundi)",
 	board.day_title("2026-10-18", fr),
-	"Dimanche 18 octobre 2026"
+	"Dim 18 octobre 2026"
 )
-check("titre : lundi", board.day_title("2026-10-19", fr), "Lundi 19 octobre 2026")
-check("titre : samedi", board.day_title("2026-10-17", fr), "Samedi 17 octobre 2026")
-check("titre : les accents gardés", board.day_title("2026-08-01", fr), "Samedi 1 août 2026")
-check("titre : février", board.day_title("2028-02-29", fr), "Mardi 29 février 2028")
-check("titre : anglais", board.day_title("2026-10-14", en), "Wednesday, October 14, 2026")
+check("titre : lundi", board.day_title("2026-10-19", fr), "Lun 19 octobre 2026")
+check("titre : samedi", board.day_title("2026-10-17", fr), "Sam 17 octobre 2026")
+check("titre : les accents gardés", board.day_title("2026-08-01", fr), "Sam 1 août 2026")
+check("titre : février", board.day_title("2028-02-29", fr), "Mar 29 février 2028")
+check("titre : anglais", board.day_title("2026-10-14", en), "Wed, October 14, 2026")
+check(
+	"titre : chaque jour de l'année tient dans la colonne des chiffres de la semaine (français et anglais)",
+	(function()
+		for _, labels in ipairs({ fr, en }) do
+			for m = 1, 12 do
+				for d = 1, 31 do
+					local key = string.format("2026-%02d-%02d", m, d)
+					if os.date("*t", os.time({ year = 2026, month = m, day = d, hour = 12 })).month == m then
+						if utf8.len(" " .. board.day_title(key, labels)) > board.WEEK_SIDE then
+							return false
+						end
+					end
+				end
+			end
+		end
+		return true
+	end)(),
+	true
+)
 
 -- ---- les chiffres de l'année
 local parts = board.year_parts(data())
@@ -1066,7 +1085,7 @@ check(
 check(
 	"les chiffres : le jour choisi, en bas",
 	(strip(side[13]):gsub("%s+$", "")) .. "|" .. (strip(side[14]):gsub("%s+$", "")),
-	" Jour choisi :| Vendredi 16 octobre 2026"
+	" Jour choisi :| Ven 16 octobre 2026"
 )
 local side5 = strip(
 	table.concat(
@@ -1086,12 +1105,12 @@ local side_small = board.week_side_lines(data(), 26, 5)
 check(
 	"peu de place : le jour choisi reste en bas",
 	#side_small .. (strip(side_small[5]):gsub("%s+$", "")),
-	"5 Vendredi 16 octobre 2026"
+	"5 Ven 16 octobre 2026"
 )
 local side_en = strip(table.concat(board.week_side_lines(data({ labels = en }), 26, 14), "\n"))
 check(
 	"les chiffres en anglais",
-	side_en:find("Active days: 5", 1, true) ~= nil and side_en:find("Friday, October 16, 2026", 1, true) ~= nil,
+	side_en:find("Active days: 5", 1, true) ~= nil and side_en:find("Fri, October 16, 2026", 1, true) ~= nil,
 	true
 )
 

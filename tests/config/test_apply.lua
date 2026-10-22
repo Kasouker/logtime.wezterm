@@ -1076,7 +1076,7 @@ local function scenarios()
 		last_text(idle_page):find("Inactif : 1h00 (85 %)", 1, true) ~= nil,
 		true
 	)
-	check("Entrée : sur aujourd'hui", last_text(idle_page):find("Mardi 13 octobre 2026", 1, true) ~= nil, true)
+	check("Entrée : sur aujourd'hui", last_text(idle_page):find("Mar 13 octobre 2026", 1, true) ~= nil, true)
 	page_binding(config, "Escape")(win, idle_page)
 	check("Échap : retour au calendrier", last_text(idle_page):find("Octobre 2026", 1, true) ~= nil, true)
 	-- WezTerm rouvert : le fichier est relu, et la suite s'y ajoute
