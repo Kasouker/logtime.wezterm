@@ -415,18 +415,23 @@ function M.week_stats(o)
 end
 
 M.BAR_MAX = 3 -- une barre de la semaine : au plus 3 colonnes de large
-M.TRACK = "#2B2E36" -- la teinte foncée derrière une barre (sa place), visible aussi sur le jour choisi
+-- la teinte derrière une barre (sa place) : un gris clair « posé en transparence » sur ce qu'il y a derrière (le fond
+-- sombre de la page, ou la couleur du jour choisi), pour qu'on la voie partout
+M.TRACK_LIGHT = "#ECE6D9"
+M.TRACK_ALPHA = 0.35
+M.BACKGROUND = "#1B1E25" -- le fond sombre supposé de la page
+M.TRACK = convert.mix(M.TRACK_LIGHT, M.BACKGROUND, M.TRACK_ALPHA)
 
 -- Une barre verticale de `height` lignes et `width` colonnes, remplie à `share` (0 à 1) par le bas, au huitième de ligne
--- près, sur sa teinte foncée (M.TRACK : on voit toute la place de la barre, même vide).
+-- près, sur sa teinte `track` (M.TRACK par défaut : on voit toute la place de la barre, même vide).
 local EIGHTHS = { "▁", "▂", "▃", "▄", "▅", "▆", "▇", "█" }
-local function track_bar(share, height, color, width)
+local function track_bar(share, height, color, width, track)
 	local eighths = math.floor(math.max(0, math.min(1, share)) * height * 8 + 0.5)
 	local out = {}
 	for line = 1, height do
 		local filled = eighths - (height - line) * 8 -- ce qui reste à remplir dans cette ligne (en huitièmes)
 		local char = filled >= 8 and "█" or (filled > 0 and EIGHTHS[filled]) or " "
-		out[line] = convert.bg(M.TRACK) .. convert.fg(color) .. string.rep(char, width) .. convert.RESET
+		out[line] = convert.bg(track or M.TRACK) .. convert.fg(color) .. string.rep(char, width) .. convert.RESET
 	end
 	return out
 end
@@ -508,6 +513,8 @@ function M.week_lines(o, width, height)
 		local color = assemble.day_color(day.total, cfg) or overview.IDLE_COLOR
 		local lines = {}
 		local _, percent = idle.share(day.total, day.idle)
+		-- le jour choisi : la teinte posée sur sa couleur (plus claire qu'elle), les autres sur le fond
+		local track = day.key == o.day_key and convert.mix(M.TRACK_LIGHT, accent, M.TRACK_ALPHA) or M.TRACK
 		if show_idle then
 			-- deux barres, toujours : l'inactif (gris) à gauche, l'actif (couleur du jour) à droite ; les deux ensemble
 			-- centrées dans la case, chaque texte centré sur sa barre
@@ -525,8 +532,8 @@ function M.week_lines(o, width, height)
 			else
 				lines[1] = ""
 			end
-			local ib = track_bar(day.idle / scale, bar_h, overview.IDLE_COLOR, bw)
-			local ab = track_bar(day.active / scale, bar_h, color, bw)
+			local ib = track_bar(day.idle / scale, bar_h, overview.IDLE_COLOR, bw, track)
+			local ab = track_bar(day.active / scale, bar_h, color, bw, track)
 			for k = 1, bar_h do
 				lines[#lines + 1] = string.rep(" ", pad) .. ib[k] .. " " .. ab[k]
 			end
@@ -543,7 +550,7 @@ function M.week_lines(o, width, height)
 			local pad = (cell - bw) // 2
 			local bar_h = math.max(1, height - 2)
 			lines[1] = centered(day.total > 0 and stats.hm(day.active) or "", cell)
-			local ab = track_bar(day.active / scale, bar_h, color, bw)
+			local ab = track_bar(day.active / scale, bar_h, color, bw, track)
 			for k = 1, bar_h do
 				lines[#lines + 1] = string.rep(" ", pad) .. ab[k]
 			end

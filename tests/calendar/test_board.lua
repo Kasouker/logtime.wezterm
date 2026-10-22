@@ -708,8 +708,10 @@ local wl = board.week_lines(data({ accent = "#C96969" }), 120, 16)
 check("la semaine : exactement la hauteur demandée", #wl, 16)
 -- deux barres par jour, partout : sur la dernière ligne des barres, chaque barre a au moins son « sol » (▁)
 -- les barres d'une ligne : chacune est posée sur sa teinte foncée (board.TRACK)
+-- (le jour choisi a sa propre teinte : la teinte claire posée sur sa couleur)
 local function bars_on(line)
-	return select(2, line:gsub(literal(convert.bg(board.TRACK)), ""))
+	local selected = convert.bg(convert.mix(board.TRACK_LIGHT, board.ACCENT, board.TRACK_ALPHA))
+	return select(2, line:gsub(literal(convert.bg(board.TRACK)), "")) + select(2, line:gsub(literal(selected), ""))
 end
 -- pour chaque colonne visible d'une ligne : true si elle est sur la teinte d'une barre, et le caractère
 local function track_map(line)
@@ -806,11 +808,35 @@ check(
 	(function()
 		local line = wl[8]
 		local at = line:find(convert.bg("#C96969"), 1, true)
-		return at ~= nil and line:find(convert.bg(board.TRACK), at, true) ~= nil
+		local selected_track = convert.bg(convert.mix(board.TRACK_LIGHT, "#C96969", board.TRACK_ALPHA))
+		return at ~= nil and line:find(selected_track, at, true) ~= nil
 	end)(),
 	true
 )
-check("une barre vide : sa place reste visible (la teinte, sans rien dessus)", bars_on(wl[3]), 14)
+check(
+	"la teinte : beaucoup plus claire que le fond",
+	(function()
+		local r, g, b_ = convert.rgb(board.TRACK)
+		local r2, g2, b2 = convert.rgb(board.BACKGROUND)
+		return r + g + b_ > r2 + g2 + b2 + 3 * 60
+	end)(),
+	true
+)
+check(
+	"la teinte du jour choisi : la teinte claire posée sur sa couleur (plus claire que la couleur)",
+	(function()
+		local r, g, b_ = convert.rgb(convert.mix(board.TRACK_LIGHT, "#C96969", board.TRACK_ALPHA))
+		local r2, g2, b2 = convert.rgb("#C96969")
+		return r + g + b_ > r2 + g2 + b2
+	end)(),
+	true
+)
+check(
+	"une barre vide : sa place reste visible (la teinte, sans rien dessus)",
+	select(2, wl[3]:gsub(literal(convert.bg(board.TRACK)), ""))
+		+ select(2, wl[3]:gsub(literal(convert.bg(convert.mix(board.TRACK_LIGHT, "#C96969", board.TRACK_ALPHA))), "")),
+	14
+)
 check(
 	"la semaine : l'inactif avant l'actif (13 % puis 87 %)",
 	strip(wl[15]):find("13%", 1, true) < strip(wl[15]):find("87%", 1, true),
