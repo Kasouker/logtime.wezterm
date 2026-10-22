@@ -614,10 +614,21 @@ check(
 	0
 )
 check(
-	"le mois : en haut de sa zone, les lignes en trop (moins d'une semaine) sous le cadre",
-	top_k == 1 and 27 - bottom_k < 5,
+	"le mois : les lignes en trop (moins d'une semaine) autour du cadre, la dernière en dessous",
+	27 - bottom_k < 5 and (27 - bottom_k) - (top_k - 1) >= 0 and (27 - bottom_k) - (top_k - 1) <= 1,
 	true
 )
+for h, above in pairs({ [26] = 0, [27] = 0, [28] = 1, [29] = 1, [30] = 2 }) do
+	local lines = board.month_lines(data(), 74, h)
+	local at
+	for k, l in ipairs(lines) do
+		if not at and strip(l):find("╭", 1, true) then
+			at = k
+		end
+	end
+	check("le mois, " .. h .. " lignes : " .. above .. " ligne(s) au-dessus du cadre", at - 1, above)
+	check("le mois, " .. h .. " lignes : exactement la hauteur", #lines, h)
+end
 local joined_ml = table.concat(ml_plain, "\n")
 check(
 	"le mois : les semaines à droite (« Sem. 1 » dans sa case)",

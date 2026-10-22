@@ -260,7 +260,7 @@ end
 
 -- Le mois choisi : exactement `height` lignes de `width` colonnes. La grille du mois dans son propre cadre, qui prend
 -- toute la largeur (une colonne d'air de chaque côté) : 7 colonnes de jours et la colonne des semaines (à droite), de la
--- même largeur à une colonne près ; toutes les semaines exactement de la même hauteur (les lignes en trop sous le cadre). Les noms des jours et du mois sont
+-- même largeur à une colonne près ; toutes les semaines exactement de la même hauteur (les lignes en trop autour du cadre, centré). Les noms des jours et du mois sont
 -- posés sur le trait du haut, les semaines et jours validés sur celui du bas (comme le calendrier F2 avec les encadrés).
 --   ╭─ Lun ─┬─ Mar ─┬─ … ─┬─ Dim ─┬─ Octobre ─╮
 --   │ 12    │ 13    │     │ 18    │           │
@@ -277,7 +277,7 @@ function M.month_lines(o, width, height)
 	local weeks = overview.weeks(o.year, o.month, cfg.week_starts_on)
 	local count = #weeks
 	local cells = split(math.max(8, width - 2 - 9), 8) -- 8 colonnes, 9 traits verticaux, une colonne d'air de chaque côté
-	-- toutes les semaines de la même hauteur (les lignes en trop restent sous le cadre)
+	-- toutes les semaines de la même hauteur (les lignes en trop vont autour du cadre)
 	local row_h = math.max(1, (height - 2 - (count - 1)) // count) -- le haut, le bas, un trait entre les semaines
 	local rows = {}
 	for w = 1, count do
@@ -391,8 +391,14 @@ function M.month_lines(o, width, height)
 	for k = 1, #out do
 		out[k] = fit(out[k], width)
 	end
+	-- les lignes en trop (moins d'une semaine) : autant au-dessus qu'en dessous du cadre (la dernière, s'il en reste
+	-- une, en dessous) : centré dans sa zone
+	local blank = string.rep(" ", width)
+	for _ = 1, (height - #out) // 2 do
+		table.insert(out, 1, blank)
+	end
 	while #out < height do
-		out[#out + 1] = string.rep(" ", width)
+		out[#out + 1] = blank
 	end
 	return out
 end
