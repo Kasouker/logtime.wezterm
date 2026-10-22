@@ -578,9 +578,9 @@ local function scenarios()
 		true
 	)
 	check(
-		"keys : la table de touches de la page existe, avec 18 touches (Tab et Shift+Tab compris)",
+		"keys : la table de touches de la page existe, avec 17 touches (Tab et Shift+Tab compris)",
 		#config.key_tables.logtime_page,
-		18
+		17
 	)
 	check(
 		"keys : un gestionnaire de redimensionnement est installé",
@@ -642,12 +642,12 @@ local function scenarios()
 	check(
 		"anglais : la page est en anglais",
 		strip(w.spawned[1].pane.injected[1]):find("Logtime: October 2026", 1, true) ~= nil
-			and strip(w.spawned[1].pane.injected[1]):find("Enter details", 1, true) ~= nil,
+			and strip(w.spawned[1].pane.injected[1]):find("Enter overview", 1, true) ~= nil,
 		true
 	)
 
 	-- ============================================================
-	-- la vue « tout en un » (touche a, calendar/board.lua)
+	-- la vue d'ensemble (touche Entrée, calendar/board.lua)
 	-- ============================================================
 	w = new_wezterm()
 	page = new_page(w)
@@ -662,11 +662,27 @@ local function scenarios()
 		return string.format("%d-%02d-%02d", year_, month_, num(w.GLOBAL.logtime_page_day))
 	end
 	check("ouverture : la vue des mois", num(w.GLOBAL.logtime_page_view), calendar_page.VIEW.MONTHS)
-	press("a")
-	check("a : la vue d'ensemble", num(w.GLOBAL.logtime_page_view), calendar_page.VIEW.YEAR)
-	check("a : les chiffres de l'année en haut", shown_now():find("Total de l'année : 7h43", 1, true) ~= nil, true)
 	check(
-		"a : l'aide de la vue d'ensemble",
+		"plus de touche a (la vue d'ensemble est sur Entrée)",
+		(function()
+			for _, b in ipairs(page.bindings()) do
+				if b.key == "a" then
+					return false
+				end
+			end
+			return true
+		end)(),
+		true
+	)
+	press("Enter")
+	check("Entrée : la vue d'ensemble", num(w.GLOBAL.logtime_page_view), calendar_page.VIEW.OVERVIEW)
+	check(
+		"Entrée : les chiffres de l'année en haut",
+		shown_now():find("Total de l'année : 7h43", 1, true) ~= nil,
+		true
+	)
+	check(
+		"Entrée : l'aide de la vue d'ensemble",
 		shown_now():find("mois : Tab Maj+Tab", 1, true) ~= nil and shown_now():find("rafraîchir : r", 1, true) ~= nil,
 		true
 	)
@@ -674,7 +690,7 @@ local function scenarios()
 	for line in (shown_now() .. "\n"):gmatch("(.-)\n") do
 		board_lines[#board_lines + 1] = line
 	end
-	check("a : toute la fenêtre (120 x 40 par défaut, sans fenêtre connue)", #board_lines, 40)
+	check("Entrée : toute la fenêtre (120 x 40 par défaut, sans fenêtre connue)", #board_lines, 40)
 	press("l")
 	check("vue d'ensemble, l : le jour suivant (plus l'année suivante)", board_day(), "2026-10-14")
 	press("DownArrow")
@@ -684,25 +700,23 @@ local function scenarios()
 	check("vue d'ensemble, Tab : le mois suivant", year .. "-" .. month, "2026-11")
 	press("t")
 	check("vue d'ensemble, t : aujourd'hui", board_day(), "2026-10-13")
-	check("vue d'ensemble, t : on y reste", num(w.GLOBAL.logtime_page_view), calendar_page.VIEW.YEAR)
-	press("Enter")
-	check("vue d'ensemble, Entrée : rien", num(w.GLOBAL.logtime_page_view), calendar_page.VIEW.YEAR)
+	check("vue d'ensemble, t : on y reste", num(w.GLOBAL.logtime_page_view), calendar_page.VIEW.OVERVIEW)
 	press("Escape")
 	check("vue d'ensemble, Échap : retour aux mois", num(w.GLOBAL.logtime_page_view), calendar_page.VIEW.MONTHS)
 	check("vue d'ensemble, Échap : la page reste ouverte", num(w.GLOBAL.logtime_page_pane), page_pane.id)
-	press("a")
-	press("a")
-	check("a de nouveau : les mois", num(w.GLOBAL.logtime_page_view), calendar_page.VIEW.MONTHS)
-	check("a de nouveau : le mois est dessiné", shown_now():find("Logtime : Octobre 2026", 1, true) ~= nil, true)
+	press("Enter")
+	press("Enter")
+	check("Entrée de nouveau : les mois", num(w.GLOBAL.logtime_page_view), calendar_page.VIEW.MONTHS)
+	check("Entrée de nouveau : le mois est dessiné", shown_now():find("Logtime : Octobre 2026", 1, true) ~= nil, true)
 	-- rouvrir F2 : on revient aux mois
-	press("a")
+	press("Enter")
 	w.GLOBAL.logtime_page_pane = nil
 	page.open(new_window(w), w.new_pane())
 	check("rouvrir F2 : la vue des mois", num(w.GLOBAL.logtime_page_view), calendar_page.VIEW.MONTHS)
 	-- la taille de la fenêtre
 	w = new_wezterm()
 	page = new_page(w)
-	w.GLOBAL.logtime_page_view = calendar_page.VIEW.YEAR
+	w.GLOBAL.logtime_page_view = calendar_page.VIEW.OVERVIEW
 	local board_text, _, board_width = page.build_text({ cols = 150, rows = 45 })
 	check("vue d'ensemble, 150 x 45 : dessinée", strip(board_text):find("Total de l'année", 1, true) ~= nil, true)
 	check("vue d'ensemble : toute la largeur (rien à centrer)", board_width, 150)
@@ -735,7 +749,7 @@ local function scenarios()
 	)
 
 	-- ============================================================
-	-- choisir un jour (flèches) et voir son détail (Entrée)
+	-- choisir un jour (flèches) et l'ouvrir dans la vue d'ensemble (Entrée)
 	-- ============================================================
 	w = new_wezterm()
 	local ctx
@@ -817,67 +831,46 @@ local function scenarios()
 	check("pas de jour enregistré, autre mois : le 1er", page.build_text():find(SEL .. "  1", 1, true) ~= nil, true)
 	press("t")
 
-	-- Entrée : le détail du jour
+	-- Entrée : la vue d'ensemble, sur le jour choisi
 	press("LeftArrow")
 	press("Enter")
-	check("Entrée : la vue du jour", num(w.GLOBAL.logtime_page_view), calendar_page.VIEW.DAY)
-	check("Entrée : le détail du 12", strip(drawn_raw()):find("Lundi 12 octobre 2026", 1, true) ~= nil, true)
-	check("Entrée : l'aide du détail", strip(drawn_raw()):find(fr.day_help, 1, true) ~= nil, true)
+	check("Entrée : la vue d'ensemble", num(w.GLOBAL.logtime_page_view), calendar_page.VIEW.OVERVIEW)
 	check(
-		"Entrée : le temps inactif du jour (0h30 sur 1h00)",
-		strip(drawn_raw()):find("Inactif    0h30", 1, true) ~= nil,
+		"Entrée : sur le jour choisi (le 12)",
+		strip(drawn_raw()):find("Lundi 12 octobre 2026", 1, true) ~= nil,
 		true
 	)
 	press("RightArrow")
 	check(
-		"dans le détail, → : le jour d'après, toujours en détail",
+		"dans la vue d'ensemble, → : le jour d'après, on y reste",
 		num(w.GLOBAL.logtime_page_view),
-		calendar_page.VIEW.DAY
+		calendar_page.VIEW.OVERVIEW
 	)
-	check(
-		"dans le détail, → : le 13, aujourd'hui",
-		strip(drawn_raw()):find("Mardi 13 octobre 2026 · aujourd'hui", 1, true) ~= nil,
-		true
-	)
+	check("dans la vue d'ensemble, → : le 13", strip(drawn_raw()):find("Mardi 13 octobre 2026", 1, true) ~= nil, true)
 	press("UpArrow")
-	check(
-		"dans le détail, ↑ : une semaine avant",
-		strip(drawn_raw()):find("Mardi 6 octobre 2026", 1, true) ~= nil,
-		true
-	)
+	check("dans la vue d'ensemble, ↑ : une semaine avant", day_of(), "2026-10-06")
 	press("Enter")
 	check("Entrée de nouveau : le calendrier", num(w.GLOBAL.logtime_page_view), calendar_page.VIEW.MONTHS)
 	check("Entrée de nouveau : le 6 est choisi", drawn_raw():find(SEL .. "  6", 1, true) ~= nil, true)
 	press("Enter")
 	press("Escape")
-	check("Échap dans le détail : retour au calendrier", num(w.GLOBAL.logtime_page_view), calendar_page.VIEW.MONTHS)
-	check("Échap dans le détail : la page reste ouverte", num(w.GLOBAL.logtime_page_pane), page_pane.id)
-	press("a")
-	press("UpArrow")
-	check("↑ dans la vue d'ensemble : la semaine d'avant", day_of(), "2026-09-29")
-	press("DownArrow")
-	press("a")
+	check(
+		"Échap dans la vue d'ensemble : retour au calendrier",
+		num(w.GLOBAL.logtime_page_view),
+		calendar_page.VIEW.MONTHS
+	)
+	check("Échap dans la vue d'ensemble : la page reste ouverte", num(w.GLOBAL.logtime_page_pane), page_pane.id)
 	press("Escape")
 	check("Échap dans le calendrier : la page est fermée", w.GLOBAL.logtime_page_pane, nil)
 	-- rouvrir : aujourd'hui de nouveau, dans les mois
 	page.open(new_window(w), w.new_pane())
 	check("rouvrir : aujourd'hui", day_of(), "2026-10-13")
-	-- le détail dans une fenêtre trop petite
-	w.GLOBAL.logtime_page_view = calendar_page.VIEW.DAY
+	-- une vue qui n'existe plus (3 : l'ancien détail du jour) dans GLOBAL : les mois
+	w.GLOBAL.logtime_page_view = 3
 	check(
-		"détail, fenêtre trop petite : le message",
-		strip(page.build_text({ cols = 30, rows = 20 })):find("Fenêtre trop petite", 1, true) == 1,
+		"vue inconnue dans GLOBAL : les mois",
+		strip(page.build_text()):find("Logtime : Octobre 2026", 1, true) ~= nil,
 		true
-	)
-	check(
-		"détail du 13 (rien compté : 6 lignes), 8 lignes : ça tient (aide, ligne vide, 6 lignes)",
-		strip(page.build_text({ cols = 60, rows = 8 })):find("Fenêtre trop petite", 1, true),
-		nil
-	)
-	check(
-		"détail, 7 lignes : trop bas",
-		strip(page.build_text({ cols = 60, rows = 7 })):find("Fenêtre trop petite", 1, true),
-		1
 	)
 end
 

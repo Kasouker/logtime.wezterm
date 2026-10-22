@@ -18,7 +18,6 @@ return {
 	weekdays_long = { "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday" },
 	title = "Logtime",
 	colon = ": ", -- "Month total: 42h10" (no space before the colon in English)
-	percent = "%3d%%", -- "83%" (in the day detail columns)
 	day_month = "{month} {day}", -- "October 14" (the best day of the year)
 	total = "Month total",
 	active = "Active days",
@@ -34,17 +33,14 @@ return {
 	goal_toast = "🎉 Daily goal reached: %s! 🎉",
 	validated_weeks = "Validated weeks",
 	validated_days = "Validated days",
-	page_help = "←→↑↓ day   Tab Shift+Tab month   Enter details   a overview   t today",
-	day_help = "← → day   ↑ ↓ week   Enter Esc back   q close",
+	page_help = "←→↑↓ day   Tab Shift+Tab month   Enter overview   t today",
 	detail_date = "{weekday}, {month} {day}, {year}",
-	detail_today = "today",
 	detail_total = "Total",
 	overview_week = "Week %d",
 	overview_week_short = "Wk %d",
 	overview_week_empty = "No time counted this week.",
 	detail_active = "Active",
 	detail_idle = "Idle",
-	detail_week = "Week",
 	detail_empty = "No time counted that day.",
 	detail_projects = "By project (active time)",
 	detail_other = "others",

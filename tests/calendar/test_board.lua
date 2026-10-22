@@ -1,4 +1,4 @@
--- tests/calendar/test_board.lua : teste calendar/board.lua (la vue « tout en un » de la page F2, touche a).
+-- tests/calendar/test_board.lua : teste calendar/board.lua (la vue d'ensemble de la page F2, touche Entrée).
 -- Lancer :   lua5.4 tests/calendar/test_board.lua
 local root = (arg and arg[0] or ""):match("^(.*)[/\\]tests[/\\]calendar[/\\]test_board%.lua$") or "."
 local cache = {}
@@ -85,6 +85,19 @@ local function data(over)
 	end
 	return o
 end
+
+-- ---- le jour en toutes lettres (« Jour choisi : » à droite de la semaine)
+check("titre : mercredi", board.day_title("2026-10-14", fr), "Mercredi 14 octobre 2026")
+check(
+	"titre : dimanche (le 7e de la liste, qui commence au lundi)",
+	board.day_title("2026-10-18", fr),
+	"Dimanche 18 octobre 2026"
+)
+check("titre : lundi", board.day_title("2026-10-19", fr), "Lundi 19 octobre 2026")
+check("titre : samedi", board.day_title("2026-10-17", fr), "Samedi 17 octobre 2026")
+check("titre : les accents gardés", board.day_title("2026-08-01", fr), "Samedi 1 août 2026")
+check("titre : février", board.day_title("2028-02-29", fr), "Mardi 29 février 2028")
+check("titre : anglais", board.day_title("2026-10-14", en), "Wednesday, October 14, 2026")
 
 -- ---- les chiffres de l'année
 local parts = board.year_parts(data())
@@ -898,11 +911,7 @@ check(
 	true
 )
 check("la partie vide : en gris foncé", table.concat(wl):find(convert.fg(board.TRACK) .. "░", 1, true) ~= nil, true)
-check(
-	"la même couleur que les barres du détail d'un jour",
-	board.TRACK,
-	load_module("calendar/day_detail").BAR_EMPTY_COLOR
-)
+check("la partie vide : le gris foncé des barres de F4", board.TRACK, load_module("calendar/overview").EMPTY_COLOR)
 check(
 	"la semaine : l'inactif avant l'actif (13 % puis 87 %)",
 	strip(wl[15]):find("13%", 1, true) < strip(wl[15]):find("87%", 1, true),

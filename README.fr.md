@@ -2,7 +2,7 @@
 
 [English](README.md) · **Français**
 
-Un plugin [WezTerm](https://wezterm.org) qui **compte le temps passé dans ton terminal** et l'affiche dans la barre d'onglets, avec un **calendrier interactif**, une **vue d'ensemble** (l'année, le mois, la semaine, les projets et la frise sur un seul écran), un **détail du jour** (temps actif / inactif, temps par projet) et une **page de réglages**. Rien d'autre à installer : tout se passe dans WezTerm.
+Un plugin [WezTerm](https://wezterm.org) qui **compte le temps passé dans ton terminal** et l'affiche dans la barre d'onglets, avec un **calendrier interactif**, une **vue d'ensemble** (l'année, le mois, la semaine, le temps actif / inactif, les projets et la frise sur un seul écran) et une **page de réglages**. Rien d'autre à installer : tout se passe dans WezTerm.
 
 ![Le calendrier](docs/calendar.fr.png)
 
@@ -11,7 +11,7 @@ Un plugin [WezTerm](https://wezterm.org) qui **compte le temps passé dans ton t
 - **Le compteur du jour dans la barre d'onglets** (`05:12:30`), sans rien à brancher : il s'affiche à droite de la barre normale, ou dans [tabline.wez](https://github.com/michaelbrusegard/tabline.wez) si tu l'utilises.
 - **Objectif du jour** : `05:12:30 / 7h`, puis `✓ 07:03:10` en couleur, et une notification 🎉 une fois par jour quand il est atteint.
 - **Calendrier** (`F2`) : plusieurs mois côte à côte selon la taille de la fenêtre, un dégradé de couleur par jour, totaux, séries, semaines et jours validés.
-- **Vue d'ensemble** (`a` dans le calendrier), tout sur un seul écran, sur toute la fenêtre :
+- **Vue d'ensemble** (`Entrée` sur un jour), tout sur un seul écran, sur toute la fenêtre :
   - l'**année**, une case par jour, avec les mois en dessous ;
   - le **mois** choisi, avec l'objectif jour par jour et les semaines et jours validés ;
   - la **semaine** choisie : deux barres par jour (inactif et actif), et ses chiffres (total, jours actifs, moyenne, meilleur jour, objectif) ;
@@ -19,16 +19,15 @@ Un plugin [WezTerm](https://wezterm.org) qui **compte le temps passé dans ton t
   - la **frise** du jour choisi.
 
   Un projet garde la même couleur partout sur l'écran.
-- **Détail du jour** (`Entrée` sur un jour) : total, objectif, **temps actif et inactif**, **temps par projet** et total de la semaine.
 - **Temps inactif** : quand rien ne bouge dans le terminal pendant 5 minutes, la pause est notée comme inactive (le compteur la compte quand même).
 - **Temps par projet** : chaque seconde va au projet de l'onglet que tu regardes (son dossier, par exemple `~/42/C05/ex02` → `42/C05`).
 - **Page de réglages** (`F4`) : couleurs (16 couleurs, ou celles de ton thème WezTerm), disposition du calendrier, encadrés, langue, objectif. Chaque changement est enregistré et appliqué tout de suite.
 - **Sauvegarde sûre** : écriture vérifiée après coup, copie de secours, fichier illisible mis de côté et jamais écrasé.
 - **Français et anglais.**
 
-| Détail du jour | Vue d'ensemble | Réglages (`F4`) |
-|---|---|---|
-| ![Détail du jour](docs/day-detail.fr.png) | ![Vue d'ensemble](docs/year.fr.png) | ![Réglages](docs/settings.fr.png) |
+| Vue d'ensemble | Réglages (`F4`) |
+|---|---|
+| ![Vue d'ensemble](docs/year.fr.png) | ![Réglages](docs/settings.fr.png) |
 
 ## Installation
 
@@ -62,11 +61,9 @@ C'est tout : le compteur apparaît dans la barre d'onglets, `F2` ouvre le calend
 | `F2` | partout | ouvre le calendrier dans un nouvel onglet (ou le remet devant) |
 | `F4` | partout | ouvre la page de réglages |
 
-**Dans le calendrier** : `←` `→` (ou `h` `l`) jour d'avant / d'après · `↑` `↓` (ou `k` `j`) semaine d'avant / d'après · `Maj+Tab` `Tab` (ou `PgUp` `PgDn`) mois précédent / suivant · `Entrée` détail du jour choisi · `a` vue d'ensemble (et retour) · `t` aujourd'hui · `r` rafraîchir · `q` ou `Échap` fermer.
+**Dans le calendrier** : `←` `→` (ou `h` `l`) jour d'avant / d'après · `↑` `↓` (ou `k` `j`) semaine d'avant / d'après · `Maj+Tab` `Tab` (ou `PgUp` `PgDn`) mois précédent / suivant · `Entrée` vue d'ensemble du jour choisi · `t` aujourd'hui · `r` rafraîchir · `q` ou `Échap` fermer.
 
-**Dans la vue d'ensemble** (il lui faut une fenêtre d'au moins 120 colonnes × 34 lignes) : `←` `→` jour · `↑` `↓` semaine · `Maj+Tab` `Tab` mois (et l'année, après décembre ou avant janvier) · `t` aujourd'hui · `a` ou `Échap` retour au calendrier · `r` rafraîchir · `q` fermer.
-
-**Dans le détail du jour** : `←` `→` `↑` `↓` passent à un autre jour · `Entrée` ou `Échap` reviennent au calendrier.
+**Dans la vue d'ensemble** (il lui faut une fenêtre d'au moins 120 colonnes × 34 lignes) : `←` `→` jour · `↑` `↓` semaine · `Maj+Tab` `Tab` mois (et l'année, après décembre ou avant janvier) · `t` aujourd'hui · `Entrée` ou `Échap` retour au calendrier · `r` rafraîchir · `q` fermer.
 
 **Dans la page de réglages** (elle remplit toute la fenêtre, avec un aperçu à droite quand il y a la place : le mois, puis aujourd'hui — temps actif et inactif, temps par projet, et la frise de la journée) : `Tab` / `Maj+Tab` onglet suivant / précédent (Couleurs, Calendrier, Général) · flèches ou `h j k l` choisir · `Entrée` enregistrer une couleur · `←` `→` changer une valeur (enregistrée tout de suite) · `d` valeur par défaut · `y` / `n` utiliser (ou non) les couleurs de ton thème · `q` ou `Échap` fermer.
 

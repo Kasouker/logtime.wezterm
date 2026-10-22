@@ -368,9 +368,9 @@ local function scenarios()
 		true
 	)
 	check(
-		"apply : la table de touches de la page, avec 18 touches (dont a : l'année, Entrée : le détail, Tab / Shift+Tab : le mois)",
+		"apply : la table de touches de la page, avec 17 touches (dont Entrée : la vue d'ensemble, Tab / Shift+Tab : le mois)",
 		#config.key_tables.logtime_page,
-		18
+		17
 	)
 	local shift_tab = nil
 	for _, binding in ipairs(config.key_tables.logtime_page) do
@@ -403,7 +403,7 @@ local function scenarios()
 	check(
 		"F2 : la ligne d'aide est la première ligne affichée (le dessin est centré)",
 		(text:gsub("^\n+", "")):match("^%s*(.-)\n"),
-		"Logtime   ←→↑↓ jour   Tab Maj+Tab mois   Entrée détail   a vue d'ensemble   t aujourd'hui"
+		"Logtime   ←→↑↓ jour   Tab Maj+Tab mois   Entrée vue d'ensemble   t aujourd'hui"
 	)
 	check(
 		"F2 : lire les heures n'écrit rien (rien de nouveau à sauvegarder)",
@@ -449,7 +449,7 @@ local function scenarios()
 	text = last_text(e.w.spawned[1].pane)
 	check(
 		"réglages : en anglais",
-		text:find("Logtime: October 2026", 1, true) ~= nil and text:find("Enter details", 1, true) ~= nil,
+		text:find("Logtime: October 2026", 1, true) ~= nil and text:find("Enter overview", 1, true) ~= nil,
 		true
 	)
 	check("réglages : la semaine commence le dimanche", text:find("Sun%s+Mon") ~= nil, true)
@@ -1070,20 +1070,13 @@ local function scenarios()
 		last_text(idle_page):find("Aujourd'hui : 1h00 inactif sur 1h11 (85 %)", 1, true) ~= nil,
 		true
 	)
-	page_binding(config, "a")(win, idle_page)
+	page_binding(config, "Enter")(win, idle_page)
 	check(
-		"inactif : la vue d'ensemble (touche a), dans les chiffres de l'année",
+		"inactif : la vue d'ensemble (touche Entrée), dans les chiffres de l'année",
 		last_text(idle_page):find("Inactif : 1h00 (85 %)", 1, true) ~= nil,
 		true
 	)
-	page_binding(config, "a")(win, idle_page)
-	page_binding(config, "Enter")(win, idle_page)
-	check(
-		"Entrée : le détail d'aujourd'hui, avec son temps inactif",
-		last_text(idle_page):find("Mardi 13 octobre 2026 · aujourd'hui", 1, true) ~= nil
-			and last_text(idle_page):find("Inactif    1h00", 1, true) ~= nil,
-		true
-	)
+	check("Entrée : sur aujourd'hui", last_text(idle_page):find("Mardi 13 octobre 2026", 1, true) ~= nil, true)
 	page_binding(config, "Escape")(win, idle_page)
 	check("Échap : retour au calendrier", last_text(idle_page):find("Octobre 2026", 1, true) ~= nil, true)
 	-- WezTerm rouvert : le fichier est relu, et la suite s'y ajoute
@@ -1269,9 +1262,10 @@ local function scenarios()
 	check("projets : la page F4 compte aussi pour logtime (jamais pour PING)", p_after.PING, nil)
 	check("projets : la page F4, le temps va bien quelque part (logtime)", p_after.logtime >= 100, true)
 	check("projets : aucune erreur", #e.w.logs.error, 0)
+	project_page.dims = { viewport_rows = 50, cols = 190 } -- assez large pour le titre des projets
 	page_binding(config, "Enter")(win, project_page)
 	check(
-		"projets : dans le détail du jour",
+		"projets : dans la vue d'ensemble (Entrée)",
 		last_text(project_page):find("Par projet (temps actif)", 1, true) ~= nil
 			and last_text(project_page):find("42/C05", 1, true) ~= nil
 			and last_text(project_page):find("Claude Code", 1, true) ~= nil,

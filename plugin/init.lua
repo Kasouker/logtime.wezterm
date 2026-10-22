@@ -961,7 +961,7 @@ function M.apply_to_config(config, opts, ...)
 			days = page_days,
 			idle_days = page_idle,
 			projects = get_projects,
-			timeline = get_timeline, -- la frise du jour choisi (vue d'ensemble, touche a)
+			timeline = get_timeline, -- la frise du jour choisi (vue d'ensemble, touche Entrée)
 			today_key = function()
 				return day.key(os.time(), cfg.day_offset)
 			end,

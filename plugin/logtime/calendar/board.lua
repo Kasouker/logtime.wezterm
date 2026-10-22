@@ -1,4 +1,4 @@
--- plugin/logtime/calendar/board.lua : la vue « tout en un » de la page F2 (touche a) : l'année, le mois, la semaine et
+-- plugin/logtime/calendar/board.lua : la vue d'ensemble de la page F2 (touche Entrée) : l'année, le mois, la semaine et
 -- le jour choisis, sur toute la fenêtre, dans un cadre (comme la page F4). Aucune dépendance à WezTerm : se teste avec un
 -- simple interpréteur Lua.
 --
@@ -24,7 +24,6 @@ local idle = load("core/idle")
 local dates = load("calendar/dates")
 local assemble = load("calendar/assemble")
 local overview = load("calendar/overview")
-local day_detail = load("calendar/day_detail")
 local activity = load("core/activity")
 local palette = load("color/palette")
 
@@ -53,6 +52,21 @@ end
 
 local function centered(text, width)
 	return fit(string.rep(" ", math.max(0, (width - vw(text)) // 2)) .. text, width)
+end
+
+-- Le jour en toutes lettres, selon le modèle de la langue (labels.detail_date) : « Mercredi 14 octobre 2026 ».
+function M.day_title(key, labels)
+	local y, m, d = key:match("^(%d+)-(%d+)-(%d+)$")
+	y, m, d = tonumber(y), tonumber(m), tonumber(d)
+	local wday = os.date("*t", os.time({ year = y, month = m, day = d, hour = 12 })).wday -- 1 = dimanche
+	local fields = {
+		weekday = labels.weekdays_long[(wday + 5) % 7 + 1], -- la liste commence au lundi
+		day = tostring(d),
+		month = labels.months[m],
+		month_lower = labels.months[m]:lower(), -- les accents (é, û) ne sont pas touchés, seulement A-Z
+		year = tostring(y),
+	}
+	return (labels.detail_date:gsub("{([%w_]+)}", fields))
 end
 
 -- « 14 octobre » ou "October 14", selon la langue
@@ -433,8 +447,8 @@ function M.week_stats(o)
 end
 
 M.BAR_MAX = 3 -- une barre de la semaine : au plus 3 colonnes de large
--- la partie vide d'une barre : « ░ » gris foncé, comme les barres du détail d'un jour (calendar/day_detail.lua)
-M.TRACK = day_detail.BAR_EMPTY_COLOR
+-- la partie vide d'une barre : « ░ » gris foncé
+M.TRACK = "#3B404C"
 M.TRACK_CHAR = "░"
 
 -- Une barre verticale de `height` lignes et `width` colonnes, remplie à `share` (0 à 1) par le bas, en lignes entières
@@ -660,7 +674,7 @@ function M.week_side_lines(o, width, height)
 	end
 	-- en bas : le jour choisi
 	out[#out + 1] = fit(" " .. labels.board_selected .. c, width)
-	out[#out + 1] = fit(" " .. day_detail.title(o.day_key or o.today_key, labels), width)
+	out[#out + 1] = fit(" " .. M.day_title(o.day_key or o.today_key, labels), width)
 	return out
 end
 

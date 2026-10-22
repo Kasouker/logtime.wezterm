@@ -1,4 +1,4 @@
--- plugin/logtime/calendar/year.lua : la vue de l'année (touche a dans le calendrier), façon GitHub : une colonne par
+-- plugin/logtime/calendar/year.lua : l'année façon GitHub (la vue d'ensemble s'en sert) : une colonne par
 -- semaine, une ligne par jour de la semaine, chaque jour un petit carré dans la couleur du jour (la même que dans les
 -- cases du calendrier). Aucune dépendance à WezTerm : se teste avec un simple interpréteur Lua.
 local load = ...

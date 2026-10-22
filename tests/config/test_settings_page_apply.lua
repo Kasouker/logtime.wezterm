@@ -268,9 +268,9 @@ check(
 	16
 )
 check(
-	"celle du calendrier est intacte (dix-huit touches, Tab et Shift+Tab compris)",
+	"celle du calendrier est intacte (dix-sept touches, Tab et Shift+Tab compris)",
 	#config.key_tables.logtime_page,
-	18
+	17
 )
 check("un gestionnaire pour l'ouverture de la personnalisation", #e.w.events["logtime-settings-open"], 1)
 check("un gestionnaire pour la touche Entrée", #e.w.events["logtime-settings-Enter"], 1)

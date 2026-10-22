@@ -2,7 +2,6 @@
 local load = ...
 local assemble = load("calendar/assemble")
 local board = load("calendar/board")
-local day_detail = load("calendar/day_detail")
 local dates = load("calendar/dates")
 local layout = load("calendar/layout")
 local screen = load("ui/screen")
@@ -16,7 +15,7 @@ local convert = load("color/convert")
 local M = {}
 
 M.TABLE_NAME = "logtime_page"
-M.VIEW = { MONTHS = 1, YEAR = 2, DAY = 3 } -- YEAR : la vue « tout en un » (calendar/board.lua)
+M.VIEW = { MONTHS = 1, OVERVIEW = 2 } -- OVERVIEW : la vue d'ensemble (calendar/board.lua, touche Entrée)
 M.DEFAULT_DIMS = { cols = 120, rows = 40 } -- la taille quand la fenêtre est inconnue (dans les tests)
 
 -- ctx fournit ce que la page ne sait pas faire seule :
@@ -39,8 +38,8 @@ function M.create(ctx)
 
 	-- L'état de la page, gardé dans wezterm.GLOBAL sous forme de simples nombres :
 	--   logtime_page_pane (le panneau de la page), logtime_page_year, logtime_page_month (le mois affiché),
-	--   logtime_page_day (le jour choisi dans ce mois, flèches), logtime_page_view (M.VIEW.MONTHS, M.VIEW.YEAR (touche a) ou
-	--   M.VIEW.DAY (le détail du jour choisi, touche Entrée))
+	--   logtime_page_day (le jour choisi dans ce mois, flèches), logtime_page_view (M.VIEW.MONTHS, ou M.VIEW.OVERVIEW : la
+	--   vue d'ensemble, touche Entrée)
 	local function page_id()
 		return num(G.logtime_page_pane)
 	end
@@ -100,30 +99,13 @@ function M.create(ctx)
 
 	local function current_view()
 		local view = num(G.logtime_page_view)
-		if view == M.VIEW.YEAR or view == M.VIEW.DAY then
+		if view == M.VIEW.OVERVIEW then
 			return view
 		end
 		return M.VIEW.MONTHS
 	end
 
-	-- Le détail du jour choisi (calendar/day_detail.lua), avec sa ligne d'aide. S'il ne tient pas : le message
-	-- « fenêtre trop petite ».
-	local function build_day_text(dims, labels, cfg)
-		local help = "  " .. labels.title .. "   " .. labels.day_help
-		local key = dates.key(selected_day())
-		local idle_days = ctx.idle_days and ctx.idle_days() or nil
-		local projects = ctx.projects and ctx.projects() or nil
-		local lines, width = day_detail.render(ctx.days(), idle_days, key, ctx.today_key(), cfg, labels, projects)
-		local needed = #lines + 2
-		if dims and ((tonumber(dims.cols) or 0) < width or (tonumber(dims.rows) or 0) < needed) then
-			local title, hint = labels.too_small, string.format(labels.too_small_hint, width, needed)
-			return title .. "\n" .. hint, 0, math.max(layout.visible_width(title), layout.visible_width(hint))
-		end
-		-- on centre le cadre ; l'aide, plus large, commence au même endroit et déborde à droite
-		return help .. "\n\n" .. table.concat(lines, "\n"), 1, width
-	end
-
-	-- La vue « tout en un » (touche a, calendar/board.lua) : l'année, le mois, la semaine et le jour choisis, sur toute
+	-- La vue d'ensemble (touche Entrée, calendar/board.lua) : l'année, le mois, la semaine et le jour choisis, sur toute
 	-- la fenêtre. Si elle ne tient pas : le message « fenêtre trop petite », avec la taille nécessaire.
 	local function build_board_text(dims, labels, cfg)
 		dims = dims or M.DEFAULT_DIMS
@@ -160,7 +142,7 @@ function M.create(ctx)
 		return table.concat(lines, "\n"), 12, tonumber(dims.cols)
 	end
 
-	-- Le texte de la page : une ligne d'aide, puis le ou les mois (ou l'année, touche a). Le nombre de mois dépend de la taille de la fenêtre
+	-- Le texte de la page : une ligne d'aide, puis le ou les mois (ou la vue d'ensemble, touche Entrée). Le nombre de mois dépend de la taille de la fenêtre
 	-- (dims = { cols, rows } ; sans taille, un seul mois). Renvoie le texte, le nombre de mois affichés et la largeur
 	-- du calendrier (la largeur qu'on centre).
 	function page.build_text(dims)
@@ -169,11 +151,8 @@ function M.create(ctx)
 			cfg[key] = value -- une copie : la case choisie ne doit pas aller dans les vrais réglages
 		end
 		local year, month = selected_month()
-		if current_view() == M.VIEW.YEAR then
+		if current_view() == M.VIEW.OVERVIEW then
 			return build_board_text(dims, labels, cfg)
-		end
-		if current_view() == M.VIEW.DAY then
-			return build_day_text(dims, labels, cfg)
 		end
 		cfg.selected_key = dates.key(selected_day())
 		local help = "  " .. labels.title .. "   " .. labels.page_help
@@ -333,19 +312,9 @@ function M.create(ctx)
 		show(year, month, pane, d)
 	end
 
-	-- Entrée : le détail du jour choisi, ou de nouveau le calendrier.
-	local function toggle_detail(window, pane)
-		local view = current_view()
-		if view == M.VIEW.YEAR then
-			return
-		end
-		G.logtime_page_view = (view == M.VIEW.DAY) and M.VIEW.MONTHS or M.VIEW.DAY
-		redraw(pane, false)
-	end
-
-	-- a : la vue « tout en un », ou de nouveau les mois.
+	-- Entrée : la vue d'ensemble (sur le jour choisi), ou de nouveau les mois.
 	local function toggle_view(window, pane)
-		G.logtime_page_view = (current_view() == M.VIEW.YEAR) and M.VIEW.MONTHS or M.VIEW.YEAR
+		G.logtime_page_view = (current_view() == M.VIEW.OVERVIEW) and M.VIEW.MONTHS or M.VIEW.OVERVIEW
 		redraw(pane, false)
 	end
 
@@ -359,9 +328,9 @@ function M.create(ctx)
 		window:perform_action(act.CloseCurrentTab({ confirm = false }), pane)
 	end
 
-	-- Échap : dans le détail du jour ou la vue « tout en un », retour au calendrier ; sinon fermer la page.
+	-- Échap : dans la vue d'ensemble, retour aux mois ; sinon fermer la page.
 	local function back_or_close(window, pane)
-		if current_view() == M.VIEW.DAY or current_view() == M.VIEW.YEAR then
+		if current_view() == M.VIEW.OVERVIEW then
 			G.logtime_page_view = M.VIEW.MONTHS
 			redraw(pane, false)
 			return
@@ -384,9 +353,8 @@ function M.create(ctx)
 			{ key = "PageDown", run = shift_month(1) },
 			{ key = "Tab", run = shift_month(1) }, -- tous les claviers n'ont pas PgUp / PgDn
 			{ key = "Tab", mods = "SHIFT", run = shift_month(-1) },
-			{ key = "Enter", run = toggle_detail },
+			{ key = "Enter", run = toggle_view },
 			{ key = "t", run = go_today },
-			{ key = "a", run = toggle_view },
 			{ key = "r", run = refresh },
 			{ key = "q", run = close },
 			{ key = "Escape", run = back_or_close },

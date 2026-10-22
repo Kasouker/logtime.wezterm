@@ -2,7 +2,7 @@
 
 **English** · [Français](README.fr.md)
 
-A [WezTerm](https://wezterm.org) plugin that **tracks the time you spend in your terminal** and shows it in the tab bar, with an **interactive calendar**, an **overview** (year, month, week, projects and timeline on one screen), a **day detail** (active / idle time, time per project) and a **settings page**. Nothing else to install: everything runs inside WezTerm.
+A [WezTerm](https://wezterm.org) plugin that **tracks the time you spend in your terminal** and shows it in the tab bar, with an **interactive calendar**, an **overview** (year, month, week, active / idle time, projects and timeline on one screen) and a **settings page**. Nothing else to install: everything runs inside WezTerm.
 
 ![The calendar](docs/calendar.en.png)
 
@@ -11,7 +11,7 @@ A [WezTerm](https://wezterm.org) plugin that **tracks the time you spend in your
 - **Today's counter in the tab bar** (`05:12:30`), with no wiring needed: it shows up on the right of the normal tab bar, or inside [tabline.wez](https://github.com/michaelbrusegard/tabline.wez) if you use it.
 - **Daily goal**: `05:12:30 / 7h`, then `✓ 07:03:10` in color, and a 🎉 notification once a day when you reach it.
 - **Calendar** (`F2`): several months side by side depending on the window size, a color gradient per day, totals, streaks, validated weeks and days.
-- **Overview** (`a` in the calendar), the whole picture on one full-window screen:
+- **Overview** (`Enter` on a day), the whole picture on one full-window screen:
   - the **year**, one square per day, with the months below it;
   - the selected **month**, with the goal reached day by day and the validated weeks and days;
   - the selected **week**: two bars per day (idle and active), and its figures (total, active days, average, best day, goal);
@@ -19,16 +19,15 @@ A [WezTerm](https://wezterm.org) plugin that **tracks the time you spend in your
   - the **timeline** of the selected day.
 
   A project keeps the same color everywhere on the screen.
-- **Day detail** (`Enter` on a day): total, goal, **active and idle time**, **time per project** and the week's total.
 - **Idle time**: when nothing moves in the terminal for 5 minutes, the pause is noted as idle (the counter still counts it).
 - **Time per project**: each second goes to the project of the tab you are looking at (its folder, e.g. `~/42/C05/ex02` → `42/C05`).
 - **Settings page** (`F4`): colors (16 colors, or your WezTerm theme's colors), calendar layout, borders, language, goal. Every change is saved and applied right away.
 - **Safe storage**: atomic writes checked after writing, a backup copy, unreadable files set aside and never overwritten.
 - **English and French.**
 
-| Day detail | Overview | Settings (`F4`) |
-|---|---|---|
-| ![Day detail](docs/day-detail.en.png) | ![Overview](docs/year.en.png) | ![Settings](docs/settings.en.png) |
+| Overview | Settings (`F4`) |
+|---|---|
+| ![Overview](docs/year.en.png) | ![Settings](docs/settings.en.png) |
 
 ## Installation
 
@@ -61,11 +60,9 @@ That's all: the counter appears in the tab bar, `F2` opens the calendar, `F4` th
 | `F2` | anywhere | open the calendar in a new tab (or bring it back) |
 | `F4` | anywhere | open the settings page |
 
-**In the calendar**: `←` `→` (or `h` `l`) previous / next day · `↑` `↓` (or `k` `j`) previous / next week · `Shift+Tab` `Tab` (or `PgUp` `PgDn`) previous / next month · `Enter` details of the selected day · `a` overview (and back) · `t` today · `r` refresh · `q` or `Esc` close.
+**In the calendar**: `←` `→` (or `h` `l`) previous / next day · `↑` `↓` (or `k` `j`) previous / next week · `Shift+Tab` `Tab` (or `PgUp` `PgDn`) previous / next month · `Enter` overview of the selected day · `t` today · `r` refresh · `q` or `Esc` close.
 
-**In the overview** (it needs a window of at least 120 columns × 34 lines): `←` `→` day · `↑` `↓` week · `Shift+Tab` `Tab` month (and the year, past December or January) · `t` today · `a` or `Esc` back to the calendar · `r` refresh · `q` close.
-
-**In the day detail**: `←` `→` `↑` `↓` move to another day · `Enter` or `Esc` back to the calendar.
+**In the overview** (it needs a window of at least 120 columns × 34 lines): `←` `→` day · `↑` `↓` week · `Shift+Tab` `Tab` month (and the year, past December or January) · `t` today · `Enter` or `Esc` back to the calendar · `r` refresh · `q` close.
 
 **In the settings page** (it fills the whole window, with a preview on the right when there is room: the month, then today — active and idle time, time per project, and the timeline of the day): `Tab` / `Shift+Tab` next / previous tab (Colors, Calendar, General) · arrows or `h j k l` choose · `Enter` save a color · `←` `→` change a value (saved right away) · `d` default value · `y` / `n` use (or not) your theme's colors · `q` or `Esc` close.
 

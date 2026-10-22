@@ -18,7 +18,6 @@ return {
 	weekdays_long = { "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche" },
 	title = "Logtime",
 	colon = " : ", -- « Total du mois : 42h10 » (espace avant les deux-points en français)
-	percent = "%3d %%", -- « 83 % » (dans les colonnes du détail du jour)
 	day_month = "{day} {month_lower}", -- « 14 octobre » (le meilleur jour de l'année)
 	total = "Total du mois",
 	active = "Jours actifs",
@@ -34,17 +33,14 @@ return {
 	goal_toast = "🎉 Objectif du jour atteint : %s ! 🎉",
 	validated_weeks = "Semaines validées",
 	validated_days = "Jours validés",
-	page_help = "←→↑↓ jour   Tab Maj+Tab mois   Entrée détail   a vue d'ensemble   t aujourd'hui",
-	day_help = "← → jour   ↑ ↓ semaine   Entrée Échap retour   q fermer",
+	page_help = "←→↑↓ jour   Tab Maj+Tab mois   Entrée vue d'ensemble   t aujourd'hui",
 	detail_date = "{weekday} {day} {month_lower} {year}",
-	detail_today = "aujourd'hui",
 	detail_total = "Total",
 	overview_week = "Semaine %d",
 	overview_week_short = "Sem. %d",
 	overview_week_empty = "Aucun temps compté cette semaine.",
 	detail_active = "Actif",
 	detail_idle = "Inactif",
-	detail_week = "Semaine",
 	detail_empty = "Aucun temps compté ce jour-là.",
 	detail_projects = "Par projet (temps actif)",
 	detail_other = "autres",
