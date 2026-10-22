@@ -146,6 +146,11 @@ function M.create(ctx)
 			b = b,
 			edge = convert.fg(border),
 			legend = board.legend(assemble.legend(cfg, labels), labels),
+			-- le mois choisi sous l'année : rempli de la couleur choisie dans F4 (comme l'onglet ouvert de F4)
+			accent = type(cfg.gradient_color) == "string"
+					and cfg.gradient_color:match("^#%x%x%x%x%x%x$")
+					and cfg.gradient_color
+				or gradient.DEFAULT_COLOR,
 		}, tonumber(dims.cols) or 0, tonumber(dims.rows) or 0)
 		if not lines then
 			local title, hint = labels.too_small, string.format(labels.too_small_hint, min_w, min_h)

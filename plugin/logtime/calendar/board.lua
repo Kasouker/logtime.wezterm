@@ -18,6 +18,8 @@ local stats = load("calendar/stats")
 local layout = load("calendar/layout")
 local convert = load("color/convert")
 local idle = load("core/idle")
+local dates = load("calendar/dates")
+local assemble = load("calendar/assemble")
 
 local M = {}
 
@@ -112,6 +114,114 @@ function M.legend(legend, labels)
 	return (legend:gsub("%s+$", ""))
 end
 
+M.ACCENT = "#8B8E99" -- la couleur du mois choisi sous l'année (sans o.accent)
+
+-- Le numéro du jour dans l'année (1 pour le 1er janvier) et le nombre de jours de l'année.
+local function yday(year, month, day)
+	return os.date("*t", os.time({ year = year, month = month, day = day, hour = 12 })).yday
+end
+
+-- L'année : M.YEAR_HEIGHT lignes de `width` colonnes. Une case par jour (7 lignes, une colonne par semaine), dans la
+-- couleur de ses heures (comme le calendrier) ; aujourd'hui « ◆ », le jour choisi en couleurs inversées. Dessous, les
+-- mois, chacun sous sa première semaine ; le mois choisi rempli de o.accent.
+--   Lundi    │ ■ ■ ■ ■ ■ ■ ■ ■ ■ …
+--   …
+--   Dimanche │ ■ ■ ■ ■ ■ ■ ■ ■ ■ …
+--     2026   │ Jan     Fév     …   ▐ Oct ▌ …
+function M.year_lines(o, width)
+	local labels, cfg = o.labels, o.cfg
+	local b, edge = o.b, o.edge or ""
+	local off = edge ~= "" and convert.RESET or ""
+	local week_starts_on = cfg.week_starts_on
+	local offset = dates.offset(o.year, 1, week_starts_on)
+	local columns = year_view.columns(o.year, week_starts_on)
+	local count = yday(o.year, 12, 31)
+	-- la colonne des jours de la semaine : les noms longs (« Mercredi »), le premier jour de la semaine d'abord
+	local names, label_w = {}, 0
+	for i = 1, 7 do
+		local index = week_starts_on == "sunday" and ((i + 5) % 7 + 1) or i
+		names[i] = (labels.weekdays_long or labels.weekdays)[index]
+		label_w = math.max(label_w, vw(names[i]))
+	end
+	label_w = label_w + 2
+	local room = width - label_w - 1 -- après le trait vertical
+	-- des cases toutes de la même largeur ; la place qui reste va entre les mois (avant la semaine du 1er de chaque mois,
+	-- et aux deux bouts) : les mois se détachent, et l'année prend toute la largeur
+	local base = math.max(1, room // columns)
+	local starts = {}
+	for month = 1, 12 do
+		starts[month] = math.floor((yday(o.year, month, 1) - 1 + offset) / 7) + 1
+	end
+	local free = math.max(0, room - base * columns)
+	local gaps = {} -- l'espace en plus avant une colonne
+	local slots = { 1 } -- le bord gauche, puis le début de chaque mois (sauf janvier)
+	for month = 2, 12 do
+		slots[#slots + 1] = starts[month]
+	end
+	local share, extra = free // (#slots + 1), free % (#slots + 1) -- + 1 : le bord droit
+	for k, col in ipairs(slots) do
+		gaps[col] = (gaps[col] or 0) + share + (k <= extra and 1 or 0)
+	end
+	local cells, at, x = {}, {}, 0
+	for col = 1, columns do
+		x = x + (gaps[col] or 0)
+		at[col] = x -- la position de la colonne, depuis le trait
+		cells[col] = base
+		x = x + base
+	end
+	local marks = math.max(1, base - 1) -- les carrés par case, puis une colonne d'air
+	local accent = o.accent or M.ACCENT
+	local out = {}
+	for row = 1, 7 do
+		local parts = { " " .. fit(names[row], label_w - 1), edge .. b.v .. off }
+		for col = 1, columns do
+			local i = (col - 1) * 7 + row - offset
+			local cell = cells[col]
+			parts[#parts + 1] = string.rep(" ", gaps[col] or 0)
+			if i < 1 or i > count then
+				parts[#parts + 1] = string.rep(" ", cell)
+			else
+				local key = dates.key_any(o.year, 1, i)
+				local secs = math.floor(math.max(0, o.days[key] or 0))
+				local color = (secs > 0 and assemble.day_color(secs, cfg)) or year_view.EMPTY_COLOR
+				local mark = (key == o.today_key) and year_view.TODAY or year_view.DAY
+				local shown = math.min(marks, cell)
+				local text = string.rep(mark, shown) .. string.rep(" ", cell - shown)
+				if key == o.day_key then
+					text = assemble.SELECTED .. convert.fg(color) .. text .. convert.RESET
+				else
+					text = convert.fg(color) .. text .. convert.RESET
+				end
+				parts[#parts + 1] = text
+			end
+		end
+		out[row] = fit(table.concat(parts), width)
+	end
+	-- les mois : chacun sous la semaine de son 1er jour ; le mois choisi rempli jusqu'au mois suivant
+	local axis = { " " .. fit(centered(tostring(o.year), label_w - 1), label_w - 1), edge .. b.v .. off }
+	local cursor = 1 -- la prochaine colonne de semaine à écrire
+	local function x_of(col) -- la position d'une colonne depuis le trait (columns + 1 : la fin)
+		return col > columns and x or at[col]
+	end
+	for month = 1, 12 do
+		local first = starts[month]
+		local last = (starts[month + 1] or (columns + 1)) - 1
+		if first >= cursor then
+			axis[#axis + 1] = string.rep(" ", x_of(first) - x_of(cursor))
+			local span = x_of(last + 1) - x_of(first)
+			local name = (labels.months_short or {})[month] or labels.months[month]
+			local text = centered(name, span)
+			if month == o.month then
+				text = convert.bg(accent) .. convert.fg(convert.contrast(accent)) .. text .. convert.RESET
+			end
+			axis[#axis + 1] = text
+			cursor = last + 1
+		end
+	end
+	out[8] = fit(table.concat(axis), width)
+	return out
+end
+
 -- Les zones de la page : { x, y, w, h } (x et y à partir de 1), pour une fenêtre de width x height. Les traits entre les
 -- zones ne leur appartiennent pas.
 function M.zones(width, height)
@@ -139,7 +249,7 @@ end
 
 -- Toute la page : exactement `height` lignes de `width` colonnes ; ou nil, la largeur et la hauteur minimum si la
 -- fenêtre est trop petite.
---   o = { days, idle_days, projects, timeline, year, month, day_key, today_key, cfg, labels, b, edge, legend }
+--   o = { days, idle_days, projects, timeline, year, month, day_key, today_key, cfg, labels, b, edge, legend, accent }
 function M.render(o, width, height)
 	if width < M.MIN_WIDTH or height < M.MIN_HEIGHT then
 		return nil, M.MIN_WIDTH, M.MIN_HEIGHT
@@ -197,6 +307,9 @@ function M.render(o, width, height)
 	local out = {}
 	for y = 1, height do
 		out[y] = table.concat(grid[y])
+	end
+	for i, text in ipairs(M.year_lines(o, z.year.w)) do
+		out[z.year.y + i - 1] = text
 	end
 	-- les chiffres de l'année, en haut ; l'aide et la légende, en bas
 	out[z.stats.y] = centered(M.join_parts(M.year_parts(o), width), width)

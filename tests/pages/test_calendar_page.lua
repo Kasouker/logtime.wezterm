@@ -36,6 +36,7 @@ local function load_module(name)
 end
 local calendar_page = load_module("pages/calendar_page")
 local assemble = load_module("calendar/assemble")
+local convert = load_module("color/convert")
 local keys = load_module("config/keys")
 local platform = load_module("system/platform")
 local fr = load_module("i18n/fr")
@@ -701,6 +702,11 @@ local function scenarios()
 	local board_text, _, board_width = page.build_text({ cols = 150, rows = 45 })
 	check("vue d'ensemble, 150 x 45 : dessinée", strip(board_text):find("Total de l'année", 1, true) ~= nil, true)
 	check("vue d'ensemble : toute la largeur (rien à centrer)", board_width, 150)
+	check(
+		"vue d'ensemble : le mois choisi rempli de la couleur choisie (l'or par défaut)",
+		board_text:find(convert.bg("#C9AB6B") .. convert.fg(convert.contrast("#C9AB6B")), 1, true) ~= nil,
+		true
+	)
 	local board_last = strip(board_text):match("([^\n]*)$")
 	check(
 		"vue d'ensemble : la légende des couleurs au bout de l'aide, sans « * = aujourd'hui »",
