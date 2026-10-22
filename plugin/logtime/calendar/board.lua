@@ -3,7 +3,7 @@
 -- simple interpréteur Lua.
 --
 --   ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────╮
---   │  Total de l'année : 412h10  |  Meilleur jour : 14 octobre (15h35)  |  Inactif : …  |  Semaines validées : … │
+--   │ Total de l'année : 412h10  |  Meilleur jour : 14 octobre (15h35)  |  Inactif : …  |  …    0h ████ 24h │
 --   ├───────────────────────────────────────────────────────────────────────────────────────────────────────────┤
 --   │                    l'année, comme l'ancienne vue de l'année (calendar/year.lua), centrée                   │
 --   ├───────────────────────────────┬───────────────────────────────────────┬───────────────────────────────────┤
@@ -13,7 +13,7 @@
 --   │                               ├───────────────────────────────────────┴───────────────────────────────────┤
 --   │                               │ la frise du jour choisi                                                     │
 --   ├───────────────────────────────┴───────────────────────────────────────────────────────────────────────────┤
---   │ mois : Tab Maj+Tab | semaine : ↑ ↓ | jour : ← → | …                                           la légende │
+--   │ mois : Tab Maj+Tab | semaine : ↑ ↓ | jour : ← → | …                                                      │
 --   ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────╯
 local load = ...
 local year_view = load("calendar/year")
@@ -111,8 +111,17 @@ function M.join_parts(parts, width)
 	return fit(parts[1] or "", width)
 end
 
+-- La ligne du haut, sur `width` colonnes : les chiffres de l'année à gauche, la légende des couleurs (o.legend) tout à
+-- droite. Les chiffres laissent leur place à la légende (les dernières parts sont retirées s'il le faut).
+function M.stats_line(o, width)
+	local legend = o.legend or ""
+	local room = width - 2 - (legend ~= "" and vw(legend) + 3 or 0) -- l'air des bords, et au moins 3 avant la légende
+	local left = " " .. M.join_parts(M.year_parts(o), room)
+	return fit(left .. string.rep(" ", math.max(1, width - vw(left) - vw(legend) - 1)) .. legend .. " ", width)
+end
+
 -- La légende des couleurs du calendrier (assemble.legend), sans « * = aujourd'hui » au bout : comme sur la maquette,
--- seulement les couleurs (elle partage la ligne de l'aide).
+-- seulement les couleurs (au bout de la ligne des chiffres de l'année).
 function M.legend(legend, labels)
 	local today = labels.today or ""
 	if today ~= "" and legend:sub(-#today) == today then
@@ -942,7 +951,7 @@ function M.render(o, width, height)
 	local off = edge ~= "" and convert.RESET or ""
 	local by_mask, by_char = box_chars(b)
 	local month_w = math.floor((width - 2) * M.MONTH_SHARE)
-	local help = M.help_lines(o.labels.board_help or "", o.legend, month_w)
+	local help = M.help_lines(o.labels.board_help or "", nil, month_w) -- la légende est en haut (M.stats_line)
 	local show_timeline = o.cfg.show_timeline ~= false
 	local z = M.zones(width, height, #help, not show_timeline)
 	-- chaque case : un nombre (les directions d'un trait) ou un texte (un caractère visible, avec ses couleurs)
@@ -1045,9 +1054,9 @@ function M.render(o, width, height)
 	for i, text in ipairs(M.year_lines(o, z.year.w, z.year.h)) do
 		inside(z.year.y + i - 1, text)
 	end
-	-- les chiffres de l'année, en haut ; l'aide et la légende, en bas à gauche (sous le mois)
+	-- les chiffres de l'année et la légende, en haut ; l'aide, en bas à gauche (sous le mois)
 	local inner = z.stats.w
-	inside(z.stats.y, centered(M.join_parts(M.year_parts(o), inner - 2), inner))
+	inside(z.stats.y, M.stats_line(o, inner))
 	for k, text in ipairs(help) do
 		local y = z.help.y + k - 1
 		-- la ligne : le bord gauche, l'aide, puis la suite déjà dessinée (à partir du trait vertical du milieu)

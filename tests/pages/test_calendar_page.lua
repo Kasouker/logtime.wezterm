@@ -711,10 +711,10 @@ local function scenarios()
 		board_text:find(convert.bg("#C9AB6B") .. convert.fg(convert.contrast("#C9AB6B")), 1, true) ~= nil,
 		true
 	)
-	local board_last = strip(board_text):match("([^\n]*)\n[^\n]*$") -- l'aide, juste au-dessus du bas du cadre
+	local board_top = strip(board_text):match("^[^\n]*\n([^\n]*)") -- la ligne des chiffres de l'année
 	check(
-		"vue d'ensemble : la légende des couleurs au bout de l'aide, sans « * = aujourd'hui »",
-		board_last:find("24h", 1, true) ~= nil and board_last:find("* =", 1, true) == nil,
+		"vue d'ensemble : la légende des couleurs au bout de la ligne de l'année, sans « * = aujourd'hui »",
+		board_top:find("24h │", 1, true) ~= nil and board_top:find("* =", 1, true) == nil,
 		true
 	)
 	local small_text = page.build_text({ cols = 99, rows = 40 })

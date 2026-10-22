@@ -418,7 +418,32 @@ local function left_of_divider(line)
 	local plain = strip(line)
 	return plain:sub(1, utf8.offset(plain, divider) - 1)
 end
-check("l'aide : la légende au bout de sa dernière ligne", left_of_divider(page[39]):find("24h $") ~= nil, true)
+check(
+	"l'aide : plus de légende en bas",
+	(left_of_divider(page[38]) .. left_of_divider(page[39])):find("24h", 1, true),
+	nil
+)
+local function legend_at_end(line)
+	local plain = strip(line)
+	return plain:find("0h █", 1, true) ~= nil and plain:sub(-#"█ 24h │") == "█ 24h │"
+end
+check("en haut : la légende tout à droite", legend_at_end(page[2]), true)
+check("en haut : les chiffres de l'année tout à gauche", strip(page[2]):find("│ Total de l'année", 1, true), 1)
+check(
+	"en haut, étroit : les chiffres laissent la place à la légende (sans la couper)",
+	(function()
+		local top = strip(board.render(data(), 120, 34)[2])
+		return legend_at_end(board.render(data(), 120, 34)[2])
+			and top:find("Total de l'année", 1, true) ~= nil
+			and top:find("Semaines validées", 1, true) == nil
+	end)(),
+	true
+)
+check(
+	"la ligne du haut, sans légende : seulement les chiffres",
+	board.stats_line(data({ legend = "" }), 148):find("24h", 1, true),
+	nil
+)
 check(
 	"l'aide : dans la zone du mois, à gauche du trait du milieu",
 	char_at(page[38], divider) .. char_at(page[39], divider),
@@ -436,25 +461,6 @@ check(
 				return false
 			end
 		end
-	end)(),
-	true
-)
-check(
-	"l'aide n'est pas « à cheval » : la légende commence après la fin de toutes les lignes de l'aide",
-	(function()
-		local longest, legend_at = 0, nil
-		for y = z.help.y, z.help.y + z.help.h - 1 do
-			local left = left_of_divider(page[y])
-			local at = left:find("0h", 1, true)
-			if at then
-				legend_at = utf8.len(left:sub(1, at - 1))
-				local before = left:sub(1, at - 1):gsub("%s+$", "")
-				longest = math.max(longest, utf8.len(before))
-			else
-				longest = math.max(longest, utf8.len((left:gsub("%s+$", ""))))
-			end
-		end
-		return legend_at ~= nil and legend_at > longest
 	end)(),
 	true
 )
