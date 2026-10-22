@@ -120,13 +120,18 @@ end
 
 M.ACCENT = "#8B8E99" -- la couleur du mois choisi sous l'année (sans o.accent)
 
-M.YEAR_SHARE = 0.35 -- l'année prend au plus cette part de la hauteur de la fenêtre
+M.MIN_BOTTOM = 24 -- l'année grandit tant qu'il reste au moins ces lignes en bas (le mois, la semaine, la frise)
 M.MAX_ROW = 3 -- une ligne de jours : au plus 3 lignes d'écran
 
 -- La hauteur de l'année pour une fenêtre de `height` lignes : 7 lignes de jours (chacune de 1 à M.MAX_ROW lignes
--- d'écran, selon la place), puis la ligne des mois.
+-- d'écran : la plus grande qui laisse M.MIN_BOTTOM lignes en bas), puis la ligne des mois.
 function M.year_height(height)
-	local row = math.max(1, math.min(M.MAX_ROW, (math.floor(height * M.YEAR_SHARE) - 1) // 7))
+	local row = 1
+	for r = 2, M.MAX_ROW do
+		if height - (7 * r + 1) - 5 >= M.MIN_BOTTOM then -- le cadre, les chiffres, leur trait, le trait sous l'année
+			row = r
+		end
+	end
 	return 7 * row + 1
 end
 
@@ -155,8 +160,8 @@ function M.year_lines(o, width, height)
 		months[m] = { first = first, count = count, weeks = weeks }
 		total = total + weeks
 	end
-	-- des cases de la même largeur partout ; au moins une colonne entre deux mois
-	local base = math.max(1, (room - 13) // total)
+	-- des cases de la même largeur partout, aussi larges que possible (deux mois peuvent se toucher)
+	local base = math.max(1, room // total)
 	local free = math.max(0, room - base * total)
 	local gaps = {} -- avant chaque mois (13 : après le dernier), la place en trop répartie régulièrement
 	for k = 1, 13 do
@@ -242,8 +247,8 @@ local function split(total, count)
 end
 
 -- Le mois choisi : exactement `height` lignes de `width` colonnes. La grille du mois dans son propre cadre, qui prend
--- toute la place (une colonne d'air de chaque côté) : 7 colonnes de jours et la colonne des semaines (à droite), de la
--- même largeur à une colonne près ; les semaines de la même hauteur à une ligne près. Les noms des jours et du mois sont
+-- toute la largeur (une colonne d'air de chaque côté) : 7 colonnes de jours et la colonne des semaines (à droite), de la
+-- même largeur à une colonne près ; toutes les semaines exactement de la même hauteur (les lignes en trop sous le cadre). Les noms des jours et du mois sont
 -- posés sur le trait du haut, les semaines et jours validés sur celui du bas (comme le calendrier F2 avec les encadrés).
 --   ╭─ Lun ─┬─ Mar ─┬─ … ─┬─ Dim ─┬─ Octobre ─╮
 --   │ 12    │ 13    │     │ 18    │           │
@@ -260,7 +265,12 @@ function M.month_lines(o, width, height)
 	local weeks = overview.weeks(o.year, o.month, cfg.week_starts_on)
 	local count = #weeks
 	local cells = split(math.max(8, width - 2 - 9), 8) -- 8 colonnes, 9 traits verticaux, une colonne d'air de chaque côté
-	local rows = split(math.max(count, height - 2 - (count - 1)), count) -- le haut, le bas, un trait entre les semaines
+	-- toutes les semaines de la même hauteur (les lignes en trop restent sous le cadre)
+	local row_h = math.max(1, (height - 2 - (count - 1)) // count) -- le haut, le bas, un trait entre les semaines
+	local rows = {}
+	for w = 1, count do
+		rows[w] = row_h
+	end
 	local narrow = math.min(table.unpack(cells))
 	-- un trait de la grille (8 morceaux) avec, au milieu de chaque morceau, un texte (ou rien)
 	local function rule(l, mid, r, texts)
@@ -397,7 +407,12 @@ function M.help_lines(help, legend, width)
 	legend = (legend or ""):gsub("^%s+", "")
 	if legend ~= "" then
 		local last = (lines[#lines] or ""):gsub("%s+$", "")
-		if #lines > 0 and vw(last) + 2 + vw(legend) + 1 <= width then
+		-- au bout de la dernière ligne seulement si elle ne passe sous aucun texte de l'aide (pas « à cheval »)
+		local longest = 0
+		for _, line in ipairs(lines) do
+			longest = math.max(longest, vw((line:gsub("%s+$", ""))))
+		end
+		if #lines > 0 and longest + 2 + vw(legend) + 1 <= width then
 			lines[#lines] = last .. string.rep(" ", width - vw(last) - vw(legend) - 1) .. legend .. " "
 		else
 			lines[#lines + 1] = string.rep(" ", math.max(0, width - vw(legend) - 1))

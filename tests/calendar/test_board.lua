@@ -224,7 +224,7 @@ for col in pairs(feb_cols) do
 end
 check("un mois n'a que ses jours (aucune colonne partagée avec janvier ou mars)", shared, false)
 -- le nom du mois centré sous son bloc (à une colonne près)
-local feb_wide = board.year_lines(data({ days = feb }), 200)
+local feb_wide = board.year_lines(data({ days = feb }), 148)
 local lo, hi = math.huge, 0
 for row = 1, 7 do
 	for _, c in ipairs(cells_at(feb_wide[row])) do
@@ -266,6 +266,21 @@ end
 check("la hauteur de l'année : 8 lignes dans une fenêtre de 34", board.year_height(34), 8)
 check("la hauteur de l'année : 15 lignes dans une fenêtre de 46 (2 lignes par jour)", board.year_height(46), 15)
 check("la hauteur de l'année : jamais plus de 3 lignes par jour", board.year_height(200), 22)
+local roomy = true
+for h = 34, 120 do
+	local y = board.year_height(h)
+	roomy = roomy and (y == 8 or h - y - 5 >= board.MIN_BOTTOM)
+end
+check("la hauteur de l'année : toujours assez de place en bas (sauf au plus petit)", roomy, true)
+check("la hauteur de l'année : 3 lignes par jour dès qu'il reste la place en bas", board.year_height(51), 22)
+check("la hauteur de l'année : pas 3 lignes une ligne trop tôt", board.year_height(50), 15)
+-- des cases aussi larges que possible : deux mois peuvent se toucher (à 160 colonnes : 3 colonnes par jour)
+check(
+	"des cases aussi larges que possible",
+	strip(board.year_lines(data(), 196)[1]):find("■■", 1, true) ~= nil
+		or board.year_lines(data(), 196)[1]:find("\27[48;", 1, true) ~= nil,
+	true
+)
 local tall = board.year_lines(data(), 148, 15)
 check("2 lignes par jour : 15 lignes", #tall, 15)
 check(
@@ -362,9 +377,9 @@ end
 check("le cadre : les côtés (│, ou ├ ┤ au bout des traits)", sides, true)
 check("en haut : les chiffres de l'année", strip(page[2]):find("Total de l'année : 31h30", 1, true) ~= nil, true)
 check("sous les chiffres : un trait d'un bord à l'autre", strip(page[3]), "├" .. string.rep("─", 148) .. "┤")
-local help_text = strip(page[38]) .. strip(page[39])
+local help_text = strip(table.concat(page, "", 37, 39))
 check(
-	"en bas à gauche : l'aide, sur deux lignes",
+	"en bas à gauche : l'aide, sur plusieurs lignes",
 	help_text:find("mois : Tab Maj+Tab", 1, true) ~= nil and help_text:find("rafraîchir : r", 1, true) ~= nil,
 	true
 )
@@ -389,7 +404,40 @@ check(
 	char_at(page[38], divider) .. char_at(page[39], divider),
 	"││"
 )
-check("pas de trait entre le mois et l'aide", left_of_divider(page[z.help.y - 1]):find("╰", 1, true) ~= nil, true)
+check(
+	"pas de trait entre le mois et l'aide (seulement les lignes en trop du mois)",
+	(function()
+		for y = z.help.y - 1, z.month.y, -1 do
+			local left = left_of_divider(page[y])
+			if left:find("╰", 1, true) then
+				return true
+			end
+			if left:find("├", 1, true) or left:find("┤", 1, true) then
+				return false
+			end
+		end
+	end)(),
+	true
+)
+check(
+	"l'aide n'est pas « à cheval » : la légende commence après la fin de toutes les lignes de l'aide",
+	(function()
+		local longest, legend_at = 0, nil
+		for y = z.help.y, z.help.y + z.help.h - 1 do
+			local left = left_of_divider(page[y])
+			local at = left:find("0h", 1, true)
+			if at then
+				legend_at = utf8.len(left:sub(1, at - 1))
+				local before = left:sub(1, at - 1):gsub("%s+$", "")
+				longest = math.max(longest, utf8.len(before))
+			else
+				longest = math.max(longest, utf8.len((left:gsub("%s+$", ""))))
+			end
+		end
+		return legend_at ~= nil and legend_at > longest
+	end)(),
+	true
+)
 check("le trait vertical entre le mois et la droite", char_at(page[z.month.y + 2], divider), "│")
 check(
 	"sous la semaine : la jonction à gauche (├) et au cadre (┤)",
@@ -535,14 +583,14 @@ for k = 2, #rows_at do
 end
 check("le mois : 5 semaines (octobre 2026)", #rows_at - 1, 5)
 check(
-	"le mois : les semaines de la même hauteur, à une ligne près",
-	math.max(table.unpack(heights_)) - math.min(table.unpack(heights_)) <= 1,
-	true
+	"le mois : toutes les semaines exactement de la même hauteur",
+	math.max(table.unpack(heights_)) - math.min(table.unpack(heights_)),
+	0
 )
 check(
-	"le mois : toute la hauteur (le haut sur la 1re ligne, le bas sur la dernière)",
-	top_k .. " " .. bottom_k,
-	"1 27"
+	"le mois : en haut de sa zone, les lignes en trop (moins d'une semaine) sous le cadre",
+	top_k == 1 and 27 - bottom_k < 5,
+	true
 )
 local joined_ml = table.concat(ml_plain, "\n")
 check(
