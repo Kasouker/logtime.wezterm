@@ -99,7 +99,7 @@ check(
 )
 check("légende : pas d'espaces au bout", strip(legend):sub(-1) ~= " ", true)
 
--- ---- l'année : le même dessin que l'ancienne vue de l'année (year.grid_lines), centré
+-- ---- l'année : le dessin de l'ancienne vue, sur toute la largeur, les mois en dessous
 local convert = load_module("color/convert")
 local year_view = load_module("calendar/year")
 local yl = board.year_lines(data({ day_key = "2026-10-14", accent = "#C96969" }), 148)
@@ -109,53 +109,104 @@ for _, line in ipairs(yl) do
 	yl_sizes = yl_sizes and layout.visible_width(line) == 148
 end
 check("l'année : chaque ligne fait la largeur", yl_sizes, true)
-local old = year_view.grid_lines(DAYS, 2026, "2026-10-16", data().cfg, fr)
-local old_width = select(2, year_view.grid_lines(DAYS, 2026, "2026-10-16", data().cfg, fr))
-local margin = (148 - old_width) // 2
+check("l'année : les jours en abrégé, lundi d'abord", strip(yl[1]):find("^ Lun ") ~= nil, true)
+check("l'année : dimanche en dernier", strip(yl[7]):find("^ Dim ") ~= nil, true)
+local sun_yl = board.year_lines(data({ cfg = gradient.apply_to({ week_starts_on = "sunday" }) }), 148)
+check("l'année, dimanche d'abord", strip(sun_yl[1]):find("^ Dim ") ~= nil, true)
+check("les mois en dessous, l'année devant", strip(yl[8]):find("^ 2026 ") ~= nil, true)
 check(
-	"l'année : exactement l'ancien dessin (les jours), centré",
-	strip(yl[2]),
-	string.rep(" ", margin) .. strip(old[2]) .. string.rep(" ", 148 - margin - layout.visible_width(old[2]))
-)
-check(
-	"l'année : les mois au-dessus, comme avant",
-	strip(yl[1]),
-	strip(board.year_lines(data({ month = 1, accent = nil }), 148)[1])
-)
-check(
-	"l'année : les jours en abrégé (Lun … Dim)",
-	strip(yl[2]):find("Lun", 1, true) ~= nil and strip(yl[8]):find("Dim", 1, true) ~= nil,
+	"les mois en dessous, dans l'ordre",
+	strip(yl[8]):find("Jan.*Fév.*Mar.*Avr.*Mai.*Juin.*Juil.*Aoû.*Sep.*Oct.*Nov.*Déc") ~= nil,
 	true
 )
-check("aujourd'hui : « ◆ » (un seul)", select(2, strip(table.concat(yl, "\n")):gsub("◆", "")), 1)
+local squares = 0
+for row = 1, 7 do
+	squares = squares + select(2, strip(yl[row]):gsub("■", "")) + select(2, strip(yl[row]):gsub("◆", ""))
+end
+check("une case par jour (365 en 2026)", squares, 365)
+check("aujourd'hui : « ◆ » (un seul), un vendredi", select(2, strip(yl[5]):gsub("◆", "")), 1)
 local worked = convert.fg(assemble.day_color(9 * 3600, data().cfg)) .. year_view.DAY
+check("un jour travaillé : dans la couleur de ses heures", table.concat(yl):find(worked, 1, true) ~= nil, true)
 check(
-	"le jour choisi (le 14, un mercredi) : en couleurs inversées",
-	yl[4]:find(assemble.SELECTED .. worked, 1, true) ~= nil,
+	"un jour sans rien : gris foncé",
+	table.concat(yl):find(convert.fg(year_view.EMPTY_COLOR) .. year_view.DAY, 1, true) ~= nil,
 	true
 )
-check("un seul jour choisi", select(2, table.concat(yl):gsub("\27%[7m", "")), 1)
+check("on ne choisit pas un jour ici : aucune case inversée", table.concat(yl):find("\27[7m", 1, true), nil)
+check("le mois choisi (octobre) : rempli de la couleur", yl[8]:find(convert.bg("#C96969"), 1, true) ~= nil, true)
 check(
-	"le mois choisi (octobre) : son nom rempli de la couleur",
-	yl[1]:find(convert.bg("#C96969") .. convert.fg(convert.contrast("#C96969")) .. "Oct", 1, true) ~= nil,
+	"le mois choisi : son nom centré dans sa place",
+	(function()
+		local style = convert.bg("#C96969") .. convert.fg(convert.contrast("#C96969"))
+		local start = yl[8]:find(style, 1, true)
+		local text = yl[8]:sub(start + #style, yl[8]:find(convert.RESET, start, true) - 1)
+		local left, right = text:match("^( *)Oct( *)$")
+		return left ~= nil and #left >= 2 and math.abs(#left - #right) <= 1
+	end)(),
 	true
 )
-check("un seul mois rempli", select(2, yl[1]:gsub("\27%[48;", "")), 1)
+check("un seul mois rempli", select(2, yl[8]:gsub("\27%[48;", "")), 1)
+check("seulement sur la ligne des mois", table.concat(yl, "", 1, 7):find("\27[48;", 1, true), nil)
 check(
 	"sans couleur donnée : le mois choisi en gris",
-	board.year_lines(data(), 148)[1]:find(convert.bg(board.ACCENT), 1, true) ~= nil,
+	board.year_lines(data(), 148)[8]:find(convert.bg(board.ACCENT), 1, true) ~= nil,
 	true
 )
+-- toute la largeur : la place en plus va entre les mois, les cases d'un même mois restent régulières
+-- les colonnes où commence chaque case (une suite de carrés)
+local function positions(line)
+	local out, col, before = {}, 0, false
+	for _, code in utf8.codes(strip(line)) do
+		col = col + 1
+		local square = code == utf8.codepoint("■") or code == utf8.codepoint("◆")
+		if square and not before then
+			out[#out + 1] = col
+		end
+		before = square
+	end
+	return out
+end
+for _, w in ipairs({ 118, 148, 200 }) do
+	local mon = positions(board.year_lines(data(), w)[1])
+	check("toute la largeur (" .. w .. ") : la dernière case près du bord droit", mon[#mon] >= w - 6, true)
+	local steps = {}
+	for k = 2, #mon do
+		steps[mon[k] - mon[k - 1]] = true
+	end
+	local distinct = 0
+	for _ in pairs(steps) do
+		distinct = distinct + 1
+	end
+	check(
+		"des écarts réguliers (" .. w .. ") : la case, et la case plus l'espace entre deux mois",
+		distinct <= 3,
+		true
+	)
+end
+local thursday = positions(yl[4]) -- le 1er janvier 2026 est un jeudi : sa ligne commence par une case
+local left_air = thursday[1] - (1 + year_view.LABEL) - 1
+local right_air = 148 - thursday[#thursday] - 1 -- (une case d'un carré, puis son espace)
 check(
-	"l'ancienne vue de l'année ne marque rien",
-	table.concat(old):find("\27%[7m") == nil and table.concat(old):find("\27%[48;") == nil,
+	"l'année centrée : autant d'air à gauche qu'à droite (à 2 près)",
+	math.abs(left_air - right_air) <= 2 and left_air >= 2,
 	true
 )
+local wide = board.year_lines(data(), 228)
+check(
+	"une fenêtre large : des cases plus grandes (plusieurs carrés)",
+	strip(wide[1]):find("■■■", 1, true) ~= nil,
+	true
+)
+local wide_cells = 0
+for row = 1, 7 do
+	wide_cells = wide_cells + #positions(wide[row])
+end
+check("une fenêtre large : toujours une case par jour", wide_cells, 365)
 local en_yl = board.year_lines(data({ labels = en }), 148)
-check("en anglais : les jours", strip(en_yl[4]):find("Wed", 1, true) ~= nil, true)
+check("en anglais : les jours", strip(en_yl[3]):find("^ Wed ") ~= nil, true)
 local page_year = board.render(data(), 150, 40)
-check("la page : les mois sous le trait des chiffres", strip(page_year[4]):find("Jan", 1, true) ~= nil, true)
-check("la page : l'année dans le cadre", strip(page_year[5]):sub(1, #"│"), "│")
+check("la page : l'année sous le trait des chiffres", strip(page_year[4]):find("Lun", 1, true) ~= nil, true)
+check("la page : les mois juste au-dessus du trait", strip(page_year[11]):find("Jan", 1, true) ~= nil, true)
 
 -- ---- les zones
 local function inside(r, width, height) -- dans le cadre (pas sur ses bords)
@@ -272,7 +323,7 @@ check(
 		and strip(narrow[2]):find("Semaines validées : 1/", 1, true) == nil,
 	true
 )
-check("120 x 34 : l'année entière (Déc)", strip(narrow[4]):find("Déc", 1, true) ~= nil, true)
+check("120 x 34 : l'année entière (Déc)", strip(narrow[11]):find("Déc", 1, true) ~= nil, true)
 local none, min_w, min_h = board.render(data(), 119, 40)
 check("trop étroit : rien", none, nil)
 check("trop étroit : la taille minimum", min_w .. " x " .. min_h, board.MIN_WIDTH .. " x " .. board.MIN_HEIGHT)

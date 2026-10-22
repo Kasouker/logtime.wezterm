@@ -91,11 +91,8 @@ function M.year_stats(days, year, cfg, idle_days)
 end
 
 -- La grille de l'année (sans titre ni statistiques) : la ligne des mois, puis une ligne par jour de la semaine. Renvoie
--- 8 lignes, larges de content_width (aussi pour la vue d'ensemble de F2, calendar/board.lua).
---   mark (facultatif) = { day = "AAAA-MM-JJ" (le jour choisi, en couleurs inversées), month = 1 à 12 (le mois choisi,
---   son nom rempli de mark.accent) }
-function M.grid_lines(days, year, today_key, cfg, labels, mark)
-	mark = mark or {}
+-- 8 lignes, larges de content_width.
+function M.grid_lines(days, year, today_key, cfg, labels)
 	local offset = dates.offset(year, 1, cfg.week_starts_on)
 	local columns = M.columns(year, cfg.week_starts_on)
 	local count = days_in_year(year)
@@ -107,11 +104,7 @@ function M.grid_lines(days, year, today_key, cfg, labels, mark)
 		local at = M.LABEL + (col - 1) * 2
 		if at >= cursor then
 			local name = (labels.months_short or {})[month] or first_chars(labels.months[month], 3)
-			local shown = name
-			if month == mark.month and mark.accent then
-				shown = convert.bg(mark.accent) .. convert.fg(convert.contrast(mark.accent)) .. name .. convert.RESET
-			end
-			header[#header + 1] = string.rep(" ", at - cursor) .. shown
+			header[#header + 1] = string.rep(" ", at - cursor) .. name
 			cursor = at + utf8.len(name)
 		end
 	end
@@ -137,8 +130,7 @@ function M.grid_lines(days, year, today_key, cfg, labels, mark)
 				local secs = math.floor(math.max(0, days[key] or 0))
 				local color = (secs > 0 and assemble.day_color(secs, cfg)) or M.EMPTY_COLOR
 				local square = (key == today_key) and M.TODAY or M.DAY
-				local selected = key == mark.day and assemble.SELECTED or ""
-				parts[#parts + 1] = selected .. convert.fg(color) .. square .. convert.RESET .. " "
+				parts[#parts + 1] = convert.fg(color) .. square .. convert.RESET .. " "
 			end
 		end
 		content[#content + 1] = table.concat(parts)
