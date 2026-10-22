@@ -704,8 +704,8 @@ check(
 	board.week_stats(data({ days = { ["2026-10-13"] = 7 * 3600 } })).reached,
 	1
 )
-local wl = board.week_lines(data({ accent = "#C96969" }), 120, 14)
-check("la semaine : le trait du haut, puis la hauteur demandée", #wl, 15)
+local wl = board.week_lines(data({ accent = "#C96969" }), 120, 16)
+check("la semaine : exactement la hauteur demandée", #wl, 16)
 -- deux barres par jour, partout : sur la dernière ligne des barres, chaque barre a au moins son « sol » (▁)
 local function bars_on(line)
 	local n, inside = 0, false
@@ -725,7 +725,7 @@ check(
 	true
 )
 for _, w in ipairs({ 46, 79, 90, 120 }) do
-	check("deux barres par jour (" .. w .. " colonnes) : 14 barres", bars_on(board.week_lines(data(), w, 14)[13]), 14)
+	check("deux barres par jour (" .. w .. " colonnes) : 14 barres", bars_on(board.week_lines(data(), w, 16)[13]), 14)
 end
 local wl_sizes = true
 for _, line in ipairs(wl) do
@@ -738,7 +738,21 @@ check(
 	true
 )
 check("la semaine : 6 jonctions sur le trait du haut", select(2, strip(wl[1]):gsub("┬", "")), 6)
-check("la semaine : 6 traits entre les colonnes", select(2, strip(wl[5]):gsub("│", "")), 6)
+check(
+	"la semaine : son cadre, en haut (une colonne d'air de chaque côté)",
+	strip(wl[1]):sub(1, 4) .. strip(wl[1]):sub(-4),
+	" ╭╮ "
+)
+check(
+	"la semaine : son cadre, en bas, avec les 6 jonctions",
+	strip(wl[16]):sub(1, 4) .. select(2, strip(wl[16]):gsub("┴", "")) .. strip(wl[16]):sub(-4),
+	" ╰6╯ "
+)
+check(
+	"la semaine : 6 traits entre les colonnes, et les deux bords de son cadre",
+	select(2, strip(wl[5]):gsub("│", "")),
+	8
+)
 check("la semaine, assez large : deux durées par jour (inactif, actif)", strip(wl[2]):find("1h00 +7h00") ~= nil, true)
 check(
 	"la semaine, assez large : les noms des barres",
@@ -754,7 +768,7 @@ local parts2 = {}
 for part in strip(wl[2]):gmatch("[^│]+") do
 	parts2[#parts2 + 1] = part
 end
-check("un jour sans temps (samedi 17) : rien au-dessus de ses barres", parts2[6]:match("^ +$") ~= nil, true)
+check("un jour sans temps (samedi 17) : rien au-dessus de ses barres", parts2[7]:match("^ +$") ~= nil, true)
 local idle_bar = convert.fg(load_module("calendar/overview").IDLE_COLOR) .. "▁"
 check(
 	"l'inactif en gris",
@@ -785,11 +799,11 @@ check(
 		for part in strip(wl[3]):gmatch("[^│]+") do
 			parts[#parts + 1] = part
 		end
-		return parts[2]:match("^ +$") ~= nil
+		return parts[3]:match("^ +$") ~= nil -- (la 1re part : l'air avant le cadre ; le mardi 13 est la 3e)
 	end)(),
 	true
 )
-local narrow_wl = board.week_lines(data(), 46, 14)
+local narrow_wl = board.week_lines(data(), 46, 16)
 check(
 	"étroit : une seule durée par jour (le total)",
 	strip(narrow_wl[2]):find("8h00", 1, true) ~= nil and strip(narrow_wl[2]):find("7h00", 1, true) == nil,
@@ -815,9 +829,9 @@ check(
 	strip(narrow_wl[15]):find("87%", 1, true) ~= nil and strip(narrow_wl[15]):find("13%", 1, true) == nil,
 	true
 )
-local mixed_wl = board.week_lines(data(), 79, 14) -- des colonnes de 10 et 11 : tous les noms pareils
+local mixed_wl = board.week_lines(data(), 79, 16) -- des colonnes de 10 et 11 : tous les noms pareils
 check("jamais un mélange : les mêmes noms de barres partout", select(2, strip(mixed_wl[14]):gsub("I +A", "")), 7)
-local no_idle_wl = board.week_lines(data({ idle_days = false }), 90, 14)
+local no_idle_wl = board.week_lines(data({ idle_days = false }), 90, 16)
 check(
 	"sans inactif compté : une seule barre, pas de noms",
 	strip(table.concat(no_idle_wl)):find("Inact", 1, true),
@@ -895,12 +909,26 @@ check(
 )
 local wy = wz.year.y + wz.year.h
 check(
-	"la page : les colonnes de la semaine partent du trait sous l'année (┬)",
-	select(2, strip(wp[wy]):gsub("┬", "")) >= 6 + 2,
+	"la page : la semaine dans son propre cadre (rien ne rejoint le trait sous l'année, sauf les deux traits de la page)",
+	select(2, strip(wp[wy]):gsub("┬", "")),
+	2
+)
+check(
+	"la page : le haut de son cadre, avec les jours dessus",
+	strip(wp[wz.week.y]):find("╭", 1, true) ~= nil and strip(wp[wz.week.y]):find(" Lun 12 ", 1, true) ~= nil,
 	true
 )
 local wb = wz.week.y + wz.week.h
-check("la page : et rejoignent le trait sous la semaine (┴)", select(2, strip(wp[wb]):gsub("┴", "")) >= 7, true)
+check(
+	"la page : le bas de son cadre juste au-dessus du trait sous la semaine",
+	strip(wp[wb - 1]):find("╰─", 1, true) ~= nil,
+	true
+)
+check(
+	"la page : le trait sous la semaine ne rejoint que les traits de la page",
+	select(2, strip(wp[wb]):gsub("┴", "")),
+	1
+)
 
 print(string.format("\n%d vérifications réussies, %d échecs", passed, failed))
 os.exit(failed == 0 and 0 or 1)

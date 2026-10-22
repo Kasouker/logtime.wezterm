@@ -414,16 +414,19 @@ function M.week_stats(o)
 	return w
 end
 
--- La semaine choisie : la ligne du trait du haut (les jours posés dessus) puis `height` lignes, de `width` colonnes.
--- 7 colonnes séparées par un trait ; dans chacune, la durée en haut, les barres (inactif en gris, actif dans la couleur du
+-- La semaine choisie : exactement `height` lignes de `width` colonnes, dans son propre cadre (une colonne d'air de
+-- chaque côté), les jours posés sur le trait du haut. 7 colonnes séparées par un trait ; dans chacune, la durée en haut, les barres (inactif en gris, actif dans la couleur du
 -- jour, à l'échelle du jour le plus long de la semaine), leurs noms et leurs pourcentages en bas. Le jour choisi est
 -- rempli de o.accent. Sans temps inactif compté (o.idle_days absent), seulement la barre de l'actif.
---   ─ Lun 12 ─┬─ Mar 13 ─┬ …
---    1h00 7h00│ 5h00     │
---     ▆▆  ███ │     ███  │
---   Inact Actif│ …
---    13%  88% │
+--   ╭─ Lun 12 ─┬─ Mar 13 ─┬ … ╮
+--   │1h00  7h00│0h00  5h00│   │
+--   │ ▆▆   ███ │      ███ │   │
+--   │Inact Actif│ …       │   │
+--   │ 13%  87% │          │   │
+--   ╰──────────┴──────────┴ … ╯
 function M.week_lines(o, width, height)
+	local full_height = height
+	height = height - 2 -- le haut et le bas du cadre
 	local labels, cfg = o.labels, o.cfg
 	local b, edge = o.b, o.edge or ""
 	local off = edge ~= "" and convert.RESET or ""
@@ -431,7 +434,7 @@ function M.week_lines(o, width, height)
 		return edge .. s_ .. off
 	end
 	local w = M.week_stats(o)
-	local cells = split(math.max(7, width - 6), 7)
+	local cells = split(math.max(7, width - 2 - 8), 7) -- une colonne d'air de chaque côté, 8 traits verticaux
 	local scale = 3600 -- l'échelle des barres : le jour le plus long de la semaine (au moins une heure)
 	for _, day in ipairs(w.days) do
 		scale = math.max(scale, day.total)
@@ -472,7 +475,7 @@ function M.week_lines(o, width, height)
 				.. e(string.rep(b.h, cell - vw(text) - 2 - before))
 		end
 	end
-	local out = { table.concat(top, e(b.t)) }
+	local out = { " " .. e(b.tl) .. table.concat(top, e(b.t)) .. e(b.tr) .. " " }
 	-- chaque colonne : ses lignes
 	local columns = {}
 	for i, day in ipairs(w.days) do
@@ -533,7 +536,18 @@ function M.week_lines(o, width, height)
 		for i = 1, 7 do
 			parts[i] = fit(columns[i][k] or "", cells[i])
 		end
-		out[#out + 1] = table.concat(parts, e(b.v))
+		out[#out + 1] = " " .. e(b.v) .. table.concat(parts, e(b.v)) .. e(b.v) .. " "
+	end
+	local bottom = {}
+	for i = 1, 7 do
+		bottom[i] = string.rep(b.h, cells[i])
+	end
+	out[#out + 1] = " " .. e(b.bl .. table.concat(bottom, b.b) .. b.br) .. " "
+	for k = 1, #out do
+		out[k] = fit(out[k], width)
+	end
+	while #out < full_height do
+		out[#out + 1] = string.rep(" ", width)
 	end
 	return out
 end
@@ -781,17 +795,8 @@ function M.render(o, width, height)
 	line(above_timeline, divider, width)
 	-- le mois choisi, dans son propre cadre
 	paste(M.month_lines(o, z.month.w, z.month.h), z.month.x, z.month.y)
-	-- la semaine choisie : ses 7 colonnes (les traits entre elles partent du trait sous l'année jusqu'à celui du bas),
-	-- puis ses chiffres à droite
-	local x = z.week.x
-	for i, cell in ipairs(split(math.max(7, z.week.w - 6), 7)) do
-		x = x + cell
-		if i < 7 then
-			column(x, below_year, under_week)
-			x = x + 1
-		end
-	end
-	paste(M.week_lines(o, z.week.w, z.week.h), z.week.x, below_year)
+	-- la semaine choisie, dans son propre cadre, puis ses chiffres à droite
+	paste(M.week_lines(o, z.week.w, z.week.h), z.week.x, z.week.y)
 	paste(M.week_side_lines(o, z.week_side.w, z.week_side.h), z.week_side.x, z.week_side.y)
 	local out = {}
 	for y = 1, height do
