@@ -23,13 +23,14 @@ local convert = load("color/convert")
 local idle = load("core/idle")
 local dates = load("calendar/dates")
 local assemble = load("calendar/assemble")
+local overview = load("calendar/overview")
 
 local M = {}
 
 M.MIN_WIDTH = 120 -- en dessous, la page demande d'agrandir la fenêtre (l'aide tient juste)
 M.MIN_HEIGHT = 34
 M.YEAR_HEIGHT = 8 -- au moins : les 7 jours de la semaine, puis la ligne des mois (voir M.year_height)
-M.MONTH_SHARE = 0.42 -- la part de la largeur pour le mois (à gauche, en bas)
+M.MONTH_SHARE = 0.5 -- la part de la largeur pour le mois (à gauche, en bas)
 M.WEEK_SIDE = 26 -- la colonne des chiffres de la semaine (à droite des 7 colonnes)
 M.WEEK_SHARE = 0.5 -- la part de la hauteur du bas pour la semaine ; le reste pour les projets et la frise
 M.PROJECTS_SHARE = 0.5 -- la part de la largeur de droite pour les projets du jour ; le reste pour ceux de la semaine
@@ -258,6 +259,45 @@ function M.zones(width, height)
 	return z
 end
 
+-- Les traits, par leurs directions : 1 vers le haut, 2 vers le bas, 4 vers la gauche, 8 vers la droite. Deux traits qui
+-- se croisent additionnent leurs directions, et le bon caractère s'en déduit (├ ┬ ┼ …) : la grille du mois peut poser
+-- son cadre sur les traits de la page.
+local UP, DOWN, LEFT, RIGHT = 1, 2, 4, 8
+local function box_chars(b)
+	local by_mask = {
+		[LEFT + RIGHT] = b.h,
+		[UP + DOWN] = b.v,
+		[DOWN + RIGHT] = b.tl,
+		[DOWN + LEFT] = b.tr,
+		[UP + RIGHT] = b.bl,
+		[UP + LEFT] = b.br,
+		[UP + DOWN + RIGHT] = b.l,
+		[UP + DOWN + LEFT] = b.r,
+		[DOWN + LEFT + RIGHT] = b.t,
+		[UP + LEFT + RIGHT] = b.b,
+		[UP + DOWN + LEFT + RIGHT] = b.x,
+		[LEFT] = b.h,
+		[RIGHT] = b.h,
+		[UP] = b.v,
+		[DOWN] = b.v,
+	}
+	-- un trait déjà dessiné : ses directions (un trait seul va des deux côtés)
+	local by_char = {
+		[b.h] = LEFT + RIGHT,
+		[b.v] = UP + DOWN,
+		[b.tl] = DOWN + RIGHT,
+		[b.tr] = DOWN + LEFT,
+		[b.bl] = UP + RIGHT,
+		[b.br] = UP + LEFT,
+		[b.l] = UP + DOWN + RIGHT,
+		[b.r] = UP + DOWN + LEFT,
+		[b.t] = DOWN + LEFT + RIGHT,
+		[b.b] = UP + LEFT + RIGHT,
+		[b.x] = UP + DOWN + LEFT + RIGHT,
+	}
+	return by_mask, by_char
+end
+
 -- Toute la page : exactement `height` lignes de `width` colonnes ; ou nil, la largeur et la hauteur minimum si la
 -- fenêtre est trop petite.
 --   o = { days, idle_days, projects, timeline, year, month, day_key, today_key, cfg, labels, b, edge, legend, accent }
@@ -267,8 +307,9 @@ function M.render(o, width, height)
 	end
 	local b, edge = o.b, o.edge or ""
 	local off = edge ~= "" and convert.RESET or ""
+	local by_mask, by_char = box_chars(b)
 	local z = M.zones(width, height)
-	-- une grille de caractères : chaque case est un caractère visible (ou un texte avec ses couleurs, déjà à sa place)
+	-- chaque case : un nombre (les directions d'un trait) ou un texte (un caractère visible, avec ses couleurs)
 	local grid = {}
 	for y = 1, height do
 		grid[y] = {}
@@ -276,65 +317,93 @@ function M.render(o, width, height)
 			grid[y][x] = " "
 		end
 	end
-	local function put(x, y, char)
-		grid[y][x] = edge .. char .. off
+	local function link(x, y, mask)
+		local current = grid[y][x]
+		grid[y][x] = (type(current) == "number" and current or 0) | mask
 	end
-	local function line(y, x1, x2, char)
+	-- un trait horizontal de x1 à x2 (ses bouts rejoignent ce qu'il touche), un trait vertical de y1 à y2
+	local function line(y, x1, x2)
 		for x = x1, x2 do
-			put(x, y, char)
+			link(x, y, (x > x1 and LEFT or 0) | (x < x2 and RIGHT or 0))
 		end
 	end
-	local function column(x, y1, y2, char)
+	local function column(x, y1, y2)
 		for y = y1, y2 do
-			put(x, y, char)
+			link(x, y, (y > y1 and UP or 0) | (y < y2 and DOWN or 0))
 		end
 	end
-	-- le cadre de la page
-	line(1, 2, width - 1, b.h)
-	line(height, 2, width - 1, b.h)
-	column(1, 2, height - 1, b.v)
-	column(width, 2, height - 1, b.v)
-	put(1, 1, b.tl)
-	put(width, 1, b.tr)
-	put(1, height, b.bl)
-	put(width, height, b.br)
-	-- un trait d'un bord à l'autre (├───┤)
-	local function across(y)
-		line(y, 2, width - 1, b.h)
-		put(1, y, b.l)
-		put(width, y, b.r)
+	-- pose des lignes déjà dessinées (avec leurs couleurs) à partir de (x0, y0) : leurs traits se mêlent aux nôtres
+	local function paste(lines, x0, y0)
+		for i, text in ipairs(lines) do
+			local y, x, k, style = y0 + i - 1, x0, 1, ""
+			while k <= #text do
+				local code = text:match("^\27%[[%d;]*m", k)
+				if code then
+					style = code == convert.RESET and "" or (style .. code)
+					k = k + #code
+				else
+					local ch = text:match("^[%z\1-\127\194-\244][\128-\191]*", k)
+					k = k + #ch
+					if grid[y] and x >= 1 and x <= width then
+						if by_char[ch] then
+							link(x, y, by_char[ch])
+						else
+							grid[y][x] = style ~= "" and (style .. ch .. convert.RESET) or ch
+						end
+					end
+					x = x + 1
+				end
+			end
+		end
 	end
-	-- un trait de la colonne x au bord droit
-	local function to_right(y, x)
-		line(y, x + 1, width - 1, b.h)
-		put(x, y, b.l)
-		put(width, y, b.r)
-	end
+	-- le cadre de la page, et les traits entre les zones
 	local below_stats = z.stats.y + 1
 	local below_year = z.year.y + z.year.h
 	local above_help = z.help.y - 1
 	local divider = z.month.x + z.month.w -- le trait vertical entre le mois et la droite
-	across(below_stats)
-	across(below_year)
-	across(above_help)
-	column(divider, below_year + 1, above_help - 1, b.v)
-	put(divider, below_year, b.t)
-	put(divider, above_help, b.b)
 	local side = z.week_side.x - 1 -- le trait entre la semaine et ses chiffres
-	column(side, z.week.y, z.week.y + z.week.h - 1, b.v)
-	put(side, below_year, b.t)
 	local under_week = z.week.y + z.week.h
-	to_right(under_week, divider)
-	put(side, under_week, b.b)
 	local between = z.week_projects.x - 1 -- le trait entre les projets du jour et ceux de la semaine
-	column(between, z.day_projects.y, z.day_projects.y + z.day_projects.h - 1, b.v)
-	put(between, under_week, b.t)
 	local above_timeline = z.timeline.y - 1
-	to_right(above_timeline, divider)
-	put(between, above_timeline, b.b)
+	line(1, 1, width)
+	line(height, 1, width)
+	column(1, 1, height)
+	column(width, 1, height)
+	for _, y in ipairs({ below_stats, below_year, above_help }) do
+		line(y, 1, width)
+	end
+	column(divider, below_year, above_help)
+	column(side, below_year, under_week)
+	line(under_week, divider, width)
+	column(between, under_week, above_timeline)
+	line(above_timeline, divider, width)
+	-- le mois choisi : la grille de l'aperçu de F4 (les semaines à droite), son cadre posé sur les traits de la page
+	local month = overview.grid({
+		days = o.days,
+		year = o.year,
+		month = o.month,
+		today_key = o.today_key,
+		day_key = o.day_key,
+		week = true,
+		accent = o.accent,
+		cfg = o.cfg,
+		labels = o.labels,
+		b = b,
+		edge = "",
+		labels_right = true,
+		stretch = true,
+	}, z.month.w + 2, z.month.h + 2)
+	if month then
+		paste(month, z.month.x - 1, z.month.y - 1)
+	end
 	local out = {}
 	for y = 1, height do
-		out[y] = table.concat(grid[y])
+		local parts = {}
+		for x = 1, width do
+			local cell = grid[y][x]
+			parts[x] = type(cell) == "number" and (edge .. (by_mask[cell] or " ") .. off) or cell
+		end
+		out[y] = table.concat(parts)
 	end
 	-- une ligne d'une zone qui prend toute la largeur entre les deux bords
 	local function inside(y, text)
