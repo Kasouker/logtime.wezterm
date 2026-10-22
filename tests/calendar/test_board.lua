@@ -731,15 +731,23 @@ local BAR_CHARS = {}
 for _, ch in ipairs({ "░", "▁", "▂", "▃", "▄", "▅", "▆", "▇", "█" }) do
 	BAR_CHARS[ch] = true
 end
+-- (les deux barres d'un jour sont collées : un bloc par jour, de largeur paire, deux barres par bloc)
 local function bars_on(line)
-	local n, inside = 0, false
-	for _, code in utf8.codes(strip(line)) do
-		local bar = BAR_CHARS[utf8.char(code)] == true
-		if bar and not inside then
-			n = n + 1
+	local n, run = 0, 0
+	local function close()
+		if run > 0 then
+			n = n + (run % 2 == 0 and 2 or 0)
 		end
-		inside = bar
+		run = 0
 	end
+	for _, code in utf8.codes(strip(line)) do
+		if BAR_CHARS[utf8.char(code)] then
+			run = run + 1
+		else
+			close()
+		end
+	end
+	close()
 	return n
 end
 -- pour chaque colonne visible d'une ligne : true si c'est la place d'une barre, et le caractère
@@ -750,6 +758,22 @@ local function track_map(line)
 		map[#map + 1] = { track = BAR_CHARS[ch] == true, ch = ch }
 	end
 	return map
+end
+for _, w in ipairs({ 46, 79, 150 }) do
+	local runs, run = {}, 0
+	for _, code in utf8.codes(strip(board.week_lines(data(), w, 16)[8])) do
+		if BAR_CHARS[utf8.char(code)] then
+			run = run + 1
+		elseif run > 0 then
+			runs[#runs + 1] = run
+			run = 0
+		end
+	end
+	check(
+		"toutes les barres de la même largeur, même si une colonne est plus large (" .. w .. ")",
+		#runs == 7 and math.max(table.unpack(runs)) == math.min(table.unpack(runs)),
+		true
+	)
 end
 check(
 	"les barres s'élargissent avec la place (120 colonnes : ███)",
@@ -915,27 +939,27 @@ check(
 	true
 )
 check(
-	"les durées centrées sur leur barre (le 12 : 1h00 sur l'inactif, 7h00 sur l'actif)",
+	"les deux barres collées, et leurs deux durées ensemble centrées sur elles (le 12 : « 1h00 7h00 »)",
 	(function()
 		local map = track_map(wl[8])
-		local bars = {}
-		local k = 1
-		while k <= #map do
-			if map[k].track then
-				local start = k
-				while k + 1 <= #map and map[k + 1].track do
-					k = k + 1
-				end
-				bars[#bars + 1] = (start + k) / 2
+		local first, last
+		for k, c in ipairs(map) do
+			if c.track and k < 20 then
+				first = first or k
+				last = k
 			end
-			k = k + 1
 		end
 		local plain = strip(wl[2])
-		local function center_of(text)
-			local at = plain:find(text, 1, true)
-			return utf8.len(plain:sub(1, at - 1)) + 1 + (#text - 1) / 2
+		local at = plain:find("1h00 7h00", 1, true)
+		if not at then
+			return false
 		end
-		return math.abs(center_of("1h00") - bars[1]) <= 1 and math.abs(center_of("7h00") - bars[2]) <= 1
+		local center_text = utf8.len(plain:sub(1, at - 1)) + 1 + (9 - 1) / 2
+		local glued = true
+		for k = first, last do
+			glued = glued and map[k].track
+		end
+		return glued and math.abs(center_text - (first + last) / 2) <= 1
 	end)(),
 	true
 )

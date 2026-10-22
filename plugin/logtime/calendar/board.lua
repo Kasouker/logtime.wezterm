@@ -517,14 +517,13 @@ function M.week_lines(o, width, height)
 		local lines = {}
 		local _, percent = idle.share(day.total, day.idle)
 		if show_idle then
-			-- deux barres, toujours : l'inactif (gris) à gauche, l'actif (couleur du jour) à droite ; les deux ensemble
-			-- centrées dans la case, chaque texte centré sur sa barre
-			local bw = math.min(M.BAR_MAX, math.max(1, (cell - 3) // 2))
-			local pad = (cell - (2 * bw + 1)) // 2
-			local left_w = pad + bw -- jusqu'à la fin de la barre de l'inactif ; puis une colonne, puis la droite
-			local right_w = cell - left_w - 1
+			-- deux barres, toujours, collées : l'inactif (gris) à gauche, l'actif (couleur du jour) à droite ; les deux
+			-- ensemble centrées dans la case, les deux textes ensemble centrés sur elles
+			local bw = math.min(M.BAR_MAX, math.max(1, (narrowest - 2) // 2)) -- la même largeur dans toutes les colonnes
+			local pad = (cell - 2 * bw) // 2
+			-- les deux textes ensemble (un espace entre eux), centrés sur les deux barres
 			local function pair(a, b_)
-				return place(a, left_w, pad, bw) .. " " .. place(b_, right_w, 0, bw)
+				return place(a .. " " .. b_, cell, pad, 2 * bw)
 			end
 			local bar_h = math.max(1, height - 3)
 			if day.total > 0 then
@@ -536,7 +535,7 @@ function M.week_lines(o, width, height)
 			local ib = track_bar(day.idle / scale, bar_h, overview.IDLE_COLOR, bw)
 			local ab = track_bar(day.active / scale, bar_h, color, bw)
 			for k = 1, bar_h do
-				lines[#lines + 1] = string.rep(" ", pad) .. ib[k] .. " " .. ab[k]
+				lines[#lines + 1] = string.rep(" ", pad) .. ib[k] .. ab[k]
 			end
 			lines[#lines + 1] = pair(idle_name, active_name)
 			if day.total > 0 then
