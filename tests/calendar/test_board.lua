@@ -707,17 +707,31 @@ check(
 local wl = board.week_lines(data({ accent = "#C96969" }), 120, 16)
 check("la semaine : exactement la hauteur demandée", #wl, 16)
 -- deux barres par jour, partout : sur la dernière ligne des barres, chaque barre a au moins son « sol » (▁)
+-- les barres d'une ligne : chacune est posée sur sa teinte foncée (board.TRACK)
 local function bars_on(line)
-	local n, inside = 0, false
-	for _, code in utf8.codes(strip(line)) do
-		local ch = utf8.char(code)
-		local bar = ch ~= " " and ch ~= "│"
-		if bar and not inside then
-			n = n + 1
+	return select(2, line:gsub(literal(convert.bg(board.TRACK)), ""))
+end
+-- pour chaque colonne visible d'une ligne : true si elle est sur la teinte d'une barre, et le caractère
+local function track_map(line)
+	local map, i, bg = {}, 1, false
+	while i <= #line do
+		local code = line:match("^\27%[[%d;]*m", i)
+		if code then
+			if code == convert.RESET then
+				bg = false
+			elseif code == convert.bg(board.TRACK) then
+				bg = true
+			elseif code:find("^\27%[48;") then
+				bg = false
+			end
+			i = i + #code
+		else
+			local ch = line:match("^[%z\1-\127\194-\244][\128-\191]*", i)
+			map[#map + 1] = { track = bg, ch = ch }
+			i = i + #ch
 		end
-		inside = bar
 	end
-	return n
+	return map
 end
 check(
 	"les barres s'élargissent avec la place (120 colonnes : ███)",
@@ -788,6 +802,16 @@ for k = 2, 15 do
 end
 check("le jour choisi : sa colonne remplie de la couleur, sur toute la hauteur", filled_rows, 14)
 check(
+	"le jour choisi : la teinte des barres reste visible sur sa couleur",
+	(function()
+		local line = wl[8]
+		local at = line:find(convert.bg("#C96969"), 1, true)
+		return at ~= nil and line:find(convert.bg(board.TRACK), at, true) ~= nil
+	end)(),
+	true
+)
+check("une barre vide : sa place reste visible (la teinte, sans rien dessus)", bars_on(wl[3]), 14)
+check(
 	"la semaine : l'inactif avant l'actif (13 % puis 87 %)",
 	strip(wl[15]):find("13%", 1, true) < strip(wl[15]):find("87%", 1, true),
 	true
@@ -820,6 +844,82 @@ check(
 		return text:find(literal(convert.fg(load_module("calendar/overview").IDLE_COLOR)) .. "[▂▃▄▅▆▇█]")
 				~= nil
 			and text:find(active_color .. "█", 1, true) ~= nil
+	end)(),
+	true
+)
+-- les barres centrées dans leur case : autant de place à gauche qu'à droite (à une colonne près)
+for _, w in ipairs({ 46, 79, 120 }) do
+	local map = track_map(board.week_lines(data(), w, 16)[8])
+	local balanced, cell_start = true, nil
+	local first, last
+	for k, c in ipairs(map) do
+		if c.ch == "│" then
+			if cell_start and first then
+				balanced = balanced and math.abs((first - cell_start - 1) - (k - last - 1)) <= 1
+			end
+			cell_start, first, last = k, nil, nil
+		elseif c.track then
+			first = first or k
+			last = k
+		end
+	end
+	check("les barres centrées dans leur case (" .. w .. " colonnes)", balanced, true)
+end
+check(
+	"sans inactif compté : la barre centrée dans sa case",
+	(function()
+		local map = track_map(board.week_lines(data({ idle_days = false }), 90, 16)[8])
+		local cell_start, first, last, ok = nil, nil, nil, true
+		for k, c in ipairs(map) do
+			if c.ch == "│" then
+				if cell_start and first then
+					ok = ok and math.abs((first - cell_start - 1) - (k - last - 1)) <= 1
+				end
+				cell_start, first, last = k, nil, nil
+			elseif c.track then
+				first = first or k
+				last = k
+			end
+		end
+		return ok
+	end)(),
+	true
+)
+check(
+	"les durées centrées sur leur barre (le 12 : 1h00 sur l'inactif, 7h00 sur l'actif)",
+	(function()
+		local map = track_map(wl[8])
+		local bars = {}
+		local k = 1
+		while k <= #map do
+			if map[k].track then
+				local start = k
+				while k + 1 <= #map and map[k + 1].track do
+					k = k + 1
+				end
+				bars[#bars + 1] = (start + k) / 2
+			end
+			k = k + 1
+		end
+		local plain = strip(wl[2])
+		local function center_of(text)
+			local at = plain:find(text, 1, true)
+			return utf8.len(plain:sub(1, at - 1)) + 1 + (#text - 1) / 2
+		end
+		return math.abs(center_of("1h00") - bars[1]) <= 1 and math.abs(center_of("7h00") - bars[2]) <= 1
+	end)(),
+	true
+)
+check(
+	"les barres au huitième de ligne près (des demi-cases)",
+	(function()
+		local text = strip(table.concat(wl))
+		for _, ch in ipairs({ "▁", "▂", "▃", "▄", "▅", "▆", "▇" }) do -- (un par un : « [▁▂] » compte des octets)
+			if text:find(ch, 1, true) then
+				return true
+			end
+		end
+		return false
 	end)(),
 	true
 )

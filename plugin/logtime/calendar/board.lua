@@ -414,6 +414,31 @@ function M.week_stats(o)
 	return w
 end
 
+M.BAR_MAX = 3 -- une barre de la semaine : au plus 3 colonnes de large
+M.TRACK = "#2B2E36" -- la teinte foncée derrière une barre (sa place), visible aussi sur le jour choisi
+
+-- Une barre verticale de `height` lignes et `width` colonnes, remplie à `share` (0 à 1) par le bas, au huitième de ligne
+-- près, sur sa teinte foncée (M.TRACK : on voit toute la place de la barre, même vide).
+local EIGHTHS = { "▁", "▂", "▃", "▄", "▅", "▆", "▇", "█" }
+local function track_bar(share, height, color, width)
+	local eighths = math.floor(math.max(0, math.min(1, share)) * height * 8 + 0.5)
+	local out = {}
+	for line = 1, height do
+		local filled = eighths - (height - line) * 8 -- ce qui reste à remplir dans cette ligne (en huitièmes)
+		local char = filled >= 8 and "█" or (filled > 0 and EIGHTHS[filled]) or " "
+		out[line] = convert.bg(M.TRACK) .. convert.fg(color) .. string.rep(char, width) .. convert.RESET
+	end
+	return out
+end
+
+-- Un texte de `width` colonnes, centré sur une barre qui commence à la colonne `at` (depuis 0) et fait `bar` de large
+-- (sans sortir de sa place).
+local function place(text, width, at, bar)
+	local len = vw(text)
+	local start = math.max(0, math.min(width - len, at + (bar - len) // 2))
+	return fit(string.rep(" ", start) .. text, width)
+end
+
 -- La semaine choisie : exactement `height` lignes de `width` colonnes, dans son propre cadre (une colonne d'air de
 -- chaque côté), les jours posés sur le trait du haut. 7 colonnes séparées par un trait ; dans chacune, la durée en haut, les barres (inactif en gris, actif dans la couleur du
 -- jour, à l'échelle du jour le plus long de la semaine), leurs noms et leurs pourcentages en bas. Le jour choisi est
@@ -484,12 +509,14 @@ function M.week_lines(o, width, height)
 		local lines = {}
 		local _, percent = idle.share(day.total, day.idle)
 		if show_idle then
-			-- deux barres, toujours : l'inactif (gris) à gauche, l'actif (couleur du jour) à droite
-			local half = (cell - 1) // 2
-			local other = cell - half - 1
-			local bw = half >= 5 and half - 2 or math.max(1, half - 1)
+			-- deux barres, toujours : l'inactif (gris) à gauche, l'actif (couleur du jour) à droite ; les deux ensemble
+			-- centrées dans la case, chaque texte centré sur sa barre
+			local bw = math.min(M.BAR_MAX, math.max(1, (cell - 3) // 2))
+			local pad = (cell - (2 * bw + 1)) // 2
+			local left_w = pad + bw -- jusqu'à la fin de la barre de l'inactif ; puis une colonne, puis la droite
+			local right_w = cell - left_w - 1
 			local function pair(a, b_)
-				return centered(a, half) .. " " .. centered(b_, other)
+				return place(a, left_w, pad, bw) .. " " .. place(b_, right_w, 0, bw)
 			end
 			local bar_h = math.max(1, height - 3)
 			if day.total > 0 then
@@ -498,10 +525,10 @@ function M.week_lines(o, width, height)
 			else
 				lines[1] = ""
 			end
-			local ib = overview.vertical_bar(day.idle / scale, bar_h, overview.IDLE_COLOR, bw)
-			local ab = overview.vertical_bar(day.active / scale, bar_h, color, bw)
+			local ib = track_bar(day.idle / scale, bar_h, overview.IDLE_COLOR, bw)
+			local ab = track_bar(day.active / scale, bar_h, color, bw)
 			for k = 1, bar_h do
-				lines[#lines + 1] = pair(ib[k], ab[k])
+				lines[#lines + 1] = string.rep(" ", pad) .. ib[k] .. " " .. ab[k]
 			end
 			lines[#lines + 1] = pair(idle_name, active_name)
 			if day.total > 0 then
@@ -511,12 +538,14 @@ function M.week_lines(o, width, height)
 				lines[#lines + 1] = ""
 			end
 		else
-			-- le temps inactif n'est pas compté : seulement la barre de l'actif
+			-- le temps inactif n'est pas compté : seulement la barre de l'actif, centrée
+			local bw = math.min(2 * M.BAR_MAX + 1, math.max(1, cell - 4))
+			local pad = (cell - bw) // 2
 			local bar_h = math.max(1, height - 2)
 			lines[1] = centered(day.total > 0 and stats.hm(day.active) or "", cell)
-			local ab = overview.vertical_bar(day.active / scale, bar_h, color, math.max(1, cell - 2))
+			local ab = track_bar(day.active / scale, bar_h, color, bw)
 			for k = 1, bar_h do
-				lines[#lines + 1] = centered(ab[k], cell)
+				lines[#lines + 1] = string.rep(" ", pad) .. ab[k]
 			end
 			lines[#lines + 1] = centered(day.total > 0 and "100%" or "", cell)
 		end
