@@ -711,8 +711,8 @@ end
 -- Une liste de projets dans son cadre (une colonne d'air de chaque côté), le titre posé sur le trait du haut (à
 -- gauche, ou au milieu si `middle`) : exactement `height` lignes de `width` colonnes.
 --   ╭─ Par projet (temps actif) ─────────╮
---   │ Total  10h00    //    ✓ objectif   │   `head` puis `goal` (rien sans objectif) sur la même ligne (M.head_line),
---   │                                    │   ou `goal` dessous si `below` (pas la place dans les deux listes)
+--   │ Total  10h00         ✓ objectif 7h │   `head` à gauche, `goal` (rien sans objectif) à droite (M.head_line),
+--   │                                    │   ou `goal` dessous, à droite, si `below` (pas la place dans les deux listes)
 --   │                                    │   (une ligne d'air s'il y a la place)
 --   │ Bot Discord  5h00 ██████░░░░░  50% │   les plus gros projets (au moins une minute), le reste dans « autres »
 --   ╰────────────────────────────────────╯
@@ -726,9 +726,9 @@ local function project_box(o, width, height, title, middle, head, goal, below, o
 	end
 	local inner_w = width - 4 -- l'air et les deux bords
 	local inner_h = height - 2
-	local rows = { " " .. (not below and M.head_line(head, goal, inner_w) or head) }
+	local rows = { not below and M.head_line(head, goal, inner_w) or (" " .. head) }
 	if below and goal ~= "" then
-		rows[2] = " " .. goal
+		rows[2] = string.rep(" ", math.max(1, inner_w - vw(goal) - 1)) .. goal
 	end
 	-- une ligne d'air sous la tête si les projets et « autres » tiennent quand même : selon la hauteur seulement (les
 	-- deux listes, de même hauteur, commencent à la même ligne)
@@ -799,21 +799,20 @@ local function project_box(o, width, height, title, middle, head, goal, below, o
 	return out
 end
 
-M.HEAD_SEPARATORS = { "    //    ", "  //  " } -- entre le total et l'objectif : large, sinon serré
+M.HEAD_GAP = 3 -- au moins 3 colonnes entre le total et l'objectif
 
--- La première ligne d'une liste de projets : « Total 10h00    //    ✓ objectif 7h atteint » sur `width` colonnes (une
--- colonne d'air devant) ; le séparateur se resserre s'il le faut ; nil si l'objectif ne tient pas sur la ligne.
+-- La première ligne d'une liste de projets, sur `width` colonnes : le total collé à gauche, l'objectif collé à droite
+-- (une colonne d'air de chaque côté) ; nil si les deux ne tiennent pas ensemble sur la ligne.
+--   « Total  10h00                ✓ objectif 7h atteint »
 function M.head_line(head, goal, width)
+	local gap = width - 1 - vw(head) - vw(goal) - 1
 	if goal == "" then
-		return head
+		return " " .. head
 	end
-	for _, sep in ipairs(M.HEAD_SEPARATORS) do
-		local text = head .. sep .. goal
-		if 1 + vw(text) + 1 <= width then
-			return text
-		end
+	if gap < M.HEAD_GAP then
+		return nil
 	end
-	return nil
+	return " " .. head .. string.rep(" ", gap) .. goal .. " "
 end
 
 -- Le total et l'objectif du jour choisi.

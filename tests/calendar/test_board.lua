@@ -1185,7 +1185,11 @@ check(
 	true
 )
 check("projets du jour : le total du jour", strip(dp[2]):find("Total  2h00", 1, true) ~= nil, true)
-check("projets du jour : l'objectif, sur sa ligne", strip(dp[3]):find("objectif 7h", 1, true) ~= nil, true)
+check(
+	"projets du jour : l'objectif collé à droite de la ligne du total",
+	strip(dp[2]):find("objectif 7h : il manque 5h00 │ $") ~= nil,
+	true
+)
 check("projets du jour : le plus gros d'abord", strip(table.concat(dp, "\n")):find("Bot Discord%s+1h00") ~= nil, true)
 check("projets du jour : sa part du jour", strip(table.concat(dp, "\n")):find("Bot Discord.-50%%") ~= nil, true)
 check("projets du jour : Netflix 0h30, 25 %", strip(table.concat(dp, "\n")):find("Netflix%s+0h30.-25%%") ~= nil, true)
@@ -1235,8 +1239,8 @@ check(
 )
 check("meilleurs de la semaine : le total de la semaine", strip(wpj[2]):find("Total  31h30", 1, true) ~= nil, true)
 check(
-	"meilleurs de la semaine : l'objectif sur la ligne du total, après « // » (il y tient)",
-	strip(wpj[2]):find("Total  31h30    //    ✓ Validée (3/3 jours)", 1, true) ~= nil,
+	"meilleurs de la semaine : le total à gauche, l'objectif collé à droite",
+	strip(wpj[2]):find("^ │ Total  31h30 +✓ Validée %(3/3 jours%) │ $") ~= nil,
 	true
 )
 check(
@@ -1267,9 +1271,14 @@ check(
 )
 
 -- la place : les deux listes commencent à la même ligne ; trop de projets, le reste dans « autres »
+-- (une ligne de projet a une barre : « █ » ou « ░ », cherchés tels quels ; un motif « [█░] » compterait des octets,
+-- et le bord « │ » commence par le même)
+local function has_bar(text)
+	return text:find("█", 1, true) ~= nil or text:find("░", 1, true) ~= nil
+end
 local function first_project_row(lines)
 	for k, l in ipairs(lines) do
-		if strip(l):find("%dh%d%d [█░]") then
+		if has_bar(strip(l)) then
 			return k
 		end
 	end
@@ -1281,28 +1290,36 @@ for _, h in ipairs({ 6, 8, 12 }) do
 		first_project_row(board.week_projects_lines(pdata, 50, h, pc, true))
 	)
 end
--- le total et l'objectif sur une ligne : « // » large, sinon serré, sinon l'objectif dessous
-check("tête : sans objectif, le total seul", board.head_line("Total  2h00", "", 30), "Total  2h00")
+-- le total collé à gauche, l'objectif collé à droite ; sinon l'objectif dessous
+check("tête : sans objectif, le total seul", board.head_line("Total  2h00", "", 30), " Total  2h00")
 check(
-	"tête : la place, « // » large",
-	board.head_line("Total  2h00", "objectif", 40),
-	"Total  2h00    //    objectif"
+	"tête : le total à gauche, l'objectif à droite (une colonne d'air de chaque côté)",
+	board.head_line("Total  2h00", "objectif", 30),
+	" Total  2h00" .. string.rep(" ", 30 - 1 - 11 - 8 - 1) .. "objectif "
 )
 check(
-	"tête : juste la place pour « // » serré",
-	board.head_line("Total  2h00", "objectif", 1 + #"Total  2h00  //  objectif" + 1),
-	"Total  2h00  //  objectif"
+	"tête : juste la place (3 colonnes entre eux)",
+	board.head_line("Total  2h00", "objectif", 1 + 11 + 3 + 8 + 1),
+	" Total  2h00   objectif "
 )
-check("tête : pas la place, rien (l'objectif ira dessous)", board.head_line("Total  2h00", "objectif", 25), nil)
 check(
-	"projets du jour, assez large : l'objectif sur la ligne du total",
-	strip(board.day_projects_lines(pdata, 70, 12, pc)[2]):find("Total  2h00    //    objectif 7h", 1, true) ~= nil,
+	"tête : pas la place, rien (l'objectif ira dessous)",
+	board.head_line("Total  2h00", "objectif", 1 + 11 + 2 + 8 + 1),
+	nil
+)
+check(
+	"projets du jour, assez large : l'objectif collé à droite de la ligne du total",
+	strip(board.day_projects_lines(pdata, 70, 12, pc)[2]):find("^ │ Total  2h00 +objectif 7h : il manque 5h00 │ $")
+		~= nil,
 	true
 )
 check(
-	"projets du jour, forcé dessous : le total seul, l'objectif dessous",
-	strip(board.day_projects_lines(pdata, 70, 12, pc, true)[2]):find("//", 1, true) == nil
-		and strip(board.day_projects_lines(pdata, 70, 12, pc, true)[3]):find("objectif 7h", 1, true) ~= nil,
+	"projets du jour, forcé dessous : le total seul, l'objectif dessous, collé à droite",
+	strip(board.day_projects_lines(pdata, 70, 12, pc, true)[2]):find("objectif", 1, true) == nil
+		and strip(board.day_projects_lines(pdata, 70, 12, pc, true)[3]):find(
+				"^ │ +objectif 7h : il manque 5h00 │ $"
+			)
+			~= nil,
 	true
 )
 local no_goal = data({ projects = PROJECTS })
@@ -1325,14 +1342,14 @@ for _, size in ipairs({ { 190, 50, false }, { 240, 56, true } }) do
 			.. size[2]
 			.. " : les objectifs "
 			.. (size[3] and "sur la ligne du total" or "dessous"),
-		select(2, row:gsub("//", "")),
+		select(2, row:gsub("objectif 7h", "")) + select(2, row:gsub("Validée", "")),
 		size[3] and 2 or 0
 	)
 	local function first_row(x0, w_)
 		for y = zz.day_projects.y, zz.day_projects.y + zz.day_projects.h - 1 do
 			local plain = strip(p[y])
 			local part = plain:sub(utf8.offset(plain, x0), utf8.offset(plain, x0 + w_) - 1)
-			if part:find("%dh%d%d [█░]") then
+			if has_bar(part) then
 				return y
 			end
 		end
@@ -1343,13 +1360,13 @@ for _, size in ipairs({ { 190, 50, false }, { 240, 56, true } }) do
 		first_row(zz.week_projects.x, zz.week_projects.w)
 	)
 end
-check("une ligne d'air sous l'objectif s'il y a la place", first_project_row(dp), 5)
+check("une ligne d'air sous le total et l'objectif s'il y a la place", first_project_row(dp), 4)
 local many = {}
 for i = 1, 8 do
 	many["projet" .. i] = (10 - i) * 600
 end
 local crowded = data({ projects = { ["2026-10-16"] = many } })
-local small = strip(table.concat(board.day_projects_lines(crowded, 50, 7, nil), "\n"))
+local small = strip(table.concat(board.day_projects_lines(crowded, 50, 6, nil), "\n"))
 check(
 	"peu de place : 2 projets puis « autres »",
 	small:find("projet1", 1, true) ~= nil
@@ -1358,7 +1375,7 @@ check(
 		and small:find("autres", 1, true) ~= nil,
 	true
 )
-local tiny = strip(table.concat(board.day_projects_lines(crowded, 50, 5, nil), "\n"))
+local tiny = strip(table.concat(board.day_projects_lines(crowded, 50, 4, nil), "\n"))
 check(
 	"une seule ligne : le plus gros projet, pas « autres »",
 	tiny:find("projet1", 1, true) ~= nil and tiny:find("autres", 1, true) == nil,
