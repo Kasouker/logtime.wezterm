@@ -673,5 +673,200 @@ check(
 local m120 = board.render(data(), 120, 34)
 check("120 x 34 : le mois tient", strip(table.concat(m120, "\n")):find("Sem. 5", 1, true) ~= nil, true)
 
+-- ---- la semaine choisie (celle du 16 octobre : du lundi 12 au dimanche 18)
+local ws = board.week_stats(data())
+check(
+	"la semaine : 7 jours, du lundi 12 au dimanche 18",
+	#ws.days .. " " .. ws.days[1].key .. " " .. ws.days[7].key,
+	"7 2026-10-12 2026-10-18"
+)
+check("la semaine : le total", ws.total, 31 * 3600 + 1800)
+check("la semaine : l'inactif (1h le 12)", ws.idle, 3600)
+check("la semaine : l'actif d'un jour (le 12 : 8h - 1h)", ws.days[1].active, 7 * 3600)
+check("la semaine : les jours actifs", ws.active_days, 5)
+check("la semaine : la moyenne par jour actif", ws.average, (31 * 3600 + 1800) // 5)
+check("la semaine : le meilleur jour (le 14, 9h)", ws.best.key, "2026-10-14")
+check("la semaine : les jours à l'objectif (7h : le 12, le 14, le 15)", ws.reached, 3)
+check(
+	"la semaine : sans inactif compté, l'actif est le total",
+	board.week_stats(data({ idle_days = false })).days[1].active,
+	8 * 3600
+)
+check(
+	"la semaine qui commence le dimanche",
+	board.week_stats(data({ cfg = gradient.apply_to({ week_starts_on = "sunday" }) })).days[1].key,
+	"2026-10-11"
+)
+check("une semaine vide : pas de meilleur jour", board.week_stats(data({ day_key = "2026-10-26" })).best, nil)
+
+check(
+	"la semaine : un jour pile à l'objectif compte",
+	board.week_stats(data({ days = { ["2026-10-13"] = 7 * 3600 } })).reached,
+	1
+)
+local wl = board.week_lines(data({ accent = "#C96969" }), 90, 14)
+check("la semaine : le trait du haut, puis la hauteur demandée", #wl, 15)
+local wl_sizes = true
+for _, line in ipairs(wl) do
+	wl_sizes = wl_sizes and layout.visible_width(line) == 90
+end
+check("la semaine : chaque ligne fait la largeur", wl_sizes, true)
+check(
+	"la semaine : les jours et leurs numéros posés sur le trait du haut",
+	strip(wl[1]):find("─ Lun 12 ─", 1, true) ~= nil and strip(wl[1]):find("─ Dim 18 ─", 1, true) ~= nil,
+	true
+)
+check("la semaine : 6 jonctions sur le trait du haut", select(2, strip(wl[1]):gsub("┬", "")), 6)
+check("la semaine : 6 traits entre les colonnes", select(2, strip(wl[5]):gsub("│", "")), 6)
+check("la semaine, assez large : deux durées par jour (inactif, actif)", strip(wl[2]):find("1h00 +7h00") ~= nil, true)
+check(
+	"la semaine, assez large : les noms des barres",
+	strip(wl[14]):find("Inact", 1, true) ~= nil and strip(wl[14]):find("Actif", 1, true) ~= nil,
+	true
+)
+check(
+	"la semaine, assez large : les pourcentages (le 12 : 13 % / 87 %)",
+	strip(wl[15]):find("13%", 1, true) ~= nil and strip(wl[15]):find("87%", 1, true) ~= nil,
+	true
+)
+local parts2 = {}
+for part in strip(wl[2]):gmatch("[^│]+") do
+	parts2[#parts2 + 1] = part
+end
+check("un jour sans temps (samedi 17) : rien au-dessus de ses barres", parts2[6]:match("^ +$") ~= nil, true)
+local idle_bar = convert.fg(load_module("calendar/overview").IDLE_COLOR) .. "▁"
+check(
+	"l'inactif en gris",
+	table
+		.concat(wl)
+		:find(literal(convert.fg(load_module("calendar/overview").IDLE_COLOR)) .. "[▁▂▃▄▅▆▇█]") ~= nil,
+	true
+)
+local active_color = convert.fg(assemble.day_color(9 * 3600, data().cfg))
+check("l'actif dans la couleur du jour", table.concat(wl):find(active_color .. "█", 1, true) ~= nil, true)
+-- le jour choisi (le 16, vendredi : la 5e colonne) rempli de la couleur, sur toute sa hauteur
+local filled_rows = 0
+for k = 2, 15 do
+	if wl[k]:find(convert.bg("#C96969"), 1, true) then
+		filled_rows = filled_rows + 1
+	end
+end
+check("le jour choisi : sa colonne remplie de la couleur, sur toute la hauteur", filled_rows, 14)
+check(
+	"la semaine : l'inactif avant l'actif (13 % puis 87 %)",
+	strip(wl[15]):find("13%", 1, true) < strip(wl[15]):find("87%", 1, true),
+	true
+)
+check(
+	"l'échelle : un jour plus court (le 13, 5h sur 9h) ne remplit pas sa barre",
+	(function()
+		local parts = {}
+		for part in strip(wl[3]):gmatch("[^│]+") do
+			parts[#parts + 1] = part
+		end
+		return parts[2]:match("^ +$") ~= nil
+	end)(),
+	true
+)
+local narrow_wl = board.week_lines(data(), 46, 14)
+check(
+	"étroit : une seule durée par jour (le total)",
+	strip(narrow_wl[2]):find("8h00", 1, true) ~= nil and strip(narrow_wl[2]):find("7h00", 1, true) == nil,
+	true
+)
+check(
+	"étroit : l'actif dans la couleur du jour, sous l'inactif",
+	table.concat(narrow_wl):find(active_color .. "█", 1, true) ~= nil,
+	true
+)
+check("étroit : pas de noms de barres", strip(table.concat(narrow_wl)):find("Inact", 1, true), nil)
+check("étroit : la part active en bas (le 12 : 87 %)", strip(narrow_wl[15]):find("87%", 1, true) ~= nil, true)
+local mixed_wl = board.week_lines(data(), 79, 14) -- des colonnes de 10 et 11 : toutes en une seule barre
+check("jamais un mélange : toutes les colonnes pareilles", strip(table.concat(mixed_wl)):find("Inact", 1, true), nil)
+local no_idle_wl = board.week_lines(data({ idle_days = false }), 90, 14)
+check(
+	"sans inactif compté : une seule barre, pas de noms",
+	strip(table.concat(no_idle_wl)):find("Inact", 1, true),
+	nil
+)
+check("sans inactif compté : 100 % actif", strip(no_idle_wl[15]):find("100%", 1, true) ~= nil, true)
+-- l'échelle : le jour le plus long de la semaine remplit la barre
+check(
+	"l'échelle : le jour le plus long (le 14) remplit toute sa barre",
+	(function()
+		for k = 3, 13 do
+			if not strip(wl[k]):find("█", 1, true) then
+				return false
+			end
+		end
+		return true
+	end)(),
+	true
+)
+
+-- ---- les chiffres de la semaine
+local side = board.week_side_lines(data(), 26, 14)
+local side_text = strip(table.concat(side, "\n"))
+check("les chiffres : la hauteur", #side, 14)
+check("les chiffres : le total de la semaine", side_text:find("Semaine : 31h30", 1, true) ~= nil, true)
+check("les chiffres : les jours actifs", side_text:find("Jours actifs : 5", 1, true) ~= nil, true)
+check("les chiffres : la moyenne", side_text:find("Moyenne : 6h18", 1, true) ~= nil, true)
+check("les chiffres : l'inactif", side_text:find("Inactif : 1h00 (3 %)", 1, true) ~= nil, true)
+check("les chiffres : le meilleur jour", side_text:find("Meilleur : Mer 14 (9h00)", 1, true) ~= nil, true)
+check(
+	"les chiffres : la semaine validée (3 jours sur 3)",
+	side_text:find("✓ Validée (3/3 jours)", 1, true) ~= nil,
+	true
+)
+check(
+	"les chiffres : le jour choisi, en bas",
+	(strip(side[13]):gsub("%s+$", "")) .. "|" .. (strip(side[14]):gsub("%s+$", "")),
+	" Jour choisi :| Vendredi 16 octobre 2026"
+)
+local side5 = strip(
+	table.concat(
+		board.week_side_lines(data({ cfg = gradient.apply_to({ goal_hours = 7, goal_days = 5 }) }), 26, 14),
+		"\n"
+	)
+)
+check("les chiffres : pas encore validée", side5:find("Objectif : 3/5 jours", 1, true) ~= nil, true)
+local side_none =
+	strip(table.concat(board.week_side_lines(data({ idle_days = false, cfg = gradient.apply_to({}) }), 26, 14), "\n"))
+check(
+	"sans objectif ni inactif : ni l'un ni l'autre",
+	side_none:find("Objectif", 1, true) == nil and side_none:find("Inactif", 1, true) == nil,
+	true
+)
+local side_small = board.week_side_lines(data(), 26, 5)
+check(
+	"peu de place : le jour choisi reste en bas",
+	#side_small .. (strip(side_small[5]):gsub("%s+$", "")),
+	"5 Vendredi 16 octobre 2026"
+)
+local side_en = strip(table.concat(board.week_side_lines(data({ labels = en }), 26, 14), "\n"))
+check(
+	"les chiffres en anglais",
+	side_en:find("Active days: 5", 1, true) ~= nil and side_en:find("Friday, October 16, 2026", 1, true) ~= nil,
+	true
+)
+
+-- ---- dans la page
+local wp = board.render(data({ accent = "#C96969" }), 240, 56)
+local wz = board.zones(240, 56, 2)
+local wp_text = strip(table.concat(wp, "\n"))
+check(
+	"la page : la semaine dans sa zone",
+	wp_text:find("─ Lun 12 ─", 1, true) ~= nil and wp_text:find("Jours actifs", 1, true) ~= nil,
+	true
+)
+local wy = wz.year.y + wz.year.h
+check(
+	"la page : les colonnes de la semaine partent du trait sous l'année (┬)",
+	select(2, strip(wp[wy]):gsub("┬", "")) >= 6 + 2,
+	true
+)
+local wb = wz.week.y + wz.week.h
+check("la page : et rejoignent le trait sous la semaine (┴)", select(2, strip(wp[wb]):gsub("┴", "")) >= 7, true)
+
 print(string.format("\n%d vérifications réussies, %d échecs", passed, failed))
 os.exit(failed == 0 and 0 or 1)

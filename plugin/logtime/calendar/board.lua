@@ -24,6 +24,7 @@ local idle = load("core/idle")
 local dates = load("calendar/dates")
 local assemble = load("calendar/assemble")
 local overview = load("calendar/overview")
+local day_detail = load("calendar/day_detail")
 
 local M = {}
 
@@ -385,6 +386,204 @@ function M.month_lines(o, width, height)
 	return out
 end
 
+-- La semaine du jour choisi : ses 7 jours, chacun { key, day (le numéro), total, idle, active }, et ses chiffres :
+-- { days, total, idle, active_days, average, best (le jour le plus long, ou nil), reached (jours à l'objectif) }.
+function M.week_stats(o)
+	local keys = overview.week_keys(o.day_key or o.today_key, o.cfg.week_starts_on)
+	local goal = stats.has_goal(o.cfg.goal_hours) and o.cfg.goal_hours * 3600 or nil
+	local w = { days = {}, total = 0, idle = 0, active_days = 0, reached = 0 }
+	for i, key in ipairs(keys) do
+		local total = math.floor(math.max(0, o.days[key] or 0))
+		local idle_secs = o.idle_days and idle.share(total, o.idle_days[key]) or 0
+		local day =
+			{ key = key, day = tonumber(key:sub(9, 10)), total = total, idle = idle_secs, active = total - idle_secs }
+		w.days[i] = day
+		w.total = w.total + total
+		w.idle = w.idle + idle_secs
+		if total > 0 then
+			w.active_days = w.active_days + 1
+		end
+		if goal and total >= goal then
+			w.reached = w.reached + 1
+		end
+		if total > 0 and (not w.best or total > w.best.total) then
+			w.best = day
+		end
+	end
+	w.average = w.active_days > 0 and w.total // w.active_days or 0
+	return w
+end
+
+M.WIDE_DAY = 11 -- une colonne de jour d'au moins 11 colonnes : deux barres (inactif, actif) ; sinon une seule, empilée
+
+-- La semaine choisie : la ligne du trait du haut (les jours posés dessus) puis `height` lignes, de `width` colonnes.
+-- 7 colonnes séparées par un trait ; dans chacune, la durée en haut, les barres (inactif en gris, actif dans la couleur du
+-- jour, à l'échelle du jour le plus long de la semaine), leurs noms et leurs pourcentages en bas. Le jour choisi est
+-- rempli de o.accent. Sans temps inactif compté (o.idle_days absent), seulement la barre de l'actif.
+--   ─ Lun 12 ─┬─ Mar 13 ─┬ …
+--    1h00 7h00│ 5h00     │
+--     ▆▆  ███ │     ███  │
+--   Inact Actif│ …
+--    13%  88% │
+function M.week_lines(o, width, height)
+	local labels, cfg = o.labels, o.cfg
+	local b, edge = o.b, o.edge or ""
+	local off = edge ~= "" and convert.RESET or ""
+	local function e(s_)
+		return edge .. s_ .. off
+	end
+	local w = M.week_stats(o)
+	local cells = split(math.max(7, width - 6), 7)
+	local scale = 3600 -- l'échelle des barres : le jour le plus long de la semaine (au moins une heure)
+	for _, day in ipairs(w.days) do
+		scale = math.max(scale, day.total)
+	end
+	local show_idle = o.idle_days and true or false -- (le temps inactif non compté : pas de tableau)
+	-- deux barres dans chaque colonne si la plus étroite a la place (toutes pareilles, jamais un mélange)
+	local wide = show_idle and math.min(table.unpack(cells)) >= M.WIDE_DAY
+	local accent = o.accent or M.ACCENT
+	-- le trait du haut : « ─ Lun 12 ─ » au milieu de chaque colonne
+	local names = {}
+	for i = 1, 7 do
+		local index = cfg.week_starts_on == "sunday" and ((i + 5) % 7 + 1) or i
+		names[i] = labels.weekdays[index]
+	end
+	local top = {}
+	for i, day in ipairs(w.days) do
+		local cell = cells[i]
+		local text = names[i] .. " " .. day.day
+		if vw(text) + 2 > cell then
+			text = vw(names[i]) + 2 <= cell and names[i] or ""
+		end
+		if text == "" then
+			top[i] = e(string.rep(b.h, cell))
+		else
+			local before = (cell - vw(text) - 2) // 2
+			top[i] = e(string.rep(b.h, before))
+				.. " "
+				.. text
+				.. " "
+				.. e(string.rep(b.h, cell - vw(text) - 2 - before))
+		end
+	end
+	local out = { table.concat(top, e(b.t)) }
+	-- chaque colonne : ses lignes
+	local columns = {}
+	for i, day in ipairs(w.days) do
+		local cell = cells[i]
+		local color = assemble.day_color(day.total, cfg) or overview.IDLE_COLOR
+		local lines = {}
+		local bar_h = math.max(1, height - (wide and 3 or 2))
+		if wide then
+			local half = (cell - 1) // 2
+			local bw = math.max(1, half - 2)
+			lines[1] = day.total > 0
+					and (centered(stats.hm(day.idle), half) .. " " .. centered(stats.hm(day.active), cell - half - 1))
+				or ""
+			local ib = overview.vertical_bar(day.idle / scale, bar_h, overview.IDLE_COLOR, bw)
+			local ab = overview.vertical_bar(day.active / scale, bar_h, color, bw)
+			for k = 1, bar_h do
+				lines[#lines + 1] = centered(ib[k], half) .. " " .. centered(ab[k], cell - half - 1)
+			end
+			lines[#lines + 1] = centered(labels.board_idle_short or "", half)
+				.. " "
+				.. centered(labels.board_active_short or "", cell - half - 1)
+			local _, percent = idle.share(day.total, day.idle)
+			local pi = day.total > 0 and (percent .. "%") or ""
+			local pa = day.total > 0 and ((100 - percent) .. "%") or ""
+			lines[#lines + 1] = centered(pi, half) .. " " .. centered(pa, cell - half - 1)
+		else
+			-- une seule barre : l'actif dans la couleur du jour, l'inactif en gris empilé au-dessus
+			local bw = math.max(1, cell - 2)
+			lines[1] = centered(day.total > 0 and stats.hm(day.total) or "", cell)
+			local all =
+				overview.vertical_bar((show_idle and day.total or day.active) / scale, bar_h, overview.IDLE_COLOR, bw)
+			local ab = overview.vertical_bar(day.active / scale, bar_h, color, bw)
+			for k = 1, bar_h do
+				local active_part = ab[k]:find("[▁▂▃▄▅▆▇█]") and day.active > 0
+				lines[#lines + 1] = centered(active_part and ab[k] or all[k], cell)
+			end
+			local _, percent = idle.share(day.total, day.idle)
+			lines[#lines + 1] = centered(day.total > 0 and ((100 - percent) .. "%") or "", cell)
+		end
+		if day.key == o.day_key then
+			for k, line in ipairs(lines) do
+				-- le jour choisi : la colonne remplie de la couleur (les barres gardent leurs couleurs)
+				local style = convert.bg(accent) .. convert.fg(convert.contrast(accent))
+				lines[k] = style
+					.. fit(line, cell):gsub("\27%[0m", convert.RESET .. convert.bg(accent))
+					.. convert.RESET
+			end
+		end
+		columns[i] = lines
+	end
+	for k = 1, height do
+		local parts = {}
+		for i = 1, 7 do
+			parts[i] = fit(columns[i][k] or "", cells[i])
+		end
+		out[#out + 1] = table.concat(parts, e(b.v))
+	end
+	return out
+end
+
+-- La colonne des chiffres de la semaine (à droite des 7 colonnes) : `height` lignes de `width` colonnes. En haut, le
+-- total, les jours actifs, la moyenne, l'inactif, le meilleur jour et l'objectif de la semaine ; en bas, le jour choisi.
+function M.week_side_lines(o, width, height)
+	local labels, c = o.labels, o.labels.colon
+	local w = M.week_stats(o)
+	local items = {
+		string.format("%s%s%s", labels.board_week_total, c, stats.hm(w.total)),
+		string.format("%s%s%d", labels.board_active_days, c, w.active_days),
+		string.format("%s%s%s", labels.board_average, c, stats.hm(w.average)),
+	}
+	if o.idle_days and w.total > 0 then
+		local _, percent = idle.share(w.total, w.idle)
+		items[#items + 1] = string.format(labels.idle_year, stats.hm(w.idle), percent)
+	end
+	if w.best then
+		local index = (
+			os.date(
+				"*t",
+				os.time({
+					year = tonumber(w.best.key:sub(1, 4)),
+					month = tonumber(w.best.key:sub(6, 7)),
+					day = w.best.day,
+					hour = 12,
+				})
+			).wday + 5
+		)
+				% 7
+			+ 1
+		items[#items + 1] = string.format(
+			"%s%s%s %d (%s)",
+			labels.board_best,
+			c,
+			labels.weekdays[index],
+			w.best.day,
+			stats.hm(w.best.total)
+		)
+	end
+	if stats.has_goal(o.cfg.goal_hours) then
+		local goal_days = math.floor(tonumber(o.cfg.goal_days) or 5)
+		local format = w.reached >= goal_days and labels.board_week_validated or labels.board_week_goal
+		items[#items + 1] = string.format(format, w.reached, goal_days)
+	end
+	local out = {}
+	for _, item in ipairs(items) do
+		if #out < height - 3 then
+			out[#out + 1] = fit(" " .. item, width)
+		end
+	end
+	while #out < height - 2 do
+		out[#out + 1] = string.rep(" ", width)
+	end
+	-- en bas : le jour choisi
+	out[#out + 1] = fit(" " .. labels.board_selected .. c, width)
+	out[#out + 1] = fit(" " .. day_detail.title(o.day_key or o.today_key, labels), width)
+	return out
+end
+
 -- L'aide (« mois : Tab Maj+Tab | semaine : ↑ ↓ | … ») sur `width` colonnes : coupée entre ses parties (« | ») sur
 -- autant de lignes qu'il faut, la légende des couleurs au bout de la dernière (ou sur une ligne à elle).
 function M.help_lines(help, legend, width)
@@ -571,6 +770,18 @@ function M.render(o, width, height)
 	line(above_timeline, divider, width)
 	-- le mois choisi, dans son propre cadre
 	paste(M.month_lines(o, z.month.w, z.month.h), z.month.x, z.month.y)
+	-- la semaine choisie : ses 7 colonnes (les traits entre elles partent du trait sous l'année jusqu'à celui du bas),
+	-- puis ses chiffres à droite
+	local x = z.week.x
+	for i, cell in ipairs(split(math.max(7, z.week.w - 6), 7)) do
+		x = x + cell
+		if i < 7 then
+			column(x, below_year, under_week)
+			x = x + 1
+		end
+	end
+	paste(M.week_lines(o, z.week.w, z.week.h), z.week.x, below_year)
+	paste(M.week_side_lines(o, z.week_side.w, z.week_side.h), z.week_side.x, z.week_side.y)
 	local out = {}
 	for y = 1, height do
 		local parts = {}
