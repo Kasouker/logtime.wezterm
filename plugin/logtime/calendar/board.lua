@@ -232,15 +232,24 @@ function M.year_lines(o, width, height)
 	return out
 end
 
--- Le mois choisi : exactement `height` lignes de `width` colonnes. La grille du mois dans son propre cadre (avec de
--- l'air autour), des cases toutes de la même taille : 7 colonnes de jours et la colonne des semaines (à droite), toutes
--- de la même largeur ; toutes les semaines de la même hauteur. Les noms des jours et du mois sont posés sur le trait du
--- haut, les semaines et jours validés sur celui du bas (comme le calendrier F2 avec les encadrés).
+-- `total` partagé en `count` parts : les parts sont égales à 1 près (les plus grandes réparties régulièrement).
+local function split(total, count)
+	local out = {}
+	for k = 1, count do
+		out[k] = k * total // count - (k - 1) * total // count
+	end
+	return out
+end
+
+-- Le mois choisi : exactement `height` lignes de `width` colonnes. La grille du mois dans son propre cadre, qui prend
+-- toute la place (une colonne d'air de chaque côté) : 7 colonnes de jours et la colonne des semaines (à droite), de la
+-- même largeur à une colonne près ; les semaines de la même hauteur à une ligne près. Les noms des jours et du mois sont
+-- posés sur le trait du haut, les semaines et jours validés sur celui du bas (comme le calendrier F2 avec les encadrés).
 --   ╭─ Lun ─┬─ Mar ─┬─ … ─┬─ Dim ─┬─ Octobre ─╮
 --   │ 12    │ 13    │     │ 18    │           │
 --   │ ✓ 8h00│ 5h00  │     │       │ Semaine 3 │   la semaine choisie remplie de o.accent
 --   ├───────┼───────┼─ … ─┼───────┼───────────┤
---   ╰─ Semaines validées : 1/5 / Jours validés : 6/31 ─╯
+--   ╰─ Semaines validées : 1/5 / Jours validés : 6/31 ─┴───────┴───────╯
 function M.month_lines(o, width, height)
 	local labels, cfg = o.labels, o.cfg
 	local b, edge = o.b, o.edge or ""
@@ -248,20 +257,16 @@ function M.month_lines(o, width, height)
 	local function e(s_)
 		return edge .. s_ .. off
 	end
-	local blank = string.rep(" ", width)
 	local weeks = overview.weeks(o.year, o.month, cfg.week_starts_on)
 	local count = #weeks
-	-- le cadre aussi grand que possible : une colonne d'air de chaque côté, toute la hauteur
-	local cell = math.max(1, (width - 2 - 9) // 8) -- 8 colonnes, 9 traits verticaux
-	local row = math.max(1, (height - 2 - (count - 1)) // count)
-	local grid_w = 8 * cell + 9
-	local grid_h = 2 + count * row + (count - 1)
-	local left = string.rep(" ", (width - grid_w) // 2)
-	-- un trait de la grille (8 morceaux de `cell` traits) avec, au milieu de chaque morceau, un texte (ou rien)
+	local cells = split(math.max(8, width - 2 - 9), 8) -- 8 colonnes, 9 traits verticaux, une colonne d'air de chaque côté
+	local rows = split(math.max(count, height - 2 - (count - 1)), count) -- le haut, le bas, un trait entre les semaines
+	local narrow = math.min(table.unpack(cells))
+	-- un trait de la grille (8 morceaux) avec, au milieu de chaque morceau, un texte (ou rien)
 	local function rule(l, mid, r, texts)
 		local parts = {}
 		for k = 1, 8 do
-			local text = texts and texts[k]
+			local text, cell = texts and texts[k], cells[k]
 			if text and text ~= "" and vw(text) + 2 <= cell then
 				local before = (cell - vw(text) - 2) // 2
 				parts[k] = e(string.rep(b.h, before))
@@ -273,13 +278,13 @@ function M.month_lines(o, width, height)
 				parts[k] = e(string.rep(b.h, cell))
 			end
 		end
-		return e(l) .. table.concat(parts, e(mid)) .. e(r)
+		return " " .. e(l) .. table.concat(parts, e(mid)) .. e(r) .. " "
 	end
 	-- les noms : les jours en entier s'ils tiennent tous, sinon tous en abrégé ; le mois en entier s'il tient
 	local long, short = labels.weekdays_long or labels.weekdays, labels.weekdays
 	local fits = true
 	for i = 1, 7 do
-		fits = fits and vw(long[i]) + 2 <= cell
+		fits = fits and vw(long[i]) + 2 <= narrow
 	end
 	local names = {}
 	for i = 1, 7 do
@@ -287,15 +292,11 @@ function M.month_lines(o, width, height)
 		names[i] = fits and long[index] or short[index]
 	end
 	local month_name = labels.months[o.month] or ""
-	if vw(month_name) + 2 > cell then
+	if vw(month_name) + 2 > cells[8] then
 		month_name = (labels.months_short or {})[o.month] or month_name
 	end
 	names[8] = month_name
-	local out = {}
-	for _ = 1, math.max(0, (height - grid_h) // 2) do -- le cadre centré en hauteur (les lignes en trop)
-		out[#out + 1] = blank
-	end
-	out[#out + 1] = fit(left .. rule(b.tl, b.t, b.tr, names), width)
+	local out = { rule(b.tl, b.t, b.tr, names) }
 	-- la semaine du jour choisi
 	local selected
 	local _, sm, sd = (o.day_key or ""):match("^(%d+)-(%d+)-(%d+)$")
@@ -310,16 +311,17 @@ function M.month_lines(o, width, height)
 	end
 	local accent = o.accent or M.ACCENT
 	local goal_secs = stats.has_goal(cfg.goal_hours) and cfg.goal_hours * 3600 or nil
-	local label_line = math.max(1, (row + 1) // 2)
 	for w, week in ipairs(weeks) do
 		local week_label = string.format(labels.overview_week or "Week %d", w)
-		if vw(week_label) > cell then
+		if vw(week_label) > cells[8] then
 			week_label = string.format(labels.overview_week_short or "W%d", w)
 		end
+		local row = rows[w]
+		local label_line = math.max(1, (row + 1) // 2)
 		for line = 1, row do
 			local parts = {}
 			for i = 1, 7 do
-				local d = week[i]
+				local d, cell = week[i], cells[i]
 				if d then
 					local key = dates.key(o.year, o.month, d)
 					local secs = math.floor(math.max(0, o.days[key] or 0))
@@ -342,46 +344,82 @@ function M.month_lines(o, width, height)
 					parts[i] = string.rep(" ", cell)
 				end
 			end
-			local label = line == label_line and centered(week_label, cell) or string.rep(" ", cell)
+			local label = line == label_line and centered(week_label, cells[8]) or string.rep(" ", cells[8])
 			if w == selected then
 				label = convert.bg(accent) .. convert.fg(convert.contrast(accent)) .. label .. convert.RESET
 			end
 			parts[8] = label
-			out[#out + 1] = fit(left .. e(b.v) .. table.concat(parts, e(b.v)) .. e(b.v), width)
+			out[#out + 1] = " " .. e(b.v) .. table.concat(parts, e(b.v)) .. e(b.v) .. " "
 		end
 		if w < count then
-			out[#out + 1] = fit(left .. rule(b.l, b.x, b.r), width)
+			out[#out + 1] = rule(b.l, b.x, b.r)
 		end
 	end
-	-- le bas : les semaines et jours validés posés dessus (s'ils tiennent)
+	-- le bas : les semaines et jours validés posés dessus (s'ils tiennent), les jonctions ┴ gardées ailleurs
 	local bottom = rule(b.bl, b.b, b.br)
 	local validated = assemble.validated_text(o.days, o.year, o.month, cfg, nil, labels)
+	local grid_w = 9 + cells[1] + cells[2] + cells[3] + cells[4] + cells[5] + cells[6] + cells[7] + cells[8]
 	if validated and vw(validated) + 4 <= grid_w - 2 then
-		bottom = e(b.bl .. b.h)
-			.. " "
-			.. validated
-			.. " "
-			.. e(string.rep(b.h, grid_w - 2 - 1 - vw(validated) - 2) .. b.br)
+		local plain = bottom:gsub("\27%[[%d;]*m", "")
+		local cover = 1 + 2 + vw(validated) + 2 -- l'air, « ╰─ », le texte entre deux espaces
+		local rest = plain:sub(utf8.offset(plain, cover + 1))
+		bottom = " " .. e(b.bl .. b.h) .. " " .. validated .. " " .. e(rest:sub(1, -2)) .. " "
 	end
-	out[#out + 1] = fit(left .. bottom, width)
+	out[#out + 1] = bottom
+	for k = 1, #out do
+		out[k] = fit(out[k], width)
+	end
 	while #out < height do
-		out[#out + 1] = blank
+		out[#out + 1] = string.rep(" ", width)
 	end
 	return out
 end
 
+-- L'aide (« mois : Tab Maj+Tab | semaine : ↑ ↓ | … ») sur `width` colonnes : coupée entre ses parties (« | ») sur
+-- autant de lignes qu'il faut, la légende des couleurs au bout de la dernière (ou sur une ligne à elle).
+function M.help_lines(help, legend, width)
+	local lines, current = {}, nil
+	for part in (help .. " | "):gmatch("(.-) | ") do
+		local candidate = current and (current .. " | " .. part) or part
+		if current and vw(candidate) + 2 > width then
+			lines[#lines + 1] = current
+			current = part
+		else
+			current = candidate
+		end
+	end
+	if current then
+		lines[#lines + 1] = current
+	end
+	for k, line in ipairs(lines) do
+		lines[k] = fit(" " .. line, width)
+	end
+	legend = (legend or ""):gsub("^%s+", "")
+	if legend ~= "" then
+		local last = (lines[#lines] or ""):gsub("%s+$", "")
+		if #lines > 0 and vw(last) + 2 + vw(legend) + 1 <= width then
+			lines[#lines] = last .. string.rep(" ", width - vw(last) - vw(legend) - 1) .. legend .. " "
+		else
+			lines[#lines + 1] = string.rep(" ", math.max(0, width - vw(legend) - 1))
+				.. fit(legend .. " ", math.min(width, vw(legend) + 1))
+		end
+	end
+	return lines
+end
+
 -- Les zones de la page : { x, y, w, h } (x et y à partir de 1), pour une fenêtre de width x height. Le cadre et les
--- traits entre les zones ne leur appartiennent pas.
-function M.zones(width, height)
+-- traits entre les zones ne leur appartiennent pas. L'aide (help_h lignes, 2 par défaut) est en bas à gauche, sous le
+-- mois ; la droite descend jusqu'au bas du cadre.
+function M.zones(width, height, help_h)
+	help_h = help_h or 2
 	local z = {}
 	local inner = width - 2 -- entre les deux bords du cadre
 	z.stats = { x = 2, y = 2, w = inner, h = 1 }
 	z.year = { x = 2, y = 4, w = inner, h = M.year_height(height) } -- sous le trait des chiffres
 	local bottom_y = z.year.y + z.year.h + 1 -- sous le trait
-	local help_y = height - 1 -- au-dessus du bas du cadre
-	local bottom_h = help_y - bottom_y -- jusqu'à l'aide (pas de trait entre les zones et l'aide)
+	local bottom_h = height - bottom_y -- jusqu'au bas du cadre
 	local month_w = math.floor(inner * M.MONTH_SHARE)
-	z.month = { x = 2, y = bottom_y, w = month_w, h = bottom_h }
+	z.month = { x = 2, y = bottom_y, w = month_w, h = bottom_h - help_h }
 	local right_x = 2 + month_w + 1 -- après le trait vertical
 	local right_w = width - right_x -- jusqu'au bord droit du cadre
 	local week_h = math.floor(bottom_h * M.WEEK_SHARE)
@@ -393,7 +431,7 @@ function M.zones(width, height)
 	z.day_projects = { x = right_x, y = projects_y, w = day_w, h = projects_h }
 	z.week_projects = { x = right_x + day_w + 1, y = projects_y, w = right_w - day_w - 1, h = projects_h }
 	z.timeline = { x = right_x, y = projects_y + projects_h + 1, w = right_w, h = M.TIMELINE_HEIGHT }
-	z.help = { x = 2, y = help_y, w = inner, h = 1 }
+	z.help = { x = 2, y = height - help_h, w = month_w, h = help_h }
 	return z
 end
 
@@ -446,7 +484,9 @@ function M.render(o, width, height)
 	local b, edge = o.b, o.edge or ""
 	local off = edge ~= "" and convert.RESET or ""
 	local by_mask, by_char = box_chars(b)
-	local z = M.zones(width, height)
+	local month_w = math.floor((width - 2) * M.MONTH_SHARE)
+	local help = M.help_lines(o.labels.board_help or "", o.legend, month_w)
+	local z = M.zones(width, height, #help)
 	-- chaque case : un nombre (les directions d'un trait) ou un texte (un caractère visible, avec ses couleurs)
 	local grid = {}
 	for y = 1, height do
@@ -509,7 +549,7 @@ function M.render(o, width, height)
 	for _, y in ipairs({ below_stats, below_year }) do
 		line(y, 1, width)
 	end
-	column(divider, below_year, z.help.y - 1)
+	column(divider, below_year, height)
 	column(side, below_year, under_week)
 	line(under_week, divider, width)
 	column(between, under_week, above_timeline)
@@ -532,15 +572,18 @@ function M.render(o, width, height)
 	for i, text in ipairs(M.year_lines(o, z.year.w, z.year.h)) do
 		inside(z.year.y + i - 1, text)
 	end
-	-- les chiffres de l'année, en haut ; l'aide et la légende, en bas
+	-- les chiffres de l'année, en haut ; l'aide et la légende, en bas à gauche (sous le mois)
 	local inner = z.stats.w
 	inside(z.stats.y, centered(M.join_parts(M.year_parts(o), inner - 2), inner))
-	local help = " " .. (o.labels.board_help or "")
-	local legend = (o.legend or ""):gsub("^%s+", "") .. " "
-	if vw(help) + vw(legend) + 2 <= inner then
-		inside(z.help.y, help .. string.rep(" ", inner - vw(help) - vw(legend)) .. legend)
-	else
-		inside(z.help.y, fit(help, inner))
+	for k, text in ipairs(help) do
+		local y = z.help.y + k - 1
+		-- la ligne : le bord gauche, l'aide, puis la suite déjà dessinée (à partir du trait vertical du milieu)
+		local rest = {}
+		for x = divider, width do
+			local cell = grid[y][x]
+			rest[#rest + 1] = type(cell) == "number" and (edge .. (by_mask[cell] or " ") .. off) or cell
+		end
+		out[y] = edge .. b.v .. off .. text .. table.concat(rest)
 	end
 	return out
 end

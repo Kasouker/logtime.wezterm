@@ -89,6 +89,32 @@ check("join : plus serré s'il le faut", board.join_parts({ "aa", "bb", "cc" }, 
 check("join : les dernières parts retirées (jamais coupées)", board.join_parts({ "aa", "bb", "cc" }, 9), "aa  |  bb")
 check("join : une seule part trop longue : coupée", board.join_parts({ "abcdef" }, 4), "abcd")
 
+-- ---- l'aide, coupée entre ses parties
+local hl = board.help_lines("aa | bb | cc", "0h ██ 24h", 20)
+check("l'aide : coupée entre ses parties", strip(hl[1]), " aa | bb | cc       ")
+check(
+	"l'aide : la légende sur une ligne à elle si elle ne tient pas à côté",
+	strip(hl[2]),
+	"          0h ██ 24h "
+)
+local hl2 = board.help_lines("aa | bb | cc", "0h ██ 24h", 30)
+check(
+	"l'aide : la légende au bout de la dernière ligne si elle tient",
+	#hl2 .. " " .. strip(hl2[1]),
+	"1  aa | bb | cc       0h ██ 24h "
+)
+local hl3 = board.help_lines("aaaa | bbbb | cccc", "", 12)
+check(
+	"l'aide : une partie par ligne s'il le faut (jamais coupée au milieu)",
+	#hl3 .. strip(hl3[1]) .. strip(hl3[3]),
+	"3 aaaa        cccc       "
+)
+local hl_sizes = true
+for _, line in ipairs(board.help_lines(fr.board_help, "0h ████ 24h", 59)) do
+	hl_sizes = hl_sizes and layout.visible_width(line) == 59
+end
+check("l'aide : chaque ligne fait la largeur", hl_sizes, true)
+
 -- ---- la légende : sans « * = aujourd'hui »
 local legend = board.legend(assemble.legend(gradient.apply_to({}), fr), fr)
 check("légende : plus de « aujourd'hui »", strip(legend):find("aujourd", 1, true), nil)
@@ -294,11 +320,15 @@ for _, size in ipairs({ { 120, 34 }, { 150, 40 }, { 220, 60 } }) do
 	check("zones " .. tag .. " : aucune ne chevauche une autre", apart, true)
 	check("zones " .. tag .. " : la hauteur de l'année suit la fenêtre", z.year.h, board.year_height(size[2]))
 	check(
-		"zones " .. tag .. " : la frise, 4 lignes, juste au-dessus de l'aide (pas de trait entre elles)",
+		"zones " .. tag .. " : la frise, 4 lignes, jusqu'au bas du cadre",
 		z.timeline.h .. " " .. (z.timeline.y + z.timeline.h),
-		"4 " .. (size[2] - 1)
+		"4 " .. size[2]
 	)
-	check("zones " .. tag .. " : l'aide juste au-dessus du bas du cadre", z.help.y, size[2] - 1)
+	check(
+		"zones " .. tag .. " : l'aide sous le mois (2 lignes par défaut), jusqu'au bas du cadre",
+		z.help.x == z.month.x and z.help.w == z.month.w and z.help.y == z.month.y + z.month.h and z.help.y + z.help.h,
+		size[2]
+	)
 	check(
 		"zones " .. tag .. " : la colonne des chiffres de la semaine, contre le bord droit",
 		z.week_side.x + z.week_side.w - 1,
@@ -315,7 +345,13 @@ for _, line in ipairs(page) do
 end
 check("la page : chaque ligne fait la largeur", sizes, true)
 check("le cadre : en haut", strip(page[1]), "╭" .. string.rep("─", 148) .. "╮")
-check("le cadre : en bas", strip(page[40]), "╰" .. string.rep("─", 148) .. "╯")
+local z = board.zones(150, 40)
+local divider = z.month.x + z.month.w
+check(
+	"le cadre : en bas, rejoint par le trait vertical du milieu (┴)",
+	strip(page[40]),
+	"╰" .. string.rep("─", divider - 2) .. "┴" .. string.rep("─", 150 - divider - 1) .. "╯"
+)
 local sides = true
 for y = 2, 39 do
 	local plain = strip(page[y])
@@ -326,10 +362,12 @@ end
 check("le cadre : les côtés (│, ou ├ ┤ au bout des traits)", sides, true)
 check("en haut : les chiffres de l'année", strip(page[2]):find("Total de l'année : 31h30", 1, true) ~= nil, true)
 check("sous les chiffres : un trait d'un bord à l'autre", strip(page[3]), "├" .. string.rep("─", 148) .. "┤")
-check("en bas : l'aide", strip(page[39]):find(fr.board_help, 1, true), 5)
-check("en bas : la légende contre le bord droit", strip(page[39]):sub(-7), "24h │")
-local z = board.zones(150, 40)
-local divider = z.month.x + z.month.w
+local help_text = strip(page[38]) .. strip(page[39])
+check(
+	"en bas à gauche : l'aide, sur deux lignes",
+	help_text:find("mois : Tab Maj+Tab", 1, true) ~= nil and help_text:find("rafraîchir : r", 1, true) ~= nil,
+	true
+)
 local function char_at(line, x)
 	local plain = strip(line)
 	local start = utf8.offset(plain, x)
@@ -341,21 +379,17 @@ check(
 	char_at(page[z.year.y + z.year.h], 1) .. char_at(page[z.year.y + z.year.h], 150),
 	"├┤"
 )
+local function left_of_divider(line)
+	local plain = strip(line)
+	return plain:sub(1, utf8.offset(plain, divider) - 1)
+end
+check("l'aide : la légende au bout de sa dernière ligne", left_of_divider(page[39]):find("24h $") ~= nil, true)
 check(
-	"plus de trait entre les zones et l'aide : le trait vertical descend jusqu'à elle",
-	char_at(page[z.help.y - 1], divider),
-	"│"
+	"l'aide : dans la zone du mois, à gauche du trait du milieu",
+	char_at(page[38], divider) .. char_at(page[39], divider),
+	"││"
 )
-check(
-	"plus de trait entre les zones et l'aide : aucun ┴ au-dessus d'elle",
-	strip(page[z.help.y - 1]):find("┴", 1, true),
-	nil
-)
-check(
-	"plus de trait entre les zones et l'aide : la ligne au-dessus n'est pas un trait",
-	strip(page[z.help.y - 1]):find("^├"),
-	nil
-)
+check("pas de trait entre le mois et l'aide", left_of_divider(page[z.help.y - 1]):find("╰", 1, true) ~= nil, true)
 check("le trait vertical entre le mois et la droite", char_at(page[z.month.y + 2], divider), "│")
 check(
 	"sous la semaine : la jonction à gauche (├) et au cadre (┤)",
@@ -389,10 +423,12 @@ check(
 )
 local narrow = board.render(data(), 120, 34)
 check("120 x 34 : la page tient", narrow ~= nil and #narrow, 34)
-check("120 x 34 : l'aide entière", strip(narrow[33]):find(fr.board_help, 1, true), 5)
+local narrow_help = strip(table.concat(narrow, "\n", 30, 33))
 check(
-	"120 x 34 : la légende ne tient pas à côté de l'aide : seulement l'aide (rien ne dépasse)",
-	layout.visible_width(narrow[33]) == 120 and strip(narrow[33]):find("24h", 1, true) == nil,
+	"120 x 34 : l'aide entière, sur plusieurs lignes, et la légende",
+	narrow_help:find("mois : Tab Maj+Tab", 1, true) ~= nil
+		and narrow_help:find("rafraîchir : r", 1, true) ~= nil
+		and narrow_help:find("24h", 1, true) ~= nil,
 	true
 )
 check(
@@ -445,7 +481,14 @@ check(
 check("le mois : centré en hauteur (à une ligne près)", math.abs((top_k - 1) - (27 - bottom_k)) <= 1, true)
 check(
 	"le mois : les jours et le mois posés sur le trait du haut",
-	top:find("─ Lun ─┬─ Mar ─", 1, true) ~= nil and top:find("─ Oct ─╮", 1, true) ~= nil,
+	top:find("─ Lun ─", 1, true) ~= nil
+		and top:find("─ Mar ─", 1, true) ~= nil
+		and top:find("─ Oct ─", 1, true) ~= nil,
+	true
+)
+check(
+	"le mois : les jonctions du bas (┴) gardées après le texte des validés, et le coin ╯",
+	bottom:find("3/31 ─", 1, true) ~= nil and bottom:find("┴", 1, true) ~= nil and bottom:sub(-4) == "╯ ",
 	true
 )
 check("le mois : plus de rangée de cases pour les noms", ml_plain[top_k + 1]:find("Lun", 1, true), nil)
@@ -469,11 +512,16 @@ end
 local _, rule_line = first_with("┼")
 local cols_ = bars(rule_line)
 check("le mois : 9 traits verticaux (7 jours, puis la colonne des semaines)", #cols_, 9)
-local same = true
+local widths_ = {}
 for k = 2, #cols_ do
-	same = same and (cols_[k] - cols_[k - 1]) == (cols_[2] - cols_[1])
+	widths_[#widths_ + 1] = cols_[k] - cols_[k - 1]
 end
-check("le mois : les 8 colonnes de la même largeur", same, true)
+check(
+	"le mois : les 8 colonnes de la même largeur, à une colonne près",
+	math.max(table.unpack(widths_)) - math.min(table.unpack(widths_)) <= 1,
+	true
+)
+check("le mois : toute la largeur (une colonne d'air de chaque côté)", cols_[1] .. " " .. cols_[#cols_], "2 73")
 -- toutes les semaines de la même hauteur
 local rows_at = { top_k }
 for k = top_k + 1, bottom_k do
@@ -481,16 +529,25 @@ for k = top_k + 1, bottom_k do
 		rows_at[#rows_at + 1] = k
 	end
 end
-local same_h = true
+local heights_ = {}
 for k = 2, #rows_at do
-	same_h = same_h and (rows_at[k] - rows_at[k - 1]) == (rows_at[2] - rows_at[1])
+	heights_[#heights_ + 1] = rows_at[k] - rows_at[k - 1]
 end
 check("le mois : 5 semaines (octobre 2026)", #rows_at - 1, 5)
-check("le mois : toutes les semaines de la même hauteur", same_h, true)
+check(
+	"le mois : les semaines de la même hauteur, à une ligne près",
+	math.max(table.unpack(heights_)) - math.min(table.unpack(heights_)) <= 1,
+	true
+)
+check(
+	"le mois : toute la hauteur (le haut sur la 1re ligne, le bas sur la dernière)",
+	top_k .. " " .. bottom_k,
+	"1 27"
+)
 local joined_ml = table.concat(ml_plain, "\n")
 check(
 	"le mois : les semaines à droite (« Sem. 1 » dans sa case)",
-	joined_ml:find("│Sem. 1 │", 1, true) ~= nil,
+	(select(2, first_with("Sem. 1"))):find("Sem%. 1 +│ $") ~= nil,
 	true
 )
 check(
@@ -502,8 +559,9 @@ check("le mois : aujourd'hui « *16 »", joined_ml:find("*16", 1, true) ~= nil, 
 local function week_filled(lines, plain, label)
 	for k, line in ipairs(plain) do
 		if line:find(label, 1, true) then
-			return lines[k]:find(convert.bg("#C96969") .. convert.fg(convert.contrast("#C96969")) .. "Sem. ", 1, true)
-				~= nil
+			return lines[k]:find(
+				literal(convert.bg("#C96969") .. convert.fg(convert.contrast("#C96969"))) .. " *Sem%. "
+			) ~= nil
 		end
 	end
 end

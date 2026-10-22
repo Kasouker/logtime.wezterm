@@ -665,7 +665,11 @@ local function scenarios()
 	press("a")
 	check("a : la vue d'ensemble", num(w.GLOBAL.logtime_page_view), calendar_page.VIEW.YEAR)
 	check("a : les chiffres de l'année en haut", shown_now():find("Total de l'année : 7h43", 1, true) ~= nil, true)
-	check("a : l'aide de la vue d'ensemble", shown_now():find(fr.board_help, 1, true) ~= nil, true)
+	check(
+		"a : l'aide de la vue d'ensemble",
+		shown_now():find("mois : Tab Maj+Tab", 1, true) ~= nil and shown_now():find("rafraîchir : r", 1, true) ~= nil,
+		true
+	)
 	local board_lines = {}
 	for line in (shown_now() .. "\n"):gmatch("(.-)\n") do
 		board_lines[#board_lines + 1] = line
