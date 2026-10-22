@@ -253,9 +253,6 @@ function M.day_color(secs, cfg)
 	return background(secs, with_defaults(cfg))
 end
 
--- La case choisie dans la page (cfg.selected_key) : en couleurs inversées (le texte prend la couleur du fond).
-M.SELECTED = "\27[7m"
-
 local function style(secs, cfg)
 	local bg = background(secs, cfg)
 	if not bg then
@@ -422,9 +419,6 @@ local function week_lines(days, year, month, today_key, cfg, rows)
 				local key = dates.key(year, month, day)
 				local secs = math.floor(math.max(0, days[key] or 0))
 				local st = style(secs, cfg)
-				if key == cfg.selected_key then
-					st = st .. M.SELECTED
-				end
 				local mark = (key == today_key) and "*" or " "
 				l1[#l1 + 1] = st .. mark .. string.format("%2d", day) .. string.rep(" ", 5) .. convert.RESET
 				l2[#l2 + 1] = st .. duration_text(secs, key, today_key, goal_secs) .. convert.RESET

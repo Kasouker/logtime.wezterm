@@ -403,7 +403,7 @@ local function scenarios()
 	check(
 		"F2 : la ligne d'aide est la première ligne affichée (le dessin est centré)",
 		(text:gsub("^\n+", "")):match("^%s*(.-)\n"),
-		"Logtime   ←→↑↓ jour   Tab Maj+Tab mois   Entrée vue d'ensemble   t aujourd'hui"
+		"Logtime   Entrée vue d'ensemble   t aujourd'hui   q fermer"
 	)
 	check(
 		"F2 : lire les heures n'écrit rien (rien de nouveau à sauvegarder)",

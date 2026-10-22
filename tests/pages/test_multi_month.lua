@@ -425,7 +425,16 @@ w.GLOBAL.logtime_page_pane = pane.id
 binding(w, page, "PageUp")(win, pane)
 local shown = last_text(pane)
 check(
-	"h avec quatre mois : le mois choisi recule, Juin à Septembre",
+	"PgUp dans le calendrier de base : rien ne bouge (on se déplace dans la vue d'ensemble)",
+	position(shown, "Juillet 2026") ~= nil and position(shown, "Octobre 2026") ~= nil,
+	true
+)
+-- revenu de la vue d'ensemble en septembre : le calendrier de base montre le mois où l'on était
+w.GLOBAL.logtime_page_year, w.GLOBAL.logtime_page_month = 2026, 9
+binding(w, page, "r")(win, pane)
+shown = last_text(pane)
+check(
+	"septembre (le mois où l'on était), quatre mois : Juin à Septembre",
 	position(shown, "Juin 2026") ~= nil
 		and position(shown, "Septembre 2026") ~= nil
 		and position(shown, "Octobre 2026") == nil,
@@ -440,20 +449,15 @@ check(
 		and position(shown, "Juin 2026") == nil,
 	true
 )
-w.GLOBAL.logtime_page_year, w.GLOBAL.logtime_page_month = 2026, 2
-binding(w, page, "PageDown")(win, pane)
-binding(w, page, "PageDown")(win, pane)
+w.GLOBAL.logtime_page_year, w.GLOBAL.logtime_page_month = 2026, 4
+binding(w, page, "r")(win, pane)
+shown = last_text(pane)
+check("avril : Janvier à Avril", position(shown, "Janvier 2026") ~= nil and position(shown, "Avril 2026") ~= nil, true)
+w.GLOBAL.logtime_page_year, w.GLOBAL.logtime_page_month = 2026, 1
+binding(w, page, "r")(win, pane)
 shown = last_text(pane)
 check(
-	"l : le mois choisi avance (Avril : Janvier à Avril)",
-	position(shown, "Janvier 2026") ~= nil and position(shown, "Avril 2026") ~= nil,
-	true
-)
-w.GLOBAL.logtime_page_year, w.GLOBAL.logtime_page_month = 2026, 2
-binding(w, page, "PageUp")(win, pane)
-shown = last_text(pane)
-check(
-	"janvier choisi : les mois d'avant sont ceux de l'année précédente",
+	"janvier : les mois d'avant sont ceux de l'année précédente",
 	position(shown, "Octobre 2025") ~= nil and position(shown, "Janvier 2026") ~= nil,
 	true
 )

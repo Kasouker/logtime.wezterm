@@ -317,6 +317,7 @@ for _, b in ipairs(config.key_tables.logtime_page) do
 	end
 end
 w.GLOBAL.logtime_page_pane = w.spawned[1].id
+w.GLOBAL.logtime_page_view = 2 -- la vue d'ensemble (on ne se déplace que là)
 h(new_window(w), w.spawned[1])
 check("h dans la page : le nouveau mois est tracé (septembre)", find(w.logs.info, "drawing month 2026-09"), 1)
 check("h dans la page : plusieurs lignes de trace en plus", #w.logs.info > before + 2, true)

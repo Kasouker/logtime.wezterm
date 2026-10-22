@@ -38,7 +38,7 @@ function M.create(ctx)
 
 	-- L'état de la page, gardé dans wezterm.GLOBAL sous forme de simples nombres :
 	--   logtime_page_pane (le panneau de la page), logtime_page_year, logtime_page_month (le mois affiché),
-	--   logtime_page_day (le jour choisi dans ce mois, flèches), logtime_page_view (M.VIEW.MONTHS, ou M.VIEW.OVERVIEW : la
+	--   logtime_page_day (le jour choisi dans ce mois, flèches de la vue d'ensemble), logtime_page_view (M.VIEW.MONTHS, ou M.VIEW.OVERVIEW : la
 	--   vue d'ensemble, touche Entrée)
 	local function page_id()
 		return num(G.logtime_page_pane)
@@ -146,15 +146,11 @@ function M.create(ctx)
 	-- (dims = { cols, rows } ; sans taille, un seul mois). Renvoie le texte, le nombre de mois affichés et la largeur
 	-- du calendrier (la largeur qu'on centre).
 	function page.build_text(dims)
-		local labels, cfg = ctx.labels(), {}
-		for key, value in pairs(with_gradient(ctx.cfg())) do
-			cfg[key] = value -- une copie : la case choisie ne doit pas aller dans les vrais réglages
-		end
+		local labels, cfg = ctx.labels(), with_gradient(ctx.cfg())
 		local year, month = selected_month()
 		if current_view() == M.VIEW.OVERVIEW then
 			return build_board_text(dims, labels, cfg)
 		end
-		cfg.selected_key = dates.key(selected_day())
 		local help = "  " .. labels.title .. "   " .. labels.page_help
 		local block_width, block_height = assemble.width(cfg), assemble.height(cfg) -- plus grand avec les encadrés
 		local plan = { count = 1 }
@@ -284,18 +280,27 @@ function M.create(ctx)
 		redraw(pane, false)
 	end
 
+	-- Les déplacements : seulement dans la vue d'ensemble (le calendrier de base montre le mois, sans case choisie).
+	local function in_overview(run)
+		return function(window, pane)
+			if current_view() == M.VIEW.OVERVIEW then
+				run(window, pane)
+			end
+		end
+	end
+
 	-- ← → ↑ ↓ : le jour d'avant / d'après, la semaine d'avant / d'après (on passe au mois voisin tout seul).
 	local function shift_day(delta)
-		return function(window, pane)
+		return in_overview(function(window, pane)
 			local year, month, d = selected_day()
 			local t = os.date("*t", os.time({ year = year, month = month, day = d + delta, hour = 12 }))
 			show(t.year, t.month, pane, t.day)
-		end
+		end)
 	end
 
 	-- PgUp PgDn (et Tab, Maj+Tab) : un mois de plus ou de moins.
 	local function shift_month(delta)
-		return function(window, pane)
+		return in_overview(function(window, pane)
 			local year, month = selected_month()
 			month = month + delta
 			if month < 1 then
@@ -304,7 +309,7 @@ function M.create(ctx)
 				month, year = 1, year + 1
 			end
 			show(year, month, pane)
-		end
+		end)
 	end
 
 	local function go_today(window, pane)

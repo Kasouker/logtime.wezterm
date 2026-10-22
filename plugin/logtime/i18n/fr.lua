@@ -33,7 +33,7 @@ return {
 	goal_toast = "🎉 Objectif du jour atteint : %s ! 🎉",
 	validated_weeks = "Semaines validées",
 	validated_days = "Jours validés",
-	page_help = "←→↑↓ jour   Tab Maj+Tab mois   Entrée vue d'ensemble   t aujourd'hui",
+	page_help = "Entrée vue d'ensemble   t aujourd'hui   q fermer",
 	detail_date = "{weekday} {day} {month_lower} {year}",
 	detail_total = "Total",
 	overview_week = "Semaine %d",

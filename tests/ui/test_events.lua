@@ -290,6 +290,7 @@ check("noms fixes : F2 de l'ancienne config appelle bien le gestionnaire du nouv
 check("noms fixes : la page est ouverte par le nouvel état", #eval2.spawned, 1)
 local page_pane = eval2.spawned[1]
 eval2.GLOBAL.logtime_page_pane = page_pane.id
+eval2.GLOBAL.logtime_page_view = 2 -- la vue d'ensemble (on ne se déplace que là)
 local h_action = action_of(config1.key_tables.logtime_page, "PageUp")
 local n_before = #page_pane.injected
 check(
@@ -298,9 +299,8 @@ check(
 	1
 )
 check(
-	"noms fixes : et le calendrier est redessiné (septembre)",
-	#page_pane.injected == n_before + 1
-		and page_pane.injected[#page_pane.injected]:find("Septembre 2026", 1, true) ~= nil,
+	"noms fixes : et la page est redessinée, en septembre",
+	#page_pane.injected == n_before + 1 and tonumber(tostring(eval2.GLOBAL.logtime_page_month)) == 9,
 	true
 )
 local q_action = action_of(config1.key_tables.logtime_page, "q")
