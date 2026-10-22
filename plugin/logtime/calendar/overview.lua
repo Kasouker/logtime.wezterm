@@ -217,7 +217,7 @@ local function hbar(share, width, color)
 end
 
 -- Le texte de l'objectif du jour (atteint, ce qu'il manque, ou manqué pour un jour passé), ou "" sans objectif.
-local function goal_text(o, key, total)
+function M.goal_text(o, key, total)
 	if not stats.has_goal(o.cfg.goal_hours) then
 		return ""
 	end
@@ -298,7 +298,7 @@ function M.detail(o, key, width, height, opts)
 	local project_colors = o.cfg.show_timeline ~= false and M.day_colors(o, key) or nil
 	-- les lignes de droite : { texte de la liste, texte du pourcentage } ou "rule" (un trait entre deux lignes)
 	local total_text = " " .. labels.detail_total .. "  " .. stats.hm(total)
-	local rows = { { fit(total_text, bar_start) .. (opts.goal or goal_text(o, key, total)), "" }, "rule" }
+	local rows = { { fit(total_text, bar_start) .. (opts.goal or M.goal_text(o, key, total)), "" }, "rule" }
 	if total == 0 then
 		rows[#rows + 1] = { " " .. (opts.empty or labels.detail_empty), "" }
 	end
@@ -481,12 +481,13 @@ local function clock(seconds)
 	return string.format("%dh%02d", seconds // 3600, (seconds % 3600) // 60)
 end
 
--- La frise du jour `key` : M.TIMELINE_HEIGHT lignes de `width` colonnes.
+-- La frise du jour `key` : M.TIMELINE_HEIGHT lignes de `width` colonnes. `colors` (facultatif) : la couleur de chaque
+-- projet ({ [projet] = "#RRGGBB" }) ; sinon celles du détail du jour (M.day_colors).
 --   0h00                                                       24h00
 --   ╭──────────────────────────────────────────────────────────────╮
 --   │   ▓Netflix▓  ▓▓plug WT▓▓▓ ▓▓▓Bot Discord▓▓▓  ▓RL▓            │   chaque projet dans sa couleur, son nom
 --   ╰──────────────────────────────────────────────────────────────╯   dedans s'il y tient
-function M.timeline(o, key, width)
+function M.timeline(o, key, width, colors)
 	local b, edge = o.b, o.edge or ""
 	local off = edge ~= "" and convert.RESET or ""
 	local function e(s)
@@ -494,7 +495,7 @@ function M.timeline(o, key, width)
 	end
 	local inner = width - 2
 	local segments = o.timeline and o.timeline[key] or {}
-	local colors = M.day_colors(o, key)
+	colors = colors or M.day_colors(o, key)
 	local columns = M.timeline_columns(segments, inner)
 	local start = -(o.cfg.day_offset or 0)
 	-- la fin de la journée : « 24h00 » (et pas « 0h00 ») quand elle finit à minuit

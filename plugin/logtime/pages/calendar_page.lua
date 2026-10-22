@@ -26,6 +26,7 @@ M.DEFAULT_DIMS = { cols = 120, rows = 40 } -- la taille quand la fenêtre est in
 --   days()        les heures par jour (table { ["2026-10-12"] = secondes })
 --   idle_days()   le temps inactif par jour, même forme (facultatif)
 --   projects()    le temps actif par projet et par jour : { ["2026-10-12"] = { [projet] = secondes } } (facultatif)
+--   timeline()    la frise : { ["2026-10-12"] = { { début, fin, projet }, ... } } (facultatif, core/timeline.lua)
 --   today_key()   la date du jour ("2026-10-12")
 --   cfg()         les réglages (week_starts_on, goal_hours, day_offset, max_months, months_anchor, center, gradient...)
 --   labels()      les textes dans la langue choisie

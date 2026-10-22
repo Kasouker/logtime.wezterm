@@ -60,6 +60,7 @@ return {
 	board_best = "Best",
 	board_week_goal = "Goal: %d/%d days",
 	board_week_validated = "✓ Validated (%d/%d days)",
+	board_week_projects = "Best projects of the week",
 	board_selected = "Selected day",
 	board_idle_short = "Idle",
 	board_active_short = "Active",

@@ -1105,5 +1105,248 @@ check(
 	1
 )
 
+-- ---- étape 5 : les projets du jour, les meilleurs de la semaine, la frise du jour
+local overview = load_module("calendar/overview")
+local palette = load_module("color/palette")
+local function nth_color(n)
+	return palette.COLORS[overview.TIMELINE_ORDER[n]]
+end
+local PROJECTS = {
+	["2026-10-16"] = { ["Bot Discord"] = 1 * 3600, ["Netflix"] = 1800 },
+	["2026-10-14"] = { ["logtime"] = 6 * 3600, ["libft"] = 3 * 3600 },
+	["2026-10-12"] = { ["libft"] = 4 * 3600 },
+}
+local TIMELINE = { ["2026-10-16"] = { { 9 * 3600, 12 * 3600, "Bot Discord" }, { 20 * 3600, 21 * 3600, "Netflix" } } }
+local pdata = data({ projects = PROJECTS, timeline = TIMELINE })
+local pc = board.project_colors(pdata)
+check("couleurs : le plus gros projet de la SEMAINE a la 1re couleur", pc["libft"], nth_color(1))
+check("couleurs : le 2e de la semaine, la 2e", pc["logtime"], nth_color(2))
+check("couleurs : un projet du jour choisi a la sienne", pc["Bot Discord"], nth_color(3))
+check("couleurs : « autres » en gris", pc[load_module("core/activity").OTHER], overview.OTHER_COLOR)
+
+local dp = board.day_projects_lines(pdata, 50, 12, pc)
+check("projets du jour : exactement la hauteur", #dp, 12)
+check(
+	"projets du jour : chaque ligne fait la largeur",
+	(function()
+		for _, l in ipairs(dp) do
+			if layout.visible_width(l) ~= 50 then
+				return false
+			end
+		end
+		return true
+	end)(),
+	true
+)
+check(
+	"projets du jour : le titre sur le trait du haut",
+	strip(dp[1]):find("╭─ Par projet (temps actif) ─", 1, true) ~= nil,
+	true
+)
+check("projets du jour : le total du jour", strip(dp[2]):find("Total  2h00", 1, true) ~= nil, true)
+check("projets du jour : l'objectif, sur sa ligne", strip(dp[3]):find("objectif 7h", 1, true) ~= nil, true)
+check("projets du jour : le plus gros d'abord", strip(table.concat(dp, "\n")):find("Bot Discord%s+1h00") ~= nil, true)
+check("projets du jour : sa part du jour", strip(table.concat(dp, "\n")):find("Bot Discord.-50%%") ~= nil, true)
+check("projets du jour : Netflix 0h30, 25 %", strip(table.concat(dp, "\n")):find("Netflix%s+0h30.-25%%") ~= nil, true)
+check(
+	"projets du jour : la barre dans la couleur du projet",
+	table.concat(dp):find(convert.fg(nth_color(3)) .. "█", 1, true) ~= nil,
+	true
+)
+check(
+	"projets du jour : la place vide de la barre en ░",
+	strip(table.concat(dp)):find("█░", 1, true) ~= nil,
+	true
+)
+local dp_plain = board.day_projects_lines(pdata, 50, 12, nil)
+check(
+	"projets du jour, sans couleurs (sans frise) : la couleur du jour",
+	table.concat(dp_plain):find(convert.fg(assemble.day_color(2 * 3600, pdata.cfg)) .. "█", 1, true) ~= nil
+		and table.concat(dp_plain):find(convert.fg(nth_color(3)), 1, true) == nil,
+	true
+)
+check("projets du jour : le bas du cadre", strip(dp[12]):find("╰─", 1, true) ~= nil, true)
+check(
+	"projets du jour, rien ce jour-là",
+	strip(table.concat(board.day_projects_lines(data({ day_key = "2026-10-17" }), 50, 12, pc))):find(
+		fr.detail_empty,
+		1,
+		true
+	) ~= nil,
+	true
+)
+
+local wpj = board.week_projects_lines(pdata, 50, 12, pc)
+check("meilleurs de la semaine : exactement la hauteur", #wpj, 12)
+check(
+	"meilleurs de la semaine : le titre au milieu du trait du haut",
+	(function()
+		local top = strip(wpj[1])
+		local at = top:find(" Meilleurs projets de la semaine ", 1, true)
+		if not at then
+			return false
+		end
+		local left = utf8.len(top:sub(1, at - 1))
+		local right = utf8.len(top) - left - utf8.len(" Meilleurs projets de la semaine ")
+		return math.abs(left - right) <= 1
+	end)(),
+	true
+)
+check("meilleurs de la semaine : le total de la semaine", strip(wpj[2]):find("Total  31h30", 1, true) ~= nil, true)
+check(
+	"meilleurs de la semaine : l'objectif de la semaine",
+	strip(wpj[3]):find("Validée (3/3 jours)", 1, true) ~= nil,
+	true
+)
+check(
+	"meilleurs de la semaine : libft (7h00) avant logtime (6h00), sur la semaine entière",
+	(strip(table.concat(wpj, "\n")):find("libft%s+7h00") or math.huge)
+		< (strip(table.concat(wpj, "\n")):find("logtime%s+6h00") or 0),
+	true
+)
+check(
+	"meilleurs de la semaine : la part de la semaine (libft 7h00 sur 31h30 : 22 %)",
+	strip(table.concat(wpj, "\n")):find("libft.-22%%") ~= nil,
+	true
+)
+check(
+	"meilleurs de la semaine : la même couleur que dans le jour",
+	table.concat(wpj):find(convert.fg(nth_color(3)) .. "█", 1, true) ~= nil
+		or table.concat(wpj):find(convert.fg(nth_color(3)) .. "░", 1, true) ~= nil,
+	true
+)
+check(
+	"meilleurs de la semaine, rien cette semaine",
+	strip(table.concat(board.week_projects_lines(data({ days = {}, day_key = "2026-10-16" }), 50, 12, nil))):find(
+		fr.overview_week_empty,
+		1,
+		true
+	) ~= nil,
+	true
+)
+
+-- la place : les deux listes commencent à la même ligne ; trop de projets, le reste dans « autres »
+local function first_project_row(lines)
+	for k, l in ipairs(lines) do
+		if strip(l):find("%dh%d%d [█░]") then
+			return k
+		end
+	end
+end
+for _, h in ipairs({ 6, 8, 12 }) do
+	check(
+		"les deux listes commencent à la même ligne (hauteur " .. h .. ")",
+		first_project_row(board.day_projects_lines(pdata, 50, h, pc)),
+		first_project_row(board.week_projects_lines(pdata, 50, h, pc))
+	)
+end
+check("une ligne d'air sous l'objectif s'il y a la place", first_project_row(dp), 5)
+local many = {}
+for i = 1, 8 do
+	many["projet" .. i] = (10 - i) * 600
+end
+local crowded = data({ projects = { ["2026-10-16"] = many } })
+local small = strip(table.concat(board.day_projects_lines(crowded, 50, 7, nil), "\n"))
+check(
+	"peu de place : 2 projets puis « autres »",
+	small:find("projet1", 1, true) ~= nil
+		and small:find("projet2", 1, true) ~= nil
+		and small:find("projet3", 1, true) == nil
+		and small:find("autres", 1, true) ~= nil,
+	true
+)
+local tiny = strip(table.concat(board.day_projects_lines(crowded, 50, 5, nil), "\n"))
+check(
+	"une seule ligne : le plus gros projet, pas « autres »",
+	tiny:find("projet1", 1, true) ~= nil and tiny:find("autres", 1, true) == nil,
+	true
+)
+local full = strip(table.concat(board.day_projects_lines(crowded, 50, 14, nil), "\n"))
+check(
+	"assez de place : 5 projets puis « autres »",
+	full:find("projet5", 1, true) ~= nil
+		and full:find("projet6", 1, true) == nil
+		and full:find("autres", 1, true) ~= nil,
+	true
+)
+check(
+	"un nom long coupé : la barre et le pourcentage tiennent toujours",
+	(function()
+		local long = data({ projects = { ["2026-10-16"] = { [string.rep("x", 40)] = 3600 } } })
+		for _, l in ipairs(board.day_projects_lines(long, 28, 6, nil)) do
+			if layout.visible_width(l) ~= 28 then
+				return false
+			end
+		end
+		local text = strip(table.concat(board.day_projects_lines(long, 28, 6, nil)))
+		return text:find("█", 1, true) ~= nil and text:find("░  50% │", 1, true) ~= nil
+	end)(),
+	true
+)
+
+local odd = strip(
+	table.concat(
+		board.day_projects_lines(
+			data({ projects = { ["2026-10-16"] = { ["court"] = 30, ["trop"] = 5 * 3600 } } }),
+			50,
+			12,
+			nil
+		),
+		"\n"
+	)
+)
+check("un projet de moins d'une minute n'est pas affiché (il dirait « 0h00 »)", odd:find("court", 1, true), nil)
+check("un projet jamais plus long que le jour (2h00, 100 %)", odd:find("trop%s+2h00.-100%%") ~= nil, true)
+
+-- la page : les projets et la frise à leur place, un projet de la même couleur partout
+local pp = board.render(pdata, 190, 50)
+local pz = board.zones(190, 50, #board.help_lines(fr.board_help, pdata.legend, math.floor(188 * board.MONTH_SHARE)))
+check(
+	"la page : le titre des projets du jour",
+	strip(pp[pz.day_projects.y]):find("Par projet (temps actif)", 1, true) ~= nil,
+	true
+)
+check(
+	"la page : le titre des meilleurs projets",
+	strip(pp[pz.week_projects.y]):find("Meilleurs projets de la semaine", 1, true) ~= nil,
+	true
+)
+check(
+	"la page : les heures de la frise",
+	strip(pp[pz.timeline.y]):find("0h00", 1, true) ~= nil and strip(pp[pz.timeline.y]):find("24h00", 1, true) ~= nil,
+	true
+)
+check(
+	"la page : la frise, Bot Discord dans la couleur de sa barre",
+	pp[pz.timeline.y + 2]:find(convert.bg(nth_color(3)), 1, true) ~= nil,
+	true
+)
+check(
+	"la page : chaque ligne fait la largeur",
+	(function()
+		for _, l in ipairs(pp) do
+			if layout.visible_width(l) ~= 190 then
+				return false
+			end
+		end
+		return true
+	end)(),
+	true
+)
+local nofrise_data = data({ projects = PROJECTS, timeline = TIMELINE })
+nofrise_data.cfg = gradient.apply_to({ goal_hours = 7, goal_days = 3, show_timeline = false })
+local np = board.render(nofrise_data, 190, 50)
+local nz =
+	board.zones(190, 50, #board.help_lines(fr.board_help, pdata.legend, math.floor(188 * board.MONTH_SHARE)), true)
+check("sans frise : pas de zone pour elle", nz.timeline.h, 0)
+check("sans frise : les projets descendent jusqu'au bas", nz.day_projects.y + nz.day_projects.h, 50)
+check("sans frise : pas d'heures", strip(table.concat(np)):find("24h00", 1, true), nil)
+check("sans frise : pas de couleurs de projets", table.concat(np):find(convert.fg(nth_color(3)) .. "█", 1, true), nil)
+check(
+	"sans frise : le trait entre les deux listes descend jusqu'au bas du cadre",
+	char_at(strip(np[50]), nz.week_projects.x - 1),
+	"┴"
+)
+
 print(string.format("\n%d vérifications réussies, %d échecs", passed, failed))
 os.exit(failed == 0 and 0 or 1)

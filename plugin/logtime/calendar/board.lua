@@ -25,6 +25,8 @@ local dates = load("calendar/dates")
 local assemble = load("calendar/assemble")
 local overview = load("calendar/overview")
 local day_detail = load("calendar/day_detail")
+local activity = load("core/activity")
+local palette = load("color/palette")
 
 local M = {}
 
@@ -646,6 +648,184 @@ function M.week_side_lines(o, width, height)
 	return out
 end
 
+-- Les couleurs des projets de la semaine choisie, les mêmes dans les deux listes et sur la frise : les plus gros
+-- projets de la semaine d'abord (dans l'ordre des couleurs de la frise), puis ceux du jour choisi qui n'en font pas
+-- partie ; « autres » en gris. { [projet] = "#RRGGBB" }
+function M.project_colors(o)
+	local keys = overview.week_keys(o.day_key or o.today_key, o.cfg.week_starts_on)
+	local week = overview.week_data(o, keys)
+	local order = activity.top(week.projects[overview.WEEK_KEY], overview.PROJECTS)
+	for _, item in ipairs(activity.top(o.projects and o.projects[o.day_key or o.today_key], overview.PROJECTS)) do
+		order[#order + 1] = item
+	end
+	local colors, n = { [activity.OTHER] = overview.OTHER_COLOR }, 0
+	for _, item in ipairs(order) do
+		if not colors[item.label] then
+			n = n + 1
+			colors[item.label] = palette.COLORS[overview.TIMELINE_ORDER[(n - 1) % #overview.TIMELINE_ORDER + 1]]
+		end
+	end
+	return colors
+end
+
+-- Une barre horizontale de `width` colonnes, remplie à `share` dans sa couleur, le reste en « ░ » gris foncé.
+local function hbar(share, width, color)
+	local filled = math.floor(math.max(0, math.min(1, share)) * width + 0.5)
+	return convert.fg(color)
+		.. string.rep("█", filled)
+		.. convert.fg(M.TRACK)
+		.. string.rep(M.TRACK_CHAR, width - filled)
+		.. convert.RESET
+end
+
+-- Une liste de projets dans son cadre (une colonne d'air de chaque côté), le titre posé sur le trait du haut (à
+-- gauche, ou au milieu si `middle`) : exactement `height` lignes de `width` colonnes.
+--   ╭─ Par projet (temps actif) ─────────╮
+--   │ Total  10h00                       │   `head` : la première ligne
+--   │ ✓ objectif atteint                 │   `goal` : la deuxième (rien sans objectif)
+--   │                                    │   (une ligne d'air s'il y a la place)
+--   │ Bot Discord  5h00 ██████░░░░░  50% │   les plus gros projets (au moins une minute), le reste dans « autres »
+--   ╰────────────────────────────────────╯
+--   `of` : le temps par projet ({ [projet] = secondes }), `total` : le temps dont on prend la part (les pourcentages),
+--   `color(projet)` : la couleur de sa barre, `empty` : le texte quand rien n'est compté.
+local function project_box(o, width, height, title, middle, head, goal, of, total, color, empty)
+	local b, edge = o.b, o.edge or ""
+	local off = edge ~= "" and convert.RESET or ""
+	local function e(s_)
+		return edge .. s_ .. off
+	end
+	local inner_w = width - 4 -- l'air et les deux bords
+	local inner_h = height - 2
+	local rows = { " " .. head }
+	if goal ~= "" then -- toujours sur sa ligne : les projets du jour et de la semaine commencent à la même hauteur
+		rows[2] = " " .. goal
+	end
+	-- une ligne d'air sous la tête si les projets et « autres » tiennent quand même : selon la hauteur seulement (les
+	-- deux listes, de même hauteur, commencent à la même ligne)
+	local air = inner_h - #rows >= overview.PROJECTS + 2
+	local room = inner_h - #rows - (air and 1 or 0) -- les lignes des projets
+	local list = {}
+	if total > 0 then
+		local all = activity.top(of, overview.PROJECTS)
+		if #all > room then -- pas la place pour tous : moins de projets, le reste dans « autres » (avec une seule
+			-- ligne, « autres » tombe sous le cadre : seul le plus gros projet se voit)
+			all = activity.top(of, math.max(1, room - 1))
+		end
+		for _, item in ipairs(all) do
+			if item.secs >= 60 then -- moins d'une minute s'afficherait « 0h00 »
+				list[#list + 1] = item
+			end
+		end
+	end
+	if total == 0 then
+		rows[#rows + 1] = " " .. empty
+	elseif air then
+		rows[#rows + 1] = ""
+	end
+	-- les colonnes : le nom, la durée (« 10h04 »), la barre, le pourcentage (« 100% »)
+	local longest = 0
+	for _, item in ipairs(list) do
+		longest = math.max(longest, vw(item.label == activity.OTHER and o.labels.detail_other or item.label))
+	end
+	local fixed = 1 + 1 + 5 + 1 + 1 + 4 + 1 -- l'air, la durée, le pourcentage et les espaces entre eux
+	-- le nom le plus long (au plus 24), en laissant au moins 4 colonnes à la barre
+	local name_w = math.max(1, math.min(longest, 24, inner_w - fixed - 4))
+	local bar_w = math.max(1, inner_w - fixed - name_w)
+	for _, item in ipairs(list) do
+		local name = item.label == activity.OTHER and o.labels.detail_other or item.label
+		local secs = math.min(item.secs, total) -- jamais plus que le total (deux fichiers fusionnés peuvent se contredire)
+		local duration = stats.hm(secs)
+		local percent = string.format("%d%%", math.floor(secs * 100 / total + 0.5))
+		rows[#rows + 1] = " "
+			.. fit(name, name_w)
+			.. " "
+			.. string.rep(" ", 5 - vw(duration))
+			.. duration
+			.. " "
+			.. hbar(secs / total, bar_w, color(item.label))
+			.. " "
+			.. string.rep(" ", 4 - vw(percent))
+			.. percent
+	end
+	local top
+	if vw(title) + 4 > inner_w then
+		title = ""
+	end
+	if title == "" then
+		top = e(b.tl .. string.rep(b.h, inner_w) .. b.tr)
+	else
+		local before = middle and (inner_w - vw(title) - 2) // 2 or 1
+		top = e(b.tl .. string.rep(b.h, before))
+			.. " "
+			.. title
+			.. " "
+			.. e(string.rep(b.h, inner_w - vw(title) - 2 - before) .. b.tr)
+	end
+	local out = { " " .. top .. " " }
+	for k = 1, inner_h do
+		out[#out + 1] = " " .. e(b.v) .. fit(rows[k] or "", inner_w) .. e(b.v) .. " "
+	end
+	out[#out + 1] = " " .. e(b.bl .. string.rep(b.h, inner_w) .. b.br) .. " "
+	return out
+end
+
+-- Les projets du jour choisi (« Par projet (temps actif) ») : le total et l'objectif du jour, puis ses plus gros
+-- projets. Exactement `height` lignes de `width` colonnes. `colors` : M.project_colors (nil : la couleur du jour).
+function M.day_projects_lines(o, width, height, colors)
+	local labels = o.labels
+	local key = o.day_key or o.today_key
+	local total = math.floor(math.max(0, o.days[key] or 0))
+	local day_color = assemble.day_color(total, o.cfg) or overview.IDLE_COLOR
+	local head = labels.detail_total .. "  " .. stats.hm(total)
+	return project_box(
+		o,
+		width,
+		height,
+		labels.detail_projects,
+		false,
+		head,
+		overview.goal_text(o, key, total),
+		o.projects and o.projects[key],
+		total,
+		function(label)
+			return colors and colors[label] or day_color
+		end,
+		labels.detail_empty
+	)
+end
+
+-- Les meilleurs projets de la semaine choisie : le total de la semaine, puis ses plus gros projets. Exactement
+-- `height` lignes de `width` colonnes. `colors` : M.project_colors (nil : la couleur de la moyenne de la semaine).
+function M.week_projects_lines(o, width, height, colors)
+	local labels = o.labels
+	local w = M.week_stats(o)
+	local keys = overview.week_keys(o.day_key or o.today_key, o.cfg.week_starts_on)
+	local week = overview.week_data(o, keys)
+	local week_color = assemble.day_color(w.average, o.cfg) or overview.IDLE_COLOR
+	local head = labels.detail_total .. "  " .. stats.hm(w.total)
+	local goal = ""
+	if stats.has_goal(o.cfg.goal_hours) then
+		local goal_days = math.floor(tonumber(o.cfg.goal_days) or 5)
+		local format = w.reached >= goal_days and labels.board_week_validated or labels.board_week_goal
+		goal = string.format(format, w.reached, goal_days)
+	end
+	return project_box(
+		o,
+		width,
+		height,
+		labels.board_week_projects or "",
+		true,
+		head,
+		goal,
+		week.projects[overview.WEEK_KEY],
+		w.total,
+		function(label)
+			return colors and colors[label] or week_color
+		end,
+		labels.overview_week_empty
+	)
+end
+
 -- L'aide (« mois : Tab Maj+Tab | semaine : ↑ ↓ | … ») sur `width` colonnes : coupée entre ses parties (« | ») sur
 -- autant de lignes qu'il faut, la légende des couleurs au bout de la dernière (ou sur une ligne à elle).
 function M.help_lines(help, legend, width)
@@ -685,8 +865,8 @@ end
 
 -- Les zones de la page : { x, y, w, h } (x et y à partir de 1), pour une fenêtre de width x height. Le cadre et les
 -- traits entre les zones ne leur appartiennent pas. L'aide (help_h lignes, 2 par défaut) est en bas à gauche, sous le
--- mois ; la droite descend jusqu'au bas du cadre.
-function M.zones(width, height, help_h)
+-- mois ; la droite descend jusqu'au bas du cadre. Sans frise (`no_timeline`), les projets prennent sa place.
+function M.zones(width, height, help_h, no_timeline)
 	help_h = help_h or 2
 	local z = {}
 	local inner = width - 2 -- entre les deux bords du cadre
@@ -702,11 +882,12 @@ function M.zones(width, height, help_h)
 	z.week_side = { x = width - M.WEEK_SIDE, y = bottom_y, w = M.WEEK_SIDE, h = week_h }
 	z.week = { x = right_x, y = bottom_y, w = z.week_side.x - 1 - right_x, h = week_h }
 	local projects_y = bottom_y + week_h + 1
-	local projects_h = bottom_h - week_h - 1 - M.TIMELINE_HEIGHT - 1
+	local timeline_h = no_timeline and 0 or M.TIMELINE_HEIGHT
+	local projects_h = bottom_h - week_h - 1 - (no_timeline and 0 or timeline_h + 1)
 	local day_w = math.floor(right_w * M.PROJECTS_SHARE)
 	z.day_projects = { x = right_x, y = projects_y, w = day_w, h = projects_h }
 	z.week_projects = { x = right_x + day_w + 1, y = projects_y, w = right_w - day_w - 1, h = projects_h }
-	z.timeline = { x = right_x, y = projects_y + projects_h + 1, w = right_w, h = M.TIMELINE_HEIGHT }
+	z.timeline = { x = right_x, y = projects_y + projects_h + 1, w = right_w, h = timeline_h }
 	z.help = { x = 2, y = height - help_h, w = month_w, h = help_h }
 	return z
 end
@@ -762,7 +943,8 @@ function M.render(o, width, height)
 	local by_mask, by_char = box_chars(b)
 	local month_w = math.floor((width - 2) * M.MONTH_SHARE)
 	local help = M.help_lines(o.labels.board_help or "", o.legend, month_w)
-	local z = M.zones(width, height, #help)
+	local show_timeline = o.cfg.show_timeline ~= false
+	local z = M.zones(width, height, #help, not show_timeline)
 	-- chaque case : un nombre (les directions d'un trait) ou un texte (un caractère visible, avec ses couleurs)
 	local grid = {}
 	for y = 1, height do
@@ -828,13 +1010,25 @@ function M.render(o, width, height)
 	column(divider, below_year, height)
 	column(side, below_year, under_week)
 	line(under_week, divider, width)
-	column(between, under_week, above_timeline)
-	line(above_timeline, divider, width)
+	if show_timeline then
+		column(between, under_week, above_timeline)
+		line(above_timeline, divider, width)
+	else
+		column(between, under_week, height)
+	end
 	-- le mois choisi, dans son propre cadre
 	paste(M.month_lines(o, z.month.w, z.month.h), z.month.x, z.month.y)
 	-- la semaine choisie, dans son propre cadre, puis ses chiffres à droite
 	paste(M.week_lines(o, z.week.w, z.week.h), z.week.x, z.week.y)
 	paste(M.week_side_lines(o, z.week_side.w, z.week_side.h), z.week_side.x, z.week_side.y)
+	-- les projets du jour et de la semaine, et la frise du jour : un projet a la même couleur partout (sans frise, les
+	-- barres gardent la couleur du jour, comme le détail d'un jour)
+	local colors = show_timeline and M.project_colors(o) or nil
+	paste(M.day_projects_lines(o, z.day_projects.w, z.day_projects.h, colors), z.day_projects.x, z.day_projects.y)
+	paste(M.week_projects_lines(o, z.week_projects.w, z.week_projects.h, colors), z.week_projects.x, z.week_projects.y)
+	if show_timeline then
+		paste(overview.timeline(o, o.day_key or o.today_key, z.timeline.w - 2, colors), z.timeline.x + 1, z.timeline.y)
+	end
 	local out = {}
 	for y = 1, height do
 		local parts = {}
