@@ -372,7 +372,8 @@ check("fenêtre de 133 x 47 : aucune marge à gauche (juste les 2 espaces du tit
 w, page, pane = open({}, 100, 40)
 w.GLOBAL.logtime_page_pane = pane.id
 _, help = find_line(drawn(pane), "Logtime   ←→↑↓")
-check("avant : fenêtre de 100 colonnes, marge de 17 (+ 2)", leading(help), 17 + 2)
+-- (la ligne d'aide, plus large que le mois, limite la marge : elle ne doit pas dépasser de la fenêtre)
+check("avant : fenêtre de 100 colonnes, marge de 9 (+ 2)", leading(help), 9 + 2)
 pane.dims.cols = 120
 page.on_resize(new_window(w, 120, 40), pane)
 _, help = find_line(drawn(pane), "Logtime   ←→↑↓")

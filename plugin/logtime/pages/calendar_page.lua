@@ -1,7 +1,7 @@
 -- plugin/logtime/pages/calendar_page.lua : la page du calendrier (un onglet où l'on change de mois avec les flèches).
 local load = ...
 local assemble = load("calendar/assemble")
-local year_view = load("calendar/year")
+local board = load("calendar/board")
 local day_detail = load("calendar/day_detail")
 local dates = load("calendar/dates")
 local layout = load("calendar/layout")
@@ -11,11 +11,13 @@ local safe = load("ui/safe")
 local gradient = load("color/gradient")
 local stats = load("calendar/stats")
 local idle = load("core/idle")
+local convert = load("color/convert")
 
 local M = {}
 
 M.TABLE_NAME = "logtime_page"
-M.VIEW = { MONTHS = 1, YEAR = 2, DAY = 3 }
+M.VIEW = { MONTHS = 1, YEAR = 2, DAY = 3 } -- YEAR : la vue « tout en un » (calendar/board.lua)
+M.DEFAULT_DIMS = { cols = 120, rows = 40 } -- la taille quand la fenêtre est inconnue (dans les tests)
 
 -- ctx fournit ce que la page ne sait pas faire seule :
 --   wezterm       l'API de WezTerm
@@ -120,25 +122,36 @@ function M.create(ctx)
 		return help .. "\n\n" .. table.concat(lines, "\n"), 1, width
 	end
 
-	-- La vue de l'année : une ligne d'aide, l'année (calendar/year.lua), la légende des couleurs. Si elle ne tient pas
-	-- dans la fenêtre : le message « fenêtre trop petite », avec la taille nécessaire.
-	local function build_year_text(dims, labels, cfg, year)
-		local help = "  " .. labels.title .. "   " .. labels.year_help
-		local idle_days = ctx.idle_days and ctx.idle_days() or nil
-		local lines, width = year_view.render(ctx.days(), year, ctx.today_key(), cfg, labels, idle_days)
-		local text = help
-			.. "\n\n"
-			.. table.concat(lines, "\n")
-			.. "\n\n"
-			.. assemble.legend(cfg, labels)
-			.. idle_today(labels)
-		local needed = #lines + 4
-		width = math.max(width, layout.visible_width(help))
-		if dims and ((tonumber(dims.cols) or 0) < width or (tonumber(dims.rows) or 0) < needed) then
-			local title, hint = labels.too_small, string.format(labels.too_small_hint, width, needed)
+	-- La vue « tout en un » (touche a, calendar/board.lua) : l'année, le mois, la semaine et le jour choisis, sur toute
+	-- la fenêtre. Si elle ne tient pas : le message « fenêtre trop petite », avec la taille nécessaire.
+	local function build_board_text(dims, labels, cfg)
+		dims = dims or M.DEFAULT_DIMS
+		local year, month = selected_month()
+		local b = assemble.BORDER_STYLES[cfg.border_style] or assemble.BORDER_STYLES.rounded
+		local border = cfg.border_color
+		if type(border) ~= "string" or not border:match("^#%x%x%x%x%x%x$") then
+			border = assemble.BORDER_COLOR
+		end
+		local lines, min_w, min_h = board.render({
+			days = ctx.days(),
+			idle_days = ctx.idle_days and ctx.idle_days() or nil,
+			projects = ctx.projects and ctx.projects() or nil,
+			timeline = ctx.timeline and ctx.timeline() or nil,
+			year = year,
+			month = month,
+			day_key = dates.key(selected_day()),
+			today_key = ctx.today_key(),
+			cfg = cfg,
+			labels = labels,
+			b = b,
+			edge = convert.fg(border),
+			legend = board.legend(assemble.legend(cfg, labels), labels),
+		}, tonumber(dims.cols) or 0, tonumber(dims.rows) or 0)
+		if not lines then
+			local title, hint = labels.too_small, string.format(labels.too_small_hint, min_w, min_h)
 			return title .. "\n" .. hint, 0, math.max(layout.visible_width(title), layout.visible_width(hint))
 		end
-		return text, 12, width
+		return table.concat(lines, "\n"), 12, tonumber(dims.cols)
 	end
 
 	-- Le texte de la page : une ligne d'aide, puis le ou les mois (ou l'année, touche a). Le nombre de mois dépend de la taille de la fenêtre
@@ -151,7 +164,7 @@ function M.create(ctx)
 		end
 		local year, month = selected_month()
 		if current_view() == M.VIEW.YEAR then
-			return build_year_text(dims, labels, cfg, year)
+			return build_board_text(dims, labels, cfg)
 		end
 		if current_view() == M.VIEW.DAY then
 			return build_day_text(dims, labels, cfg)
@@ -287,29 +300,18 @@ function M.create(ctx)
 	end
 
 	-- ← → ↑ ↓ : le jour d'avant / d'après, la semaine d'avant / d'après (on passe au mois voisin tout seul).
-	-- Dans la vue de l'année, ← → changent d'année.
 	local function shift_day(delta)
 		return function(window, pane)
 			local year, month, d = selected_day()
-			if current_view() == M.VIEW.YEAR then
-				if delta == 1 or delta == -1 then
-					show(year + delta, month, pane)
-				end
-				return
-			end
 			local t = os.date("*t", os.time({ year = year, month = month, day = d + delta, hour = 12 }))
 			show(t.year, t.month, pane, t.day)
 		end
 	end
 
-	-- PgUp PgDn : un mois de plus ou de moins (une année dans la vue de l'année).
+	-- PgUp PgDn (et Tab, Maj+Tab) : un mois de plus ou de moins.
 	local function shift_month(delta)
 		return function(window, pane)
 			local year, month = selected_month()
-			if current_view() == M.VIEW.YEAR then
-				show(year + delta, month, pane) -- l'année d'à côté, le même mois (delta n'est pas modifié : la touche le garde)
-				return
-			end
 			month = month + delta
 			if month < 1 then
 				month, year = 12, year - 1
@@ -335,7 +337,7 @@ function M.create(ctx)
 		redraw(pane, false)
 	end
 
-	-- a : la vue de l'année, ou de nouveau les mois.
+	-- a : la vue « tout en un », ou de nouveau les mois.
 	local function toggle_view(window, pane)
 		G.logtime_page_view = (current_view() == M.VIEW.YEAR) and M.VIEW.MONTHS or M.VIEW.YEAR
 		redraw(pane, false)
@@ -351,9 +353,9 @@ function M.create(ctx)
 		window:perform_action(act.CloseCurrentTab({ confirm = false }), pane)
 	end
 
-	-- Échap : dans le détail du jour, retour au calendrier ; sinon fermer la page.
+	-- Échap : dans le détail du jour ou la vue « tout en un », retour au calendrier ; sinon fermer la page.
 	local function back_or_close(window, pane)
-		if current_view() == M.VIEW.DAY then
+		if current_view() == M.VIEW.DAY or current_view() == M.VIEW.YEAR then
 			G.logtime_page_view = M.VIEW.MONTHS
 			redraw(pane, false)
 			return

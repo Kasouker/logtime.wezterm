@@ -403,7 +403,7 @@ local function scenarios()
 	check(
 		"F2 : la ligne d'aide est la première ligne affichée (le dessin est centré)",
 		(text:gsub("^\n+", "")):match("^%s*(.-)\n"),
-		"Logtime   ←→↑↓ jour   Tab Maj+Tab mois   Entrée détail   a année   t aujourd'hui"
+		"Logtime   ←→↑↓ jour   Tab Maj+Tab mois   Entrée détail   a vue d'ensemble   t aujourd'hui"
 	)
 	check(
 		"F2 : lire les heures n'écrit rien (rien de nouveau à sauvegarder)",
@@ -1072,13 +1072,8 @@ local function scenarios()
 	)
 	page_binding(config, "a")(win, idle_page)
 	check(
-		"inactif : la vue de l'année, dans les statistiques",
+		"inactif : la vue d'ensemble (touche a), dans les chiffres de l'année",
 		last_text(idle_page):find("Inactif : 1h00 (85 %)", 1, true) ~= nil,
-		true
-	)
-	check(
-		"inactif : la vue de l'année, au bout de la légende",
-		last_text(idle_page):find("Aujourd'hui : 1h00 inactif", 1, true) ~= nil,
 		true
 	)
 	page_binding(config, "a")(win, idle_page)
