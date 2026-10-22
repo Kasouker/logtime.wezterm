@@ -1235,8 +1235,8 @@ check(
 )
 check("meilleurs de la semaine : le total de la semaine", strip(wpj[2]):find("Total  31h30", 1, true) ~= nil, true)
 check(
-	"meilleurs de la semaine : l'objectif de la semaine",
-	strip(wpj[3]):find("Validée (3/3 jours)", 1, true) ~= nil,
+	"meilleurs de la semaine : l'objectif sur la ligne du total, après « // » (il y tient)",
+	strip(wpj[2]):find("Total  31h30    //    ✓ Validée (3/3 jours)", 1, true) ~= nil,
 	true
 )
 check(
@@ -1276,9 +1276,71 @@ local function first_project_row(lines)
 end
 for _, h in ipairs({ 6, 8, 12 }) do
 	check(
-		"les deux listes commencent à la même ligne (hauteur " .. h .. ")",
-		first_project_row(board.day_projects_lines(pdata, 50, h, pc)),
-		first_project_row(board.week_projects_lines(pdata, 50, h, pc))
+		"les deux listes commencent à la même ligne (hauteur " .. h .. ", objectifs dessous)",
+		first_project_row(board.day_projects_lines(pdata, 50, h, pc, true)),
+		first_project_row(board.week_projects_lines(pdata, 50, h, pc, true))
+	)
+end
+-- le total et l'objectif sur une ligne : « // » large, sinon serré, sinon l'objectif dessous
+check("tête : sans objectif, le total seul", board.head_line("Total  2h00", "", 30), "Total  2h00")
+check(
+	"tête : la place, « // » large",
+	board.head_line("Total  2h00", "objectif", 40),
+	"Total  2h00    //    objectif"
+)
+check(
+	"tête : juste la place pour « // » serré",
+	board.head_line("Total  2h00", "objectif", 1 + #"Total  2h00  //  objectif" + 1),
+	"Total  2h00  //  objectif"
+)
+check("tête : pas la place, rien (l'objectif ira dessous)", board.head_line("Total  2h00", "objectif", 25), nil)
+check(
+	"projets du jour, assez large : l'objectif sur la ligne du total",
+	strip(board.day_projects_lines(pdata, 70, 12, pc)[2]):find("Total  2h00    //    objectif 7h", 1, true) ~= nil,
+	true
+)
+check(
+	"projets du jour, forcé dessous : le total seul, l'objectif dessous",
+	strip(board.day_projects_lines(pdata, 70, 12, pc, true)[2]):find("//", 1, true) == nil
+		and strip(board.day_projects_lines(pdata, 70, 12, pc, true)[3]):find("objectif 7h", 1, true) ~= nil,
+	true
+)
+local no_goal = data({ projects = PROJECTS })
+no_goal.cfg = gradient.apply_to({ goal_hours = 0 })
+check(
+	"sans objectif, même « dessous » : pas de ligne vide à sa place",
+	first_project_row(board.day_projects_lines(no_goal, 50, 6, nil, true)),
+	first_project_row(board.day_projects_lines(no_goal, 50, 6, nil, false))
+)
+-- dans la page : sur la ligne s'il tient dans les DEUX listes, sinon dessous dans les deux
+for _, size in ipairs({ { 190, 50, false }, { 240, 56, true } }) do
+	local p = board.render(pdata, size[1], size[2])
+	local month_w = math.floor((size[1] - 2) * board.MONTH_SHARE)
+	local zz = board.zones(size[1], size[2], #board.help_lines(fr.board_help, nil, month_w))
+	local row = strip(p[zz.day_projects.y + 1])
+	check(
+		"la page "
+			.. size[1]
+			.. " x "
+			.. size[2]
+			.. " : les objectifs "
+			.. (size[3] and "sur la ligne du total" or "dessous"),
+		select(2, row:gsub("//", "")),
+		size[3] and 2 or 0
+	)
+	local function first_row(x0, w_)
+		for y = zz.day_projects.y, zz.day_projects.y + zz.day_projects.h - 1 do
+			local plain = strip(p[y])
+			local part = plain:sub(utf8.offset(plain, x0), utf8.offset(plain, x0 + w_) - 1)
+			if part:find("%dh%d%d [█░]") then
+				return y
+			end
+		end
+	end
+	check(
+		"la page " .. size[1] .. " x " .. size[2] .. " : les deux listes commencent à la même ligne",
+		first_row(zz.day_projects.x, zz.day_projects.w),
+		first_row(zz.week_projects.x, zz.week_projects.w)
 	)
 end
 check("une ligne d'air sous l'objectif s'il y a la place", first_project_row(dp), 5)

@@ -711,14 +711,14 @@ end
 -- Une liste de projets dans son cadre (une colonne d'air de chaque côté), le titre posé sur le trait du haut (à
 -- gauche, ou au milieu si `middle`) : exactement `height` lignes de `width` colonnes.
 --   ╭─ Par projet (temps actif) ─────────╮
---   │ Total  10h00                       │   `head` : la première ligne
---   │ ✓ objectif atteint                 │   `goal` : la deuxième (rien sans objectif)
+--   │ Total  10h00    //    ✓ objectif   │   `head` puis `goal` (rien sans objectif) sur la même ligne (M.head_line),
+--   │                                    │   ou `goal` dessous si `below` (pas la place dans les deux listes)
 --   │                                    │   (une ligne d'air s'il y a la place)
 --   │ Bot Discord  5h00 ██████░░░░░  50% │   les plus gros projets (au moins une minute), le reste dans « autres »
 --   ╰────────────────────────────────────╯
 --   `of` : le temps par projet ({ [projet] = secondes }), `total` : le temps dont on prend la part (les pourcentages),
 --   `color(projet)` : la couleur de sa barre, `empty` : le texte quand rien n'est compté.
-local function project_box(o, width, height, title, middle, head, goal, of, total, color, empty)
+local function project_box(o, width, height, title, middle, head, goal, below, of, total, color, empty)
 	local b, edge = o.b, o.edge or ""
 	local off = edge ~= "" and convert.RESET or ""
 	local function e(s_)
@@ -726,8 +726,8 @@ local function project_box(o, width, height, title, middle, head, goal, of, tota
 	end
 	local inner_w = width - 4 -- l'air et les deux bords
 	local inner_h = height - 2
-	local rows = { " " .. head }
-	if goal ~= "" then -- toujours sur sa ligne : les projets du jour et de la semaine commencent à la même hauteur
+	local rows = { " " .. (not below and M.head_line(head, goal, inner_w) or head) }
+	if below and goal ~= "" then
 		rows[2] = " " .. goal
 	end
 	-- une ligne d'air sous la tête si les projets et « autres » tiennent quand même : selon la hauteur seulement (les
@@ -799,14 +799,52 @@ local function project_box(o, width, height, title, middle, head, goal, of, tota
 	return out
 end
 
+M.HEAD_SEPARATORS = { "    //    ", "  //  " } -- entre le total et l'objectif : large, sinon serré
+
+-- La première ligne d'une liste de projets : « Total 10h00    //    ✓ objectif 7h atteint » sur `width` colonnes (une
+-- colonne d'air devant) ; le séparateur se resserre s'il le faut ; nil si l'objectif ne tient pas sur la ligne.
+function M.head_line(head, goal, width)
+	if goal == "" then
+		return head
+	end
+	for _, sep in ipairs(M.HEAD_SEPARATORS) do
+		local text = head .. sep .. goal
+		if 1 + vw(text) + 1 <= width then
+			return text
+		end
+	end
+	return nil
+end
+
+-- Le total et l'objectif du jour choisi.
+function M.day_head(o)
+	local key = o.day_key or o.today_key
+	local total = math.floor(math.max(0, o.days[key] or 0))
+	return o.labels.detail_total .. "  " .. stats.hm(total), overview.goal_text(o, key, total)
+end
+
+-- Le total et l'objectif de la semaine choisie (« Objectif : 3/5 jours » ou « ✓ Validée (5/5 jours) »).
+function M.week_head(o)
+	local labels = o.labels
+	local w = M.week_stats(o)
+	local goal = ""
+	if stats.has_goal(o.cfg.goal_hours) then
+		local goal_days = math.floor(tonumber(o.cfg.goal_days) or 5)
+		local format = w.reached >= goal_days and labels.board_week_validated or labels.board_week_goal
+		goal = string.format(format, w.reached, goal_days)
+	end
+	return labels.detail_total .. "  " .. stats.hm(w.total), goal
+end
+
 -- Les projets du jour choisi (« Par projet (temps actif) ») : le total et l'objectif du jour, puis ses plus gros
--- projets. Exactement `height` lignes de `width` colonnes. `colors` : M.project_colors (nil : la couleur du jour).
-function M.day_projects_lines(o, width, height, colors)
+-- projets. Exactement `height` lignes de `width` colonnes. `colors` : M.project_colors (nil : la couleur du jour) ;
+-- `below` : l'objectif sous le total (sinon sur sa ligne, s'il y tient).
+function M.day_projects_lines(o, width, height, colors, below)
 	local labels = o.labels
 	local key = o.day_key or o.today_key
 	local total = math.floor(math.max(0, o.days[key] or 0))
 	local day_color = assemble.day_color(total, o.cfg) or overview.IDLE_COLOR
-	local head = labels.detail_total .. "  " .. stats.hm(total)
+	local head, goal = M.day_head(o)
 	return project_box(
 		o,
 		width,
@@ -814,7 +852,8 @@ function M.day_projects_lines(o, width, height, colors)
 		labels.detail_projects,
 		false,
 		head,
-		overview.goal_text(o, key, total),
+		goal,
+		below or M.head_line(head, goal, width - 4) == nil,
 		o.projects and o.projects[key],
 		total,
 		function(label)
@@ -824,21 +863,16 @@ function M.day_projects_lines(o, width, height, colors)
 	)
 end
 
--- Les meilleurs projets de la semaine choisie : le total de la semaine, puis ses plus gros projets. Exactement
--- `height` lignes de `width` colonnes. `colors` : M.project_colors (nil : la couleur de la moyenne de la semaine).
-function M.week_projects_lines(o, width, height, colors)
+-- Les meilleurs projets de la semaine choisie : le total et l'objectif de la semaine, puis ses plus gros projets.
+-- Exactement `height` lignes de `width` colonnes. `colors` : M.project_colors (nil : la couleur de la moyenne de la
+-- semaine) ; `below` : comme pour le jour.
+function M.week_projects_lines(o, width, height, colors, below)
 	local labels = o.labels
 	local w = M.week_stats(o)
 	local keys = overview.week_keys(o.day_key or o.today_key, o.cfg.week_starts_on)
 	local week = overview.week_data(o, keys)
 	local week_color = assemble.day_color(w.average, o.cfg) or overview.IDLE_COLOR
-	local head = labels.detail_total .. "  " .. stats.hm(w.total)
-	local goal = ""
-	if stats.has_goal(o.cfg.goal_hours) then
-		local goal_days = math.floor(tonumber(o.cfg.goal_days) or 5)
-		local format = w.reached >= goal_days and labels.board_week_validated or labels.board_week_goal
-		goal = string.format(format, w.reached, goal_days)
-	end
+	local head, goal = M.week_head(o)
 	return project_box(
 		o,
 		width,
@@ -847,6 +881,7 @@ function M.week_projects_lines(o, width, height, colors)
 		true,
 		head,
 		goal,
+		below or M.head_line(head, goal, width - 4) == nil,
 		week.projects[overview.WEEK_KEY],
 		w.total,
 		function(label)
@@ -1056,8 +1091,19 @@ function M.render(o, width, height)
 	-- les projets du jour et de la semaine, et la frise du jour : un projet a la même couleur partout (sans frise, les
 	-- barres gardent la couleur du jour, comme le détail d'un jour)
 	local colors = show_timeline and M.project_colors(o) or nil
-	paste(M.day_projects_lines(o, z.day_projects.w, z.day_projects.h, colors), z.day_projects.x, z.day_projects.y)
-	paste(M.week_projects_lines(o, z.week_projects.w, z.week_projects.h, colors), z.week_projects.x, z.week_projects.y)
+	-- l'objectif sur la ligne du total seulement s'il y tient dans les DEUX listes (elles restent alignées)
+	local below = M.head_line(M.day_head(o), select(2, M.day_head(o)), z.day_projects.w - 4) == nil
+		or M.head_line(M.week_head(o), select(2, M.week_head(o)), z.week_projects.w - 4) == nil
+	paste(
+		M.day_projects_lines(o, z.day_projects.w, z.day_projects.h, colors, below),
+		z.day_projects.x,
+		z.day_projects.y
+	)
+	paste(
+		M.week_projects_lines(o, z.week_projects.w, z.week_projects.h, colors, below),
+		z.week_projects.x,
+		z.week_projects.y
+	)
 	if show_timeline then
 		paste(overview.timeline(o, o.day_key or o.today_key, z.timeline.w - 2, colors), z.timeline.x + 1, z.timeline.y)
 	end
