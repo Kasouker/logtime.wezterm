@@ -2,7 +2,7 @@
 
 [English](README.md) · **Français**
 
-Un plugin [WezTerm](https://wezterm.org) qui **compte le temps passé dans ton terminal** et l'affiche dans la barre d'onglets, avec un **calendrier interactif**, une **vue de l'année**, un **détail du jour** (temps actif / inactif, temps par projet) et une **page de réglages**. Rien d'autre à installer : tout se passe dans WezTerm.
+Un plugin [WezTerm](https://wezterm.org) qui **compte le temps passé dans ton terminal** et l'affiche dans la barre d'onglets, avec un **calendrier interactif**, une **vue d'ensemble** (l'année, le mois, la semaine, les projets et la frise sur un seul écran), un **détail du jour** (temps actif / inactif, temps par projet) et une **page de réglages**. Rien d'autre à installer : tout se passe dans WezTerm.
 
 ![Le calendrier](docs/calendar.fr.png)
 
@@ -11,7 +11,14 @@ Un plugin [WezTerm](https://wezterm.org) qui **compte le temps passé dans ton t
 - **Le compteur du jour dans la barre d'onglets** (`05:12:30`), sans rien à brancher : il s'affiche à droite de la barre normale, ou dans [tabline.wez](https://github.com/michaelbrusegard/tabline.wez) si tu l'utilises.
 - **Objectif du jour** : `05:12:30 / 7h`, puis `✓ 07:03:10` en couleur, et une notification 🎉 une fois par jour quand il est atteint.
 - **Calendrier** (`F2`) : plusieurs mois côte à côte selon la taille de la fenêtre, un dégradé de couleur par jour, totaux, séries, semaines et jours validés.
-- **Vue de l'année** (`a` dans le calendrier), façon GitHub.
+- **Vue d'ensemble** (`a` dans le calendrier), tout sur un seul écran, sur toute la fenêtre :
+  - l'**année**, une case par jour, avec les mois en dessous ;
+  - le **mois** choisi, avec l'objectif jour par jour et les semaines et jours validés ;
+  - la **semaine** choisie : deux barres par jour (inactif et actif), et ses chiffres (total, jours actifs, moyenne, meilleur jour, objectif) ;
+  - les **projets du jour choisi** et les **meilleurs projets de la semaine** ;
+  - la **frise** du jour choisi.
+
+  Un projet garde la même couleur partout sur l'écran.
 - **Détail du jour** (`Entrée` sur un jour) : total, objectif, **temps actif et inactif**, **temps par projet** et total de la semaine.
 - **Temps inactif** : quand rien ne bouge dans le terminal pendant 5 minutes, la pause est notée comme inactive (le compteur la compte quand même).
 - **Temps par projet** : chaque seconde va au projet de l'onglet que tu regardes (son dossier, par exemple `~/42/C05/ex02` → `42/C05`).
@@ -19,9 +26,9 @@ Un plugin [WezTerm](https://wezterm.org) qui **compte le temps passé dans ton t
 - **Sauvegarde sûre** : écriture vérifiée après coup, copie de secours, fichier illisible mis de côté et jamais écrasé.
 - **Français et anglais.**
 
-| Détail du jour | Vue de l'année | Réglages (`F4`) |
+| Détail du jour | Vue d'ensemble | Réglages (`F4`) |
 |---|---|---|
-| ![Détail du jour](docs/day-detail.fr.png) | ![Vue de l'année](docs/year.fr.png) | ![Réglages](docs/settings.fr.png) |
+| ![Détail du jour](docs/day-detail.fr.png) | ![Vue d'ensemble](docs/year.fr.png) | ![Réglages](docs/settings.fr.png) |
 
 ## Installation
 
@@ -55,7 +62,9 @@ C'est tout : le compteur apparaît dans la barre d'onglets, `F2` ouvre le calend
 | `F2` | partout | ouvre le calendrier dans un nouvel onglet (ou le remet devant) |
 | `F4` | partout | ouvre la page de réglages |
 
-**Dans le calendrier** : `←` `→` (ou `h` `l`) jour d'avant / d'après · `↑` `↓` (ou `k` `j`) semaine d'avant / d'après · `Maj+Tab` `Tab` (ou `PgUp` `PgDn`) mois précédent / suivant · `Entrée` détail du jour choisi · `a` vue de l'année (et retour) · `t` aujourd'hui · `r` rafraîchir · `q` ou `Échap` fermer. Dans la vue de l'année, `←` `→` changent d'année.
+**Dans le calendrier** : `←` `→` (ou `h` `l`) jour d'avant / d'après · `↑` `↓` (ou `k` `j`) semaine d'avant / d'après · `Maj+Tab` `Tab` (ou `PgUp` `PgDn`) mois précédent / suivant · `Entrée` détail du jour choisi · `a` vue d'ensemble (et retour) · `t` aujourd'hui · `r` rafraîchir · `q` ou `Échap` fermer.
+
+**Dans la vue d'ensemble** (il lui faut une fenêtre d'au moins 120 colonnes × 34 lignes) : `←` `→` jour · `↑` `↓` semaine · `Maj+Tab` `Tab` mois (et l'année, après décembre ou avant janvier) · `t` aujourd'hui · `a` ou `Échap` retour au calendrier · `r` rafraîchir · `q` fermer.
 
 **Dans le détail du jour** : `←` `→` `↑` `↓` passent à un autre jour · `Entrée` ou `Échap` reviennent au calendrier.
 
@@ -75,8 +84,8 @@ Les options sont lues dans cet ordre (la dernière gagne) : **valeurs par défau
 | `week_starts_on` | `"monday"`, `"sunday"` | `"monday"` | premier jour de la semaine |
 | `goal_hours` | `0` (aucun), ou de 0,5 à 24 | aucun | heures par jour qui comptent pour « objectif atteint » |
 | `goal_days` | 1 à 7 | `5` | jours à l'objectif qui font une semaine validée |
-| `count_idle` | `true` / `false` | `true` | `false` : le temps inactif n'est pas compté — le compteur, l'objectif du jour, le calendrier et l'aperçu ne montrent que le temps actif (les fichiers gardent tout) |
-| `show_timeline` | `true` / `false` | `true` | la frise en bas de l'aperçu de `F4` (onglet Calendrier, bloc Aperçu) ; avec elle, chaque projet a sa couleur, la même sur la frise et dans le détail du jour (sans elle, le détail garde la couleur du jour) |
+| `count_idle` | `true` / `false` | `true` | `false` : le temps inactif n'est pas compté — le compteur, l'objectif du jour, le calendrier et l'aperçu ne montrent que le temps actif, et la vue d'ensemble une seule barre par jour (les fichiers gardent tout) |
+| `show_timeline` | `true` / `false` | `true` | la frise du jour, en bas de l'aperçu de `F4` (onglet Calendrier, bloc Aperçu) et de la vue d'ensemble ; avec elle, chaque projet a sa couleur, la même sur la frise et dans les listes de projets (sans elle, les barres gardent la couleur du jour, et la vue d'ensemble donne la place de la frise aux projets) |
 | `max_months` | 1 à 12 | `12` | nombre de mois maximum (autant que la fenêtre en contient, jusqu'à ce nombre) |
 | `months_anchor` | `"last"`, `"first"` | `"last"` | le mois choisi est le dernier affiché, ou le premier |
 | `center` | `true`, `false` | `true` | centrer le calendrier dans la fenêtre |

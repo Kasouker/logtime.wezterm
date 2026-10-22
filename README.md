@@ -2,7 +2,7 @@
 
 **English** · [Français](README.fr.md)
 
-A [WezTerm](https://wezterm.org) plugin that **tracks the time you spend in your terminal** and shows it in the tab bar, with an **interactive calendar**, a **year view**, a **day detail** (active / idle time, time per project) and a **settings page**. Nothing else to install: everything runs inside WezTerm.
+A [WezTerm](https://wezterm.org) plugin that **tracks the time you spend in your terminal** and shows it in the tab bar, with an **interactive calendar**, an **overview** (year, month, week, projects and timeline on one screen), a **day detail** (active / idle time, time per project) and a **settings page**. Nothing else to install: everything runs inside WezTerm.
 
 ![The calendar](docs/calendar.en.png)
 
@@ -11,7 +11,14 @@ A [WezTerm](https://wezterm.org) plugin that **tracks the time you spend in your
 - **Today's counter in the tab bar** (`05:12:30`), with no wiring needed: it shows up on the right of the normal tab bar, or inside [tabline.wez](https://github.com/michaelbrusegard/tabline.wez) if you use it.
 - **Daily goal**: `05:12:30 / 7h`, then `✓ 07:03:10` in color, and a 🎉 notification once a day when you reach it.
 - **Calendar** (`F2`): several months side by side depending on the window size, a color gradient per day, totals, streaks, validated weeks and days.
-- **Year view** (`a` in the calendar), GitHub style.
+- **Overview** (`a` in the calendar), the whole picture on one full-window screen:
+  - the **year**, one square per day, with the months below it;
+  - the selected **month**, with the goal reached day by day and the validated weeks and days;
+  - the selected **week**: two bars per day (idle and active), and its figures (total, active days, average, best day, goal);
+  - the **projects of the selected day** and the **best projects of the week**;
+  - the **timeline** of the selected day.
+
+  A project keeps the same color everywhere on the screen.
 - **Day detail** (`Enter` on a day): total, goal, **active and idle time**, **time per project** and the week's total.
 - **Idle time**: when nothing moves in the terminal for 5 minutes, the pause is noted as idle (the counter still counts it).
 - **Time per project**: each second goes to the project of the tab you are looking at (its folder, e.g. `~/42/C05/ex02` → `42/C05`).
@@ -19,9 +26,9 @@ A [WezTerm](https://wezterm.org) plugin that **tracks the time you spend in your
 - **Safe storage**: atomic writes checked after writing, a backup copy, unreadable files set aside and never overwritten.
 - **English and French.**
 
-| Day detail | Year view | Settings (`F4`) |
+| Day detail | Overview | Settings (`F4`) |
 |---|---|---|
-| ![Day detail](docs/day-detail.en.png) | ![Year view](docs/year.en.png) | ![Settings](docs/settings.en.png) |
+| ![Day detail](docs/day-detail.en.png) | ![Overview](docs/year.en.png) | ![Settings](docs/settings.en.png) |
 
 ## Installation
 
@@ -54,7 +61,9 @@ That's all: the counter appears in the tab bar, `F2` opens the calendar, `F4` th
 | `F2` | anywhere | open the calendar in a new tab (or bring it back) |
 | `F4` | anywhere | open the settings page |
 
-**In the calendar**: `←` `→` (or `h` `l`) previous / next day · `↑` `↓` (or `k` `j`) previous / next week · `Shift+Tab` `Tab` (or `PgUp` `PgDn`) previous / next month · `Enter` details of the selected day · `a` year view (and back) · `t` today · `r` refresh · `q` or `Esc` close. In the year view, `←` `→` change the year.
+**In the calendar**: `←` `→` (or `h` `l`) previous / next day · `↑` `↓` (or `k` `j`) previous / next week · `Shift+Tab` `Tab` (or `PgUp` `PgDn`) previous / next month · `Enter` details of the selected day · `a` overview (and back) · `t` today · `r` refresh · `q` or `Esc` close.
+
+**In the overview** (it needs a window of at least 120 columns × 34 lines): `←` `→` day · `↑` `↓` week · `Shift+Tab` `Tab` month (and the year, past December or January) · `t` today · `a` or `Esc` back to the calendar · `r` refresh · `q` close.
 
 **In the day detail**: `←` `→` `↑` `↓` move to another day · `Enter` or `Esc` back to the calendar.
 
@@ -74,8 +83,8 @@ Options are read in this order (the last one wins): **plugin defaults → option
 | `week_starts_on` | `"monday"`, `"sunday"` | `"monday"` | first day of the week |
 | `goal_hours` | `0` (none), or 0.5 to 24 | none | hours per day that count as "goal reached" |
 | `goal_days` | 1 to 7 | `5` | days at the goal that make a validated week |
-| `count_idle` | `true` / `false` | `true` | `false`: idle time is not counted — the counter, the daily goal, the calendar and the preview show active time only (the files still keep everything) |
-| `show_timeline` | `true` / `false` | `true` | the timeline at the bottom of the preview in `F4` (Calendar tab, Preview block); with it, each project has its own color, the same on the timeline and in the day detail (without it, the detail keeps the day color) |
+| `count_idle` | `true` / `false` | `true` | `false`: idle time is not counted — the counter, the daily goal, the calendar and the preview show active time only, and the overview shows one bar per day (the files still keep everything) |
+| `show_timeline` | `true` / `false` | `true` | the timeline of the day, at the bottom of the preview in `F4` (Calendar tab, Preview block) and of the overview; with it, each project has its own color, the same on the timeline and in the lists of projects (without it, the bars keep the day color and the overview gives the timeline's room to the projects) |
 | `max_months` | 1 to 12 | `12` | most months shown (as many as fit in the window, up to this) |
 | `months_anchor` | `"last"`, `"first"` | `"last"` | the selected month is the last one shown, or the first |
 | `center` | `true`, `false` | `true` | center the calendar in the window |
