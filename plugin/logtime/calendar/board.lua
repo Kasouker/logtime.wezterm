@@ -419,19 +419,20 @@ M.BAR_MAX = 3 -- une barre de la semaine : au plus 3 colonnes de large
 M.TRACK = day_detail.BAR_EMPTY_COLOR
 M.TRACK_CHAR = "░"
 
--- Une barre verticale de `height` lignes et `width` colonnes, remplie à `share` (0 à 1) par le bas, au huitième de ligne
--- près, dans sa couleur ; le reste de sa place en « ░ » gris foncé (on voit toute la place de la barre, même vide),
+-- Une barre verticale de `height` lignes et `width` colonnes, remplie à `share` (0 à 1) par le bas, en lignes entières
+-- (une case coupée, comme « ▂ », laisserait un vide noir entre la barre et le « ░ » au-dessus), au moins une ligne
+-- dès qu'il y a du temps ; le reste de sa place en « ░ » gris foncé (on voit toute la place de la barre, même vide),
 -- comme les barres du détail d'un jour.
-local EIGHTHS = { "▁", "▂", "▃", "▄", "▅", "▆", "▇", "█" }
 local function track_bar(share, height, color, width)
-	local eighths = math.floor(math.max(0, math.min(1, share)) * height * 8 + 0.5)
+	share = math.max(0, math.min(1, share))
+	local filled = math.floor(share * height + 0.5)
+	if share > 0 then
+		filled = math.max(1, filled)
+	end
 	local out = {}
 	for line = 1, height do
-		local filled = eighths - (height - line) * 8 -- ce qui reste à remplir dans cette ligne (en huitièmes)
-		if filled > 0 then
-			out[line] = convert.fg(color)
-				.. string.rep(filled >= 8 and "█" or EIGHTHS[filled], width)
-				.. convert.RESET
+		if line > height - filled then
+			out[line] = convert.fg(color) .. string.rep("█", width) .. convert.RESET
 		else
 			out[line] = convert.fg(M.TRACK) .. string.rep(M.TRACK_CHAR, width) .. convert.RESET
 		end

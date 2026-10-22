@@ -825,12 +825,9 @@ for _, part in ipairs(split_bars(strip(wl[2]))) do
 	parts2[#parts2 + 1] = part
 end
 check("un jour sans temps (samedi 17) : rien au-dessus de ses barres", parts2[7]:match("^ +$") ~= nil, true)
-local idle_bar = convert.fg(load_module("calendar/overview").IDLE_COLOR) .. "▁"
 check(
 	"l'inactif en gris",
-	table
-		.concat(wl)
-		:find(literal(convert.fg(load_module("calendar/overview").IDLE_COLOR)) .. "[▁▂▃▄▅▆▇█]") ~= nil,
+	table.concat(wl):find(convert.fg(load_module("calendar/overview").IDLE_COLOR) .. "█", 1, true) ~= nil,
 	true
 )
 local active_color = convert.fg(assemble.day_color(9 * 3600, data().cfg))
@@ -894,8 +891,7 @@ check(
 			parts[#parts + 1] = part
 		end
 		local text = table.concat(narrow_wl)
-		return text:find(literal(convert.fg(load_module("calendar/overview").IDLE_COLOR)) .. "[▂▃▄▅▆▇█]")
-				~= nil
+		return text:find(convert.fg(load_module("calendar/overview").IDLE_COLOR) .. "█", 1, true) ~= nil
 			and text:find(active_color .. "█", 1, true) ~= nil
 	end)(),
 	true
@@ -964,17 +960,43 @@ check(
 	true
 )
 check(
-	"les barres au huitième de ligne près (des demi-cases)",
+	"les barres en lignes entières : aucune case coupée (pas de vide noir sous le « ░ »)",
 	(function()
-		local text = strip(table.concat(wl))
-		for _, ch in ipairs({ "▁", "▂", "▃", "▄", "▅", "▆", "▇" }) do -- (un par un : « [▁▂] » compte des octets)
-			if text:find(ch, 1, true) then
-				return true
+		for _, w in ipairs({ 46, 79, 120 }) do
+			local text = strip(table.concat(board.week_lines(data(), w, 16)))
+			for _, ch in ipairs({ "▁", "▂", "▃", "▄", "▅", "▆", "▇" }) do -- (un par un : « [▁▂] » compte des octets)
+				if text:find(ch, 1, true) then
+					return false
+				end
 			end
 		end
-		return false
+		return true
 	end)(),
 	true
+)
+check(
+	"une minute d'inactif : quand même une ligne pleine (le temps se voit)",
+	table
+		.concat(board.week_lines(data({ idle_days = { ["2026-10-12"] = 60 } }), 120, 16))
+		:find(convert.fg(load_module("calendar/overview").IDLE_COLOR) .. "█", 1, true) ~= nil,
+	true
+)
+check(
+	"la hauteur arrondie à la ligne la plus proche (le 13 : 5h00 sur 9h00, 6,1 lignes de 11 -> 6)",
+	(function()
+		local n = 0
+		for _, line in ipairs(wl) do
+			local parts = {}
+			for _, part in ipairs(split_bars(strip(line))) do
+				parts[#parts + 1] = part
+			end
+			if parts[3] and parts[3]:find("█", 1, true) then
+				n = n + 1
+			end
+		end
+		return n
+	end)(),
+	6
 )
 check("étroit : les noms des barres en une lettre (I A)", select(2, strip(narrow_wl[14]):gsub("I +A", "")), 7)
 check(
