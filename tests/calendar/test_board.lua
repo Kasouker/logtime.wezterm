@@ -360,9 +360,9 @@ for _, size in ipairs({ { 120, 34 }, { 150, 40 }, { 220, 60 } }) do
 		"4 " .. size[2]
 	)
 	check(
-		"zones " .. tag .. " : l'aide sous le mois (2 lignes par défaut), jusqu'au bas du cadre",
+		"zones " .. tag .. " : l'aide sous le mois (2 lignes par défaut), une ligne d'air sous elle",
 		z.help.x == z.month.x and z.help.w == z.month.w and z.help.y == z.month.y + z.month.h and z.help.y + z.help.h,
-		size[2]
+		size[2] - 1
 	)
 	check(
 		"zones " .. tag .. " : la colonne des chiffres de la semaine, contre le bord droit",
@@ -420,7 +420,7 @@ local function left_of_divider(line)
 end
 check(
 	"l'aide : plus de légende en bas",
-	(left_of_divider(page[38]) .. left_of_divider(page[39])):find("24h", 1, true),
+	(left_of_divider(page[z.help.y]) .. left_of_divider(page[z.help.y + 1])):find("24h", 1, true),
 	nil
 )
 local function legend_at_end(line)
@@ -446,9 +446,35 @@ check(
 )
 check(
 	"l'aide : dans la zone du mois, à gauche du trait du milieu",
-	char_at(page[38], divider) .. char_at(page[39], divider),
+	char_at(page[z.help.y], divider) .. char_at(page[z.help.y + 1], divider),
 	"││"
 )
+check("l'aide : une ligne d'air sous elle", strip(left_of_divider(page[39])):match("^│ *$") ~= nil, true)
+check(
+	"l'aide : sur ses deux lignes, au-dessus de cette ligne d'air",
+	strip(page[38]):find("rafraîchir", 1, true) ~= nil,
+	true
+)
+-- seule l'aide remonte : le mois reste où il était (comme s'il avait encore la ligne d'air), sauf s'il n'y tient pas
+for _, size in ipairs({ { 150, 40 }, { 190, 50 }, { 120, 34 }, { 190, 52 }, { 150, 41 }, { 190, 48 } }) do
+	local p = board.render(data(), size[1], size[2])
+	local month_w = math.floor((size[1] - 2) * board.MONTH_SHARE)
+	local zz = board.zones(size[1], size[2], #board.help_lines(fr.board_help, nil, month_w))
+	local alone = board.month_lines(data(), zz.month.w, zz.month.h + board.HELP_GAP)
+	local fits = alone[zz.month.h + 1]:match("^ *$") ~= nil
+	local want = fits and alone or board.month_lines(data(), zz.month.w, zz.month.h)
+	local same = true
+	for k = 1, zz.month.h do
+		local got = strip(p[zz.month.y + k - 1])
+		got = got:sub(utf8.offset(got, 2), utf8.offset(got, 2 + zz.month.w) - 1)
+		same = same and got == strip(want[k])
+	end
+	check(
+		"le mois à sa place (" .. size[1] .. " x " .. size[2] .. ", " .. (fits and "inchangé" or "resserré") .. ")",
+		same,
+		true
+	)
+end
 check(
 	"pas de trait entre le mois et l'aide (seulement les lignes en trop du mois)",
 	(function()

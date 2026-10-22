@@ -38,6 +38,7 @@ M.WEEK_SIDE = 26 -- la colonne des chiffres de la semaine (à droite des 7 colon
 M.WEEK_SHARE = 0.5 -- la part de la hauteur du bas pour la semaine ; le reste pour les projets et la frise
 M.PROJECTS_SHARE = 0.5 -- la part de la largeur de droite pour les projets du jour ; le reste pour ceux de la semaine
 M.TIMELINE_HEIGHT = 4 -- la frise : les heures, puis la frise dans son cadre
+M.HELP_GAP = 1 -- les lignes d'air sous l'aide (au-dessus du bas du cadre)
 
 local vw = layout.visible_width
 
@@ -880,7 +881,8 @@ end
 
 -- Les zones de la page : { x, y, w, h } (x et y à partir de 1), pour une fenêtre de width x height. Le cadre et les
 -- traits entre les zones ne leur appartiennent pas. L'aide (help_h lignes, 2 par défaut) est en bas à gauche, sous le
--- mois ; la droite descend jusqu'au bas du cadre. Sans frise (`no_timeline`), les projets prennent sa place.
+-- mois, avec M.HELP_GAP lignes d'air sous elle ; la droite descend jusqu'au bas du cadre. Sans frise (`no_timeline`),
+-- les projets prennent sa place.
 function M.zones(width, height, help_h, no_timeline)
 	help_h = help_h or 2
 	local z = {}
@@ -890,7 +892,7 @@ function M.zones(width, height, help_h, no_timeline)
 	local bottom_y = z.year.y + z.year.h + 1 -- sous le trait
 	local bottom_h = height - bottom_y -- jusqu'au bas du cadre
 	local month_w = math.floor(inner * M.MONTH_SHARE)
-	z.month = { x = 2, y = bottom_y, w = month_w, h = bottom_h - help_h }
+	z.month = { x = 2, y = bottom_y, w = month_w, h = bottom_h - help_h - M.HELP_GAP }
 	local right_x = 2 + month_w + 1 -- après le trait vertical
 	local right_w = width - right_x -- jusqu'au bord droit du cadre
 	local week_h = math.floor(bottom_h * M.WEEK_SHARE)
@@ -903,7 +905,7 @@ function M.zones(width, height, help_h, no_timeline)
 	z.day_projects = { x = right_x, y = projects_y, w = day_w, h = projects_h }
 	z.week_projects = { x = right_x + day_w + 1, y = projects_y, w = right_w - day_w - 1, h = projects_h }
 	z.timeline = { x = right_x, y = projects_y + projects_h + 1, w = right_w, h = timeline_h }
-	z.help = { x = 2, y = height - help_h, w = month_w, h = help_h }
+	z.help = { x = 2, y = height - help_h - M.HELP_GAP, w = month_w, h = help_h }
 	return z
 end
 
@@ -1031,8 +1033,16 @@ function M.render(o, width, height)
 	else
 		column(between, under_week, height)
 	end
-	-- le mois choisi, dans son propre cadre
-	paste(M.month_lines(o, z.month.w, z.month.h), z.month.x, z.month.y)
+	-- le mois choisi, dans son propre cadre : placé comme si l'aide était tout en bas (seule l'aide remonte), sauf si
+	-- son cadre descendrait alors sous le haut de l'aide (il se resserre dans sa zone)
+	local month = M.month_lines(o, z.month.w, z.month.h + M.HELP_GAP)
+	for k = z.month.h + 1, #month do
+		if month[k] ~= string.rep(" ", z.month.w) then
+			month = M.month_lines(o, z.month.w, z.month.h)
+			break
+		end
+	end
+	paste(month, z.month.x, z.month.y) -- (ses lignes sous la zone sont vides : l'aide les recouvre)
 	-- la semaine choisie, dans son propre cadre, puis ses chiffres à droite
 	paste(M.week_lines(o, z.week.w, z.week.h), z.week.x, z.week.y)
 	paste(M.week_side_lines(o, z.week_side.w, z.week_side.h), z.week_side.x, z.week_side.y)
