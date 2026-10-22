@@ -251,11 +251,9 @@ function M.month_lines(o, width, height)
 	local blank = string.rep(" ", width)
 	local weeks = overview.weeks(o.year, o.month, cfg.week_starts_on)
 	local count = #weeks
-	-- de l'air autour du cadre : une colonne de chaque côté ; une ligne en haut et en bas s'il reste au moins 2 lignes
-	-- par semaine (le numéro, puis la durée)
-	local margin_y = (height - 2 - 2 - (count - 1)) // count >= 2 and 1 or 0
+	-- le cadre aussi grand que possible : une colonne d'air de chaque côté, toute la hauteur
 	local cell = math.max(1, (width - 2 - 9) // 8) -- 8 colonnes, 9 traits verticaux
-	local row = math.max(1, (height - 2 * margin_y - 2 - (count - 1)) // count)
+	local row = math.max(1, (height - 2 - (count - 1)) // count)
 	local grid_w = 8 * cell + 9
 	local grid_h = 2 + count * row + (count - 1)
 	local left = string.rep(" ", (width - grid_w) // 2)
@@ -294,7 +292,7 @@ function M.month_lines(o, width, height)
 	end
 	names[8] = month_name
 	local out = {}
-	for _ = 1, math.max(0, (height - grid_h) // 2) do -- le cadre centré en hauteur (au moins margin_y d'air)
+	for _ = 1, math.max(0, (height - grid_h) // 2) do -- le cadre centré en hauteur (les lignes en trop)
 		out[#out + 1] = blank
 	end
 	out[#out + 1] = fit(left .. rule(b.tl, b.t, b.tr, names), width)
@@ -381,7 +379,7 @@ function M.zones(width, height)
 	z.year = { x = 2, y = 4, w = inner, h = M.year_height(height) } -- sous le trait des chiffres
 	local bottom_y = z.year.y + z.year.h + 1 -- sous le trait
 	local help_y = height - 1 -- au-dessus du bas du cadre
-	local bottom_h = help_y - 1 - bottom_y -- jusqu'au trait au-dessus de l'aide
+	local bottom_h = help_y - bottom_y -- jusqu'à l'aide (pas de trait entre les zones et l'aide)
 	local month_w = math.floor(inner * M.MONTH_SHARE)
 	z.month = { x = 2, y = bottom_y, w = month_w, h = bottom_h }
 	local right_x = 2 + month_w + 1 -- après le trait vertical
@@ -499,7 +497,6 @@ function M.render(o, width, height)
 	-- le cadre de la page, et les traits entre les zones
 	local below_stats = z.stats.y + 1
 	local below_year = z.year.y + z.year.h
-	local above_help = z.help.y - 1
 	local divider = z.month.x + z.month.w -- le trait vertical entre le mois et la droite
 	local side = z.week_side.x - 1 -- le trait entre la semaine et ses chiffres
 	local under_week = z.week.y + z.week.h
@@ -509,10 +506,10 @@ function M.render(o, width, height)
 	line(height, 1, width)
 	column(1, 1, height)
 	column(width, 1, height)
-	for _, y in ipairs({ below_stats, below_year, above_help }) do
+	for _, y in ipairs({ below_stats, below_year }) do
 		line(y, 1, width)
 	end
-	column(divider, below_year, above_help)
+	column(divider, below_year, z.help.y - 1)
 	column(side, below_year, under_week)
 	line(under_week, divider, width)
 	column(between, under_week, above_timeline)

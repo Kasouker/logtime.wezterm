@@ -294,9 +294,9 @@ for _, size in ipairs({ { 120, 34 }, { 150, 40 }, { 220, 60 } }) do
 	check("zones " .. tag .. " : aucune ne chevauche une autre", apart, true)
 	check("zones " .. tag .. " : la hauteur de l'année suit la fenêtre", z.year.h, board.year_height(size[2]))
 	check(
-		"zones " .. tag .. " : la frise, 4 lignes, juste au-dessus du trait de l'aide",
+		"zones " .. tag .. " : la frise, 4 lignes, juste au-dessus de l'aide (pas de trait entre elles)",
 		z.timeline.h .. " " .. (z.timeline.y + z.timeline.h),
-		"4 " .. (size[2] - 2)
+		"4 " .. (size[2] - 1)
 	)
 	check("zones " .. tag .. " : l'aide juste au-dessus du bas du cadre", z.help.y, size[2] - 1)
 	check(
@@ -341,7 +341,21 @@ check(
 	char_at(page[z.year.y + z.year.h], 1) .. char_at(page[z.year.y + z.year.h], 150),
 	"├┤"
 )
-check("le trait vertical rejoint le trait de l'aide (┴)", char_at(page[z.help.y - 1], divider), "┴")
+check(
+	"plus de trait entre les zones et l'aide : le trait vertical descend jusqu'à elle",
+	char_at(page[z.help.y - 1], divider),
+	"│"
+)
+check(
+	"plus de trait entre les zones et l'aide : aucun ┴ au-dessus d'elle",
+	strip(page[z.help.y - 1]):find("┴", 1, true),
+	nil
+)
+check(
+	"plus de trait entre les zones et l'aide : la ligne au-dessus n'est pas un trait",
+	strip(page[z.help.y - 1]):find("^├"),
+	nil
+)
 check("le trait vertical entre le mois et la droite", char_at(page[z.month.y + 2], divider), "│")
 check(
 	"sous la semaine : la jonction à gauche (├) et au cadre (┤)",
@@ -419,8 +433,13 @@ end
 local top_k, top = first_with("╭")
 local bottom_k, bottom = first_with("╰")
 check(
-	"le mois : son propre cadre, avec de l'air autour",
-	top_k > 1 and bottom_k < 27 and top:find("^ +╭") ~= nil,
+	"le mois : son propre cadre, avec une colonne d'air au moins de chaque côté",
+	top:find("^ +╭") ~= nil and top:find("╮ +$") ~= nil,
+	true
+)
+check(
+	"le mois : toute la hauteur (au plus une ligne en trop par semaine, partagée)",
+	(top_k - 1) + (27 - bottom_k) < 5,
 	true
 )
 check("le mois : centré en hauteur (à une ligne près)", math.abs((top_k - 1) - (27 - bottom_k)) <= 1, true)
