@@ -230,44 +230,6 @@ check(
 	strip(overview.grid(data(), 100, 30)[2]):find("Mercredi", 1, true) ~= nil,
 	true
 )
--- ---- les semaines à droite (o.labels_right), et toute la hauteur (o.stretch)
-local right = overview.grid(data({ labels_right = true }), 100, 30)
-check("à droite : le nom du mois au bout de la ligne des jours", strip(right[2]):find("Octobre +│$") ~= nil, true)
-check("à droite : « Semaine 1 » au bout de sa ligne", strip(joined(right)):find("Semaine 1 +│") ~= nil, true)
-check("à droite : les jours d'abord", strip(right[2]):find("^│ +Lundi") ~= nil, true)
-local function rule_count(g)
-	local n = 0
-	for _, line in ipairs(g) do
-		if strip(line):find("^├") then
-			n = n + 1
-		end
-	end
-	return n
-end
-local stretched = overview.grid(data({ stretch = true }), 100, 41)
-check("toute la hauteur : la dernière ligne est le bas du cadre", strip(stretched[41]):sub(1, #"╰"), "╰")
-check("toute la hauteur : un trait sous les noms et entre les semaines", rule_count(stretched), 5)
-check(
-	"sans stretch : au plus 3 lignes par semaine (des lignes vides en bas)",
-	strip(overview.grid(data(), 100, 41)[41]),
-	string.rep(" ", 100)
-)
-local heights = {}
-local last_rule = 3
-for k = 4, 41 do
-	local plain = strip(stretched[k])
-	if plain:find("^├") or plain:find("^╰") then
-		heights[#heights + 1] = k - last_rule - 1
-		last_rule = k
-	end
-end
-check(
-	"toute la hauteur : les semaines se partagent la place (à une ligne près)",
-	math.max(table.unpack(heights)) - math.min(table.unpack(heights)) <= 1,
-	true
-)
-check("toute la hauteur : les premières semaines ont la ligne en plus", heights[1] >= heights[#heights], true)
-
 -- ---- une barre verticale (au huitième de ligne près)
 local function bar_text(lines)
 	local out = {}

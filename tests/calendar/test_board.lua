@@ -397,89 +397,156 @@ check("le style des traits suit le réglage (double)", strip(double[1]):sub(1, #
 local colored = board.render(data({ edge = "\27[38;2;1;2;3m" }), 150, 40)
 check("les traits dans leur couleur", colored[3]:find("\27[38;2;1;2;3m─", 1, true) ~= nil, true)
 
--- ---- le mois choisi, en bas à gauche : la grille de l'aperçu de F4, les semaines à droite
-local mp = board.render(data({ accent = "#C96969" }), 150, 40)
+-- ---- le mois choisi, en bas à gauche : dans son propre cadre, des cases toutes de la même taille
+local ml = board.month_lines(data({ accent = "#C96969" }), 74, 27)
+check("le mois : exactement la hauteur", #ml, 27)
+local ml_sizes = true
+for _, line in ipairs(ml) do
+	ml_sizes = ml_sizes and layout.visible_width(line) == 74
+end
+check("le mois : chaque ligne fait la largeur", ml_sizes, true)
+local ml_plain = {}
+for k, line in ipairs(ml) do
+	ml_plain[k] = strip(line)
+end
+local function first_with(text)
+	for k, line in ipairs(ml_plain) do
+		if line:find(text, 1, true) then
+			return k, line
+		end
+	end
+end
+local top_k, top = first_with("╭")
+local bottom_k, bottom = first_with("╰")
+check(
+	"le mois : son propre cadre, avec de l'air autour",
+	top_k > 1 and bottom_k < 27 and top:find("^ +╭") ~= nil,
+	true
+)
+check("le mois : centré en hauteur (à une ligne près)", math.abs((top_k - 1) - (27 - bottom_k)) <= 1, true)
+check(
+	"le mois : les jours et le mois posés sur le trait du haut",
+	top:find("─ Lun ─┬─ Mar ─", 1, true) ~= nil and top:find("─ Oct ─╮", 1, true) ~= nil,
+	true
+)
+check("le mois : plus de rangée de cases pour les noms", ml_plain[top_k + 1]:find("Lun", 1, true), nil)
+check(
+	"le mois : les semaines et jours validés posés sur le trait du bas",
+	bottom:find("╰─ Semaines validées : 1/5 / Jours validés : 3/31 ─", 1, true) ~= nil,
+	true
+)
+-- toutes les cases de la même largeur : les traits verticaux régulièrement espacés
+local function bars(line)
+	local out, col = {}, 0
+	for _, code in utf8.codes(line) do
+		col = col + 1
+		local ch = utf8.char(code)
+		if ch == "│" or ch == "┼" or ch == "├" or ch == "┤" then
+			out[#out + 1] = col
+		end
+	end
+	return out
+end
+local _, rule_line = first_with("┼")
+local cols_ = bars(rule_line)
+check("le mois : 9 traits verticaux (7 jours, puis la colonne des semaines)", #cols_, 9)
+local same = true
+for k = 2, #cols_ do
+	same = same and (cols_[k] - cols_[k - 1]) == (cols_[2] - cols_[1])
+end
+check("le mois : les 8 colonnes de la même largeur", same, true)
+-- toutes les semaines de la même hauteur
+local rows_at = { top_k }
+for k = top_k + 1, bottom_k do
+	if ml_plain[k]:find("├", 1, true) or k == bottom_k then
+		rows_at[#rows_at + 1] = k
+	end
+end
+local same_h = true
+for k = 2, #rows_at do
+	same_h = same_h and (rows_at[k] - rows_at[k - 1]) == (rows_at[2] - rows_at[1])
+end
+check("le mois : 5 semaines (octobre 2026)", #rows_at - 1, 5)
+check("le mois : toutes les semaines de la même hauteur", same_h, true)
+local joined_ml = table.concat(ml_plain, "\n")
+check(
+	"le mois : les semaines à droite (« Sem. 1 » dans sa case)",
+	joined_ml:find("│Sem. 1 │", 1, true) ~= nil,
+	true
+)
+check(
+	"le mois : ses jours (le 31) et l'objectif (✓)",
+	joined_ml:find("31", 1, true) ~= nil and joined_ml:find("✓ 9h00", 1, true) ~= nil,
+	true
+)
+check("le mois : aujourd'hui « *16 »", joined_ml:find("*16", 1, true) ~= nil, true)
+local function week_filled(lines, plain, label)
+	for k, line in ipairs(plain) do
+		if line:find(label, 1, true) then
+			return lines[k]:find(convert.bg("#C96969") .. convert.fg(convert.contrast("#C96969")) .. "Sem. ", 1, true)
+				~= nil
+		end
+	end
+end
+check("le mois : la semaine choisie (celle du 16) remplie de la couleur", week_filled(ml, ml_plain, "Sem. 3"), true)
+check("le mois : les autres non", week_filled(ml, ml_plain, "Sem. 2"), false)
+local other = board.month_lines(data({ accent = "#C96969", day_key = "2026-10-26" }), 74, 27)
+local other_plain = {}
+for k, line in ipairs(other) do
+	other_plain[k] = strip(line)
+end
+check("le mois : la semaine choisie suit le jour choisi", week_filled(other, other_plain, "Sem. 5"), true)
+local elsewhere = board.month_lines(data({ accent = "#C96969", day_key = "2026-11-03" }), 74, 27)
+check(
+	"le mois : un jour choisi dans un autre mois : aucune semaine remplie",
+	table.concat(elsewhere):find(convert.bg("#C96969"), 1, true),
+	nil
+)
+check(
+	"le mois : « Sem. 1 » au milieu de sa case (pas sur la ligne des numéros)",
+	(select(2, first_with("Sem. 1"))):find("│ 1 ", 1, true),
+	nil
+)
+check(
+	"le mois : une case sans temps reste sans couleur (les couleurs ne débordent pas)",
+	(function()
+		for k, line in ipairs(ml_plain) do
+			if line:find("│ 17 ", 1, true) then
+				return ml[k]:find("│ 17 ", 1, true) ~= nil
+			end
+		end
+	end)(),
+	true
+)
+local wide_ml = strip(table.concat(board.month_lines(data(), 110, 27), "\n"))
+check(
+	"une zone large : « Semaine 3 » en entier, les jours et le mois en entier",
+	wide_ml:find("Semaine 3", 1, true) ~= nil
+		and wide_ml:find("Mercredi", 1, true) ~= nil
+		and wide_ml:find("Octobre", 1, true) ~= nil,
+	true
+)
+local narrow_ml = strip(table.concat(board.month_lines(data(), 59, 19), "\n"))
+check(
+	"une case étroite : « ✓8h00 » plutôt qu'une durée coupée",
+	narrow_ml:find("✓8h00", 1, true) ~= nil and narrow_ml:find("✓ 8h0│", 1, true) == nil,
+	true
+)
+local sun_ml = strip(board.month_lines(data({ cfg = gradient.apply_to({ week_starts_on = "sunday" }) }), 74, 27)[top_k])
+check("le mois : dimanche d'abord si réglé", sun_ml:find("╭─ Dim ─", 1, true) ~= nil, true)
+local en_ml = strip(table.concat(board.month_lines(data({ labels = en }), 74, 27), "\n"))
+check("le mois en anglais", en_ml:find("Week 1", 1, true) ~= nil and en_ml:find("Mon", 1, true) ~= nil, true)
+-- dans la page
+local mp = board.render(data(), 150, 40)
 local mz = board.zones(150, 40)
-local month_text = {}
-for y = mz.month.y, mz.month.y + mz.month.h - 1 do
-	month_text[#month_text + 1] = strip(mp[y])
-end
-local month_joined = table.concat(month_text, "\n")
-check("le mois : les noms des jours en haut", month_text[1]:find("Lun", 1, true) ~= nil, true)
-check("le mois : son nom au-dessus des semaines, à droite", month_text[1]:find("Octobre", 1, true) ~= nil, true)
-check("le mois : les semaines à droite des jours", month_joined:find("│ Semaine 1 │", 1, true) ~= nil, true)
-check("le mois : ses jours (le 31)", month_joined:find("31", 1, true) ~= nil, true)
-check("le mois : l'objectif (✓)", month_joined:find("✓ 9h00", 1, true) ~= nil, true)
+check("la page : le mois dans sa zone", strip(table.concat(mp, "\n")):find("Sem. 3", 1, true) ~= nil, true)
 check(
-	"le mois : la semaine choisie (celle du 16) remplie de la couleur",
-	(function()
-		for y = mz.month.y, mz.month.y + mz.month.h - 1 do
-			if strip(mp[y]):find("Semaine 3", 1, true) then
-				return mp[y]:find(convert.bg("#C96969"), 1, true) ~= nil
-			end
-		end
-	end)(),
-	true
-)
-check(
-	"le mois : la semaine choisie suit le jour choisi",
-	(function()
-		local other = board.render(data({ accent = "#C96969", day_key = "2026-10-26" }), 150, 40)
-		for y = mz.month.y, mz.month.y + mz.month.h - 1 do
-			if strip(other[y]):find("Semaine 5", 1, true) then
-				return other[y]:find(convert.bg("#C96969"), 1, true) ~= nil
-			end
-		end
-	end)(),
-	true
-)
--- son cadre est posé sur les traits de la page : les jonctions
-local mdiv = mz.month.x + mz.month.w
-check(
-	"le mois : ses traits verticaux partent du trait sous l'année (┬)",
-	select(2, strip(mp[mz.year.y + mz.year.h]):gsub("┬", "")) >= 8,
-	true
-)
-check("le mois : ses traits horizontaux partent du cadre de la page (├)", char_at(mp[mz.month.y + 1], 1), "├")
-check("le mois : et rejoignent le trait vertical du milieu (┤)", char_at(mp[mz.month.y + 1], mdiv), "┤")
-check(
-	"le mois : aucun coin arrondi à l'intérieur (pas de cadre en double)",
-	(function()
-		for y = 2, 39 do
-			local plain = strip(mp[y])
-			if plain:find("╭", 1, true) or plain:find("╮", 1, true) then
-				return false
-			end
-		end
-		return true
-	end)(),
-	true
-)
-check(
-	"le mois : le bas de sa grille est le trait de l'aide (les validés dessus)",
-	strip(mp[mz.help.y - 1]):find("├─ Semaines validées", 1, true),
-	1
-)
-local cross = 0
-for y = 1, 40 do
-	cross = cross + select(2, strip(mp[y]):gsub("┼", ""))
-end
-check("le mois : des croisements ┼ à l'intérieur de sa grille", cross > 0, true)
-check(
-	"le mois : une case sans temps reste sans couleur (les couleurs d'une case ne débordent pas)",
-	(function()
-		for y = mz.month.y, mz.month.y + mz.month.h - 1 do
-			if strip(mp[y]):find("│ 17 ", 1, true) then -- le 17, sans temps, juste après le 16 (coloré)
-				return mp[y]:find("│ 17 ", 1, true) ~= nil
-			end
-		end
-	end)(),
-	true
+	"la page : le cadre du mois ne touche pas les traits de la page",
+	char_at(mp[mz.month.y + 1], 1) .. char_at(mp[mz.month.y + 1], 2),
+	"│ "
 )
 local m120 = board.render(data(), 120, 34)
-check("120 x 34 : le mois tient", table.concat(m120, "\n"):find("Semaine 1", 1, true) ~= nil, true)
-local sunday_month = board.render(data({ cfg = gradient.apply_to({ week_starts_on = "sunday" }) }), 150, 40)
-check("le mois : dimanche d'abord si réglé", strip(sunday_month[mz.month.y]):find("^│ +Dim") ~= nil, true)
+check("120 x 34 : le mois tient", strip(table.concat(m120, "\n")):find("Sem. 5", 1, true) ~= nil, true)
 
 print(string.format("\n%d vérifications réussies, %d échecs", passed, failed))
 os.exit(failed == 0 and 0 or 1)

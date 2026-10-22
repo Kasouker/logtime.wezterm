@@ -95,11 +95,7 @@ function M.grid(o, width, height)
 	local count = #weeks
 	local lw = M.WEEK_LABEL_WIDTH
 	local cell = (width - lw - 9) // 7 -- 9 traits verticaux
-	local avail = height - 3 - count -- le haut, les noms, leur trait ; un trait par semaine
-	-- o.stretch : les semaines prennent toute la hauteur (les lignes en trop vont aux premières semaines) ; sinon au plus
-	-- M.MAX_ROW lignes chacune
-	local row = o.stretch and avail // count or math.min(M.MAX_ROW, avail // count)
-	local tall = o.stretch and avail % count or 0 -- les semaines qui ont une ligne de plus
+	local row = math.min(M.MAX_ROW, (height - 3 - count) // count) -- le haut, les noms, leur trait ; un trait par semaine
 	if cell < M.MIN_CELL or row < M.MIN_ROW then
 		return nil
 	end
@@ -110,30 +106,19 @@ function M.grid(o, width, height)
 	local function e(s)
 		return edge .. s .. off
 	end
-	-- o.labels_right : la colonne des semaines (et le nom du mois) à droite des jours, au lieu de la gauche
-	local function ordered(label, days)
-		if o.labels_right then
-			days[#days + 1] = label
-			return days
-		end
-		table.insert(days, 1, label)
-		return days
-	end
 	local function rule(left, mid, right)
-		local parts = {}
+		local parts = { string.rep(b.h, lw) }
 		for _ = 1, 7 do
 			parts[#parts + 1] = string.rep(b.h, cell)
 		end
-		return e(left .. table.concat(ordered(string.rep(b.h, lw), parts), mid) .. right)
+		return e(left .. table.concat(parts, mid) .. right)
 	end
 	local out = { rule(b.tl, b.t, b.tr) }
 	local names = day_names(o.labels, o.cfg.week_starts_on, cell)
-	local header = {}
+	local header = { centered(o.labels.months[o.month] or "", lw) } -- le nom du mois, au-dessus des semaines
 	for i = 1, 7 do
 		header[#header + 1] = centered(names[i], cell)
 	end
-	-- le nom du mois, au-dessus des semaines
-	header = ordered(centered(o.labels.months[o.month] or "", lw), header)
 	out[#out + 1] = e(b.v) .. table.concat(header, e(b.v)) .. e(b.v)
 	out[#out + 1] = rule(b.l, b.x, b.r)
 	-- o.week : la semaine du jour o.day_key est choisie, sa case « Semaine N » est remplie de la couleur o.accent
@@ -153,15 +138,14 @@ function M.grid(o, width, height)
 	local accent = o.accent or M.IDLE_COLOR
 	local goal_secs = stats.has_goal(o.cfg.goal_hours) and o.cfg.goal_hours * 3600 or nil
 	for w, week in ipairs(weeks) do
-		local lines = row + (w <= tall and 1 or 0)
-		for line = 1, lines do
-			local label = line == math.max(1, (lines + 1) // 2)
+		for line = 1, row do
+			local label = line == math.max(1, (row + 1) // 2)
 					and centered(string.format(o.labels.overview_week or "Week %d", w), lw)
 				or string.rep(" ", lw)
 			if w == selected then
 				label = convert.bg(accent) .. convert.fg(convert.contrast(accent)) .. label .. convert.RESET
 			end
-			local parts = {}
+			local parts = { label }
 			for i = 1, 7 do
 				local d = week[i]
 				if d then
@@ -184,7 +168,7 @@ function M.grid(o, width, height)
 					parts[#parts + 1] = string.rep(" ", cell)
 				end
 			end
-			out[#out + 1] = e(b.v) .. table.concat(ordered(label, parts), e(b.v)) .. e(b.v)
+			out[#out + 1] = e(b.v) .. table.concat(parts, e(b.v)) .. e(b.v)
 		end
 		out[#out + 1] = w < count and rule(b.l, b.x, b.r) or rule(b.bl, b.b, b.br)
 	end

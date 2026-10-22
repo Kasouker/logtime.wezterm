@@ -232,6 +232,146 @@ function M.year_lines(o, width, height)
 	return out
 end
 
+-- Le mois choisi : exactement `height` lignes de `width` colonnes. La grille du mois dans son propre cadre (avec de
+-- l'air autour), des cases toutes de la même taille : 7 colonnes de jours et la colonne des semaines (à droite), toutes
+-- de la même largeur ; toutes les semaines de la même hauteur. Les noms des jours et du mois sont posés sur le trait du
+-- haut, les semaines et jours validés sur celui du bas (comme le calendrier F2 avec les encadrés).
+--   ╭─ Lun ─┬─ Mar ─┬─ … ─┬─ Dim ─┬─ Octobre ─╮
+--   │ 12    │ 13    │     │ 18    │           │
+--   │ ✓ 8h00│ 5h00  │     │       │ Semaine 3 │   la semaine choisie remplie de o.accent
+--   ├───────┼───────┼─ … ─┼───────┼───────────┤
+--   ╰─ Semaines validées : 1/5 / Jours validés : 6/31 ─╯
+function M.month_lines(o, width, height)
+	local labels, cfg = o.labels, o.cfg
+	local b, edge = o.b, o.edge or ""
+	local off = edge ~= "" and convert.RESET or ""
+	local function e(s_)
+		return edge .. s_ .. off
+	end
+	local blank = string.rep(" ", width)
+	local weeks = overview.weeks(o.year, o.month, cfg.week_starts_on)
+	local count = #weeks
+	-- de l'air autour du cadre : une colonne de chaque côté ; une ligne en haut et en bas s'il reste au moins 2 lignes
+	-- par semaine (le numéro, puis la durée)
+	local margin_y = (height - 2 - 2 - (count - 1)) // count >= 2 and 1 or 0
+	local cell = math.max(1, (width - 2 - 9) // 8) -- 8 colonnes, 9 traits verticaux
+	local row = math.max(1, (height - 2 * margin_y - 2 - (count - 1)) // count)
+	local grid_w = 8 * cell + 9
+	local grid_h = 2 + count * row + (count - 1)
+	local left = string.rep(" ", (width - grid_w) // 2)
+	-- un trait de la grille (8 morceaux de `cell` traits) avec, au milieu de chaque morceau, un texte (ou rien)
+	local function rule(l, mid, r, texts)
+		local parts = {}
+		for k = 1, 8 do
+			local text = texts and texts[k]
+			if text and text ~= "" and vw(text) + 2 <= cell then
+				local before = (cell - vw(text) - 2) // 2
+				parts[k] = e(string.rep(b.h, before))
+					.. " "
+					.. text
+					.. " "
+					.. e(string.rep(b.h, cell - vw(text) - 2 - before))
+			else
+				parts[k] = e(string.rep(b.h, cell))
+			end
+		end
+		return e(l) .. table.concat(parts, e(mid)) .. e(r)
+	end
+	-- les noms : les jours en entier s'ils tiennent tous, sinon tous en abrégé ; le mois en entier s'il tient
+	local long, short = labels.weekdays_long or labels.weekdays, labels.weekdays
+	local fits = true
+	for i = 1, 7 do
+		fits = fits and vw(long[i]) + 2 <= cell
+	end
+	local names = {}
+	for i = 1, 7 do
+		local index = cfg.week_starts_on == "sunday" and ((i + 5) % 7 + 1) or i
+		names[i] = fits and long[index] or short[index]
+	end
+	local month_name = labels.months[o.month] or ""
+	if vw(month_name) + 2 > cell then
+		month_name = (labels.months_short or {})[o.month] or month_name
+	end
+	names[8] = month_name
+	local out = {}
+	for _ = 1, math.max(0, (height - grid_h) // 2) do -- le cadre centré en hauteur (au moins margin_y d'air)
+		out[#out + 1] = blank
+	end
+	out[#out + 1] = fit(left .. rule(b.tl, b.t, b.tr, names), width)
+	-- la semaine du jour choisi
+	local selected
+	local _, sm, sd = (o.day_key or ""):match("^(%d+)-(%d+)-(%d+)$")
+	if tonumber(sm) == o.month then
+		for w, week in ipairs(weeks) do
+			for i = 1, 7 do
+				if week[i] == tonumber(sd) then
+					selected = w
+				end
+			end
+		end
+	end
+	local accent = o.accent or M.ACCENT
+	local goal_secs = stats.has_goal(cfg.goal_hours) and cfg.goal_hours * 3600 or nil
+	local label_line = math.max(1, (row + 1) // 2)
+	for w, week in ipairs(weeks) do
+		local week_label = string.format(labels.overview_week or "Week %d", w)
+		if vw(week_label) > cell then
+			week_label = string.format(labels.overview_week_short or "W%d", w)
+		end
+		for line = 1, row do
+			local parts = {}
+			for i = 1, 7 do
+				local d = week[i]
+				if d then
+					local key = dates.key(o.year, o.month, d)
+					local secs = math.floor(math.max(0, o.days[key] or 0))
+					local color = assemble.day_color(secs, cfg)
+					local text = ""
+					if line == 1 then
+						text = " " .. (key == o.today_key and ("*" .. d) or tostring(d))
+					elseif line == 2 and secs > 0 then
+						text = " " .. assemble.goal_duration(secs, key, o.today_key, goal_secs)
+						if vw(text) > cell then -- une case étroite : « ✓8h00 » plutôt qu'une durée coupée
+							text = " " .. text:sub(2):gsub("^" .. assemble.GOAL_MARK .. " ", assemble.GOAL_MARK)
+						end
+					end
+					text = fit(text, cell)
+					if color then
+						text = convert.bg(color) .. convert.fg(convert.contrast(color)) .. text .. convert.RESET
+					end
+					parts[i] = text
+				else
+					parts[i] = string.rep(" ", cell)
+				end
+			end
+			local label = line == label_line and centered(week_label, cell) or string.rep(" ", cell)
+			if w == selected then
+				label = convert.bg(accent) .. convert.fg(convert.contrast(accent)) .. label .. convert.RESET
+			end
+			parts[8] = label
+			out[#out + 1] = fit(left .. e(b.v) .. table.concat(parts, e(b.v)) .. e(b.v), width)
+		end
+		if w < count then
+			out[#out + 1] = fit(left .. rule(b.l, b.x, b.r), width)
+		end
+	end
+	-- le bas : les semaines et jours validés posés dessus (s'ils tiennent)
+	local bottom = rule(b.bl, b.b, b.br)
+	local validated = assemble.validated_text(o.days, o.year, o.month, cfg, nil, labels)
+	if validated and vw(validated) + 4 <= grid_w - 2 then
+		bottom = e(b.bl .. b.h)
+			.. " "
+			.. validated
+			.. " "
+			.. e(string.rep(b.h, grid_w - 2 - 1 - vw(validated) - 2) .. b.br)
+	end
+	out[#out + 1] = fit(left .. bottom, width)
+	while #out < height do
+		out[#out + 1] = blank
+	end
+	return out
+end
+
 -- Les zones de la page : { x, y, w, h } (x et y à partir de 1), pour une fenêtre de width x height. Le cadre et les
 -- traits entre les zones ne leur appartiennent pas.
 function M.zones(width, height)
@@ -377,25 +517,8 @@ function M.render(o, width, height)
 	line(under_week, divider, width)
 	column(between, under_week, above_timeline)
 	line(above_timeline, divider, width)
-	-- le mois choisi : la grille de l'aperçu de F4 (les semaines à droite), son cadre posé sur les traits de la page
-	local month = overview.grid({
-		days = o.days,
-		year = o.year,
-		month = o.month,
-		today_key = o.today_key,
-		day_key = o.day_key,
-		week = true,
-		accent = o.accent,
-		cfg = o.cfg,
-		labels = o.labels,
-		b = b,
-		edge = "",
-		labels_right = true,
-		stretch = true,
-	}, z.month.w + 2, z.month.h + 2)
-	if month then
-		paste(month, z.month.x - 1, z.month.y - 1)
-	end
+	-- le mois choisi, dans son propre cadre
+	paste(M.month_lines(o, z.month.w, z.month.h), z.month.x, z.month.y)
 	local out = {}
 	for y = 1, height do
 		local parts = {}
