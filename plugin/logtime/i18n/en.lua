@@ -63,6 +63,8 @@ return {
 	board_selected = "Selected day",
 	board_idle_short = "Idle",
 	board_active_short = "Active",
+	board_idle_letter = "I",
+	board_active_letter = "A",
 	settings_title = "Settings",
 	settings_help_top = "d: default // q: close // Tab or Shift+Tab: change tab",
 	settings_help_colors = "Arrows or h j k l: choose // Enter: save",

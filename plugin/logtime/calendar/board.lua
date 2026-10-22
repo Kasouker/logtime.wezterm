@@ -414,8 +414,6 @@ function M.week_stats(o)
 	return w
 end
 
-M.WIDE_DAY = 11 -- une colonne de jour d'au moins 11 colonnes : deux barres (inactif, actif) ; sinon une seule, empilée
-
 -- La semaine choisie : la ligne du trait du haut (les jours posés dessus) puis `height` lignes, de `width` colonnes.
 -- 7 colonnes séparées par un trait ; dans chacune, la durée en haut, les barres (inactif en gris, actif dans la couleur du
 -- jour, à l'échelle du jour le plus long de la semaine), leurs noms et leurs pourcentages en bas. Le jour choisi est
@@ -439,8 +437,16 @@ function M.week_lines(o, width, height)
 		scale = math.max(scale, day.total)
 	end
 	local show_idle = o.idle_days and true or false -- (le temps inactif non compté : pas de tableau)
-	-- deux barres dans chaque colonne si la plus étroite a la place (toutes pareilles, jamais un mélange)
-	local wide = show_idle and math.min(table.unpack(cells)) >= M.WIDE_DAY
+	-- les textes selon la colonne la plus étroite (toutes pareilles, jamais un mélange) : les deux durées, les noms des
+	-- barres en entier et les deux pourcentages s'ils tiennent ; sinon le total, « I A » et le pourcentage de l'actif
+	local narrowest = math.min(table.unpack(cells))
+	local half_min = (narrowest - 1) // 2
+	local both_durations = 2 * 5 + 1 <= narrowest -- « 10h04 10h04 »
+	local idle_name, active_name = labels.board_idle_short or "", labels.board_active_short or ""
+	if vw(idle_name) > half_min or vw(active_name) > narrowest - half_min - 1 then
+		idle_name, active_name = labels.board_idle_letter or "", labels.board_active_letter or ""
+	end
+	local both_percents = 4 <= half_min -- « 100% »
 	local accent = o.accent or M.ACCENT
 	-- le trait du haut : « ─ Lun 12 ─ » au milieu de chaque colonne
 	local names = {}
@@ -473,38 +479,43 @@ function M.week_lines(o, width, height)
 		local cell = cells[i]
 		local color = assemble.day_color(day.total, cfg) or overview.IDLE_COLOR
 		local lines = {}
-		local bar_h = math.max(1, height - (wide and 3 or 2))
-		if wide then
+		local _, percent = idle.share(day.total, day.idle)
+		if show_idle then
+			-- deux barres, toujours : l'inactif (gris) à gauche, l'actif (couleur du jour) à droite
 			local half = (cell - 1) // 2
-			local bw = math.max(1, half - 2)
-			lines[1] = day.total > 0
-					and (centered(stats.hm(day.idle), half) .. " " .. centered(stats.hm(day.active), cell - half - 1))
-				or ""
+			local other = cell - half - 1
+			local bw = half >= 5 and half - 2 or math.max(1, half - 1)
+			local function pair(a, b_)
+				return centered(a, half) .. " " .. centered(b_, other)
+			end
+			local bar_h = math.max(1, height - 3)
+			if day.total > 0 then
+				lines[1] = both_durations and pair(stats.hm(day.idle), stats.hm(day.active))
+					or centered(stats.hm(day.total), cell)
+			else
+				lines[1] = ""
+			end
 			local ib = overview.vertical_bar(day.idle / scale, bar_h, overview.IDLE_COLOR, bw)
 			local ab = overview.vertical_bar(day.active / scale, bar_h, color, bw)
 			for k = 1, bar_h do
-				lines[#lines + 1] = centered(ib[k], half) .. " " .. centered(ab[k], cell - half - 1)
+				lines[#lines + 1] = pair(ib[k], ab[k])
 			end
-			lines[#lines + 1] = centered(labels.board_idle_short or "", half)
-				.. " "
-				.. centered(labels.board_active_short or "", cell - half - 1)
-			local _, percent = idle.share(day.total, day.idle)
-			local pi = day.total > 0 and (percent .. "%") or ""
-			local pa = day.total > 0 and ((100 - percent) .. "%") or ""
-			lines[#lines + 1] = centered(pi, half) .. " " .. centered(pa, cell - half - 1)
+			lines[#lines + 1] = pair(idle_name, active_name)
+			if day.total > 0 then
+				lines[#lines + 1] = both_percents and pair(percent .. "%", (100 - percent) .. "%")
+					or centered((100 - percent) .. "%", cell)
+			else
+				lines[#lines + 1] = ""
+			end
 		else
-			-- une seule barre : l'actif dans la couleur du jour, l'inactif en gris empilé au-dessus
-			local bw = math.max(1, cell - 2)
-			lines[1] = centered(day.total > 0 and stats.hm(day.total) or "", cell)
-			local all =
-				overview.vertical_bar((show_idle and day.total or day.active) / scale, bar_h, overview.IDLE_COLOR, bw)
-			local ab = overview.vertical_bar(day.active / scale, bar_h, color, bw)
+			-- le temps inactif n'est pas compté : seulement la barre de l'actif
+			local bar_h = math.max(1, height - 2)
+			lines[1] = centered(day.total > 0 and stats.hm(day.active) or "", cell)
+			local ab = overview.vertical_bar(day.active / scale, bar_h, color, math.max(1, cell - 2))
 			for k = 1, bar_h do
-				local active_part = ab[k]:find("[▁▂▃▄▅▆▇█]") and day.active > 0
-				lines[#lines + 1] = centered(active_part and ab[k] or all[k], cell)
+				lines[#lines + 1] = centered(ab[k], cell)
 			end
-			local _, percent = idle.share(day.total, day.idle)
-			lines[#lines + 1] = centered(day.total > 0 and ((100 - percent) .. "%") or "", cell)
+			lines[#lines + 1] = centered(day.total > 0 and "100%" or "", cell)
 		end
 		if day.key == o.day_key then
 			for k, line in ipairs(lines) do

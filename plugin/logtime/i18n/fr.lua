@@ -63,6 +63,8 @@ return {
 	board_selected = "Jour choisi",
 	board_idle_short = "Inact.",
 	board_active_short = "Actif",
+	board_idle_letter = "I",
+	board_active_letter = "A",
 	settings_title = "Personnalisation",
 	settings_help_top = "d : défaut // q : fermer // Tab ou Maj+Tab : changer d'onglet",
 	settings_help_colors = "Flèches ou h j k l : choisir // Entrée : enregistrer",

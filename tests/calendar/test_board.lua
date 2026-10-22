@@ -704,11 +704,32 @@ check(
 	board.week_stats(data({ days = { ["2026-10-13"] = 7 * 3600 } })).reached,
 	1
 )
-local wl = board.week_lines(data({ accent = "#C96969" }), 90, 14)
+local wl = board.week_lines(data({ accent = "#C96969" }), 120, 14)
 check("la semaine : le trait du haut, puis la hauteur demandée", #wl, 15)
+-- deux barres par jour, partout : sur la dernière ligne des barres, chaque barre a au moins son « sol » (▁)
+local function bars_on(line)
+	local n, inside = 0, false
+	for _, code in utf8.codes(strip(line)) do
+		local ch = utf8.char(code)
+		local bar = ch ~= " " and ch ~= "│"
+		if bar and not inside then
+			n = n + 1
+		end
+		inside = bar
+	end
+	return n
+end
+check(
+	"les barres s'élargissent avec la place (120 colonnes : ███)",
+	strip(wl[5]):find("███", 1, true) ~= nil,
+	true
+)
+for _, w in ipairs({ 46, 79, 90, 120 }) do
+	check("deux barres par jour (" .. w .. " colonnes) : 14 barres", bars_on(board.week_lines(data(), w, 14)[13]), 14)
+end
 local wl_sizes = true
 for _, line in ipairs(wl) do
-	wl_sizes = wl_sizes and layout.visible_width(line) == 90
+	wl_sizes = wl_sizes and layout.visible_width(line) == 120
 end
 check("la semaine : chaque ligne fait la largeur", wl_sizes, true)
 check(
@@ -775,14 +796,27 @@ check(
 	true
 )
 check(
-	"étroit : l'actif dans la couleur du jour, sous l'inactif",
-	table.concat(narrow_wl):find(active_color .. "█", 1, true) ~= nil,
+	"étroit : toujours deux barres par jour (l'inactif du 12 en gris, son actif en couleur)",
+	(function()
+		local parts = {}
+		for part in table.concat(narrow_wl, "", 2, 14):gmatch("[^│]+") do
+			parts[#parts + 1] = part
+		end
+		local text = table.concat(narrow_wl)
+		return text:find(literal(convert.fg(load_module("calendar/overview").IDLE_COLOR)) .. "[▂▃▄▅▆▇█]")
+				~= nil
+			and text:find(active_color .. "█", 1, true) ~= nil
+	end)(),
 	true
 )
-check("étroit : pas de noms de barres", strip(table.concat(narrow_wl)):find("Inact", 1, true), nil)
-check("étroit : la part active en bas (le 12 : 87 %)", strip(narrow_wl[15]):find("87%", 1, true) ~= nil, true)
-local mixed_wl = board.week_lines(data(), 79, 14) -- des colonnes de 10 et 11 : toutes en une seule barre
-check("jamais un mélange : toutes les colonnes pareilles", strip(table.concat(mixed_wl)):find("Inact", 1, true), nil)
+check("étroit : les noms des barres en une lettre (I A)", select(2, strip(narrow_wl[14]):gsub("I +A", "")), 7)
+check(
+	"étroit : la part active en bas (le 12 : 87 %)",
+	strip(narrow_wl[15]):find("87%", 1, true) ~= nil and strip(narrow_wl[15]):find("13%", 1, true) == nil,
+	true
+)
+local mixed_wl = board.week_lines(data(), 79, 14) -- des colonnes de 10 et 11 : tous les noms pareils
+check("jamais un mélange : les mêmes noms de barres partout", select(2, strip(mixed_wl[14]):gsub("I +A", "")), 7)
 local no_idle_wl = board.week_lines(data({ idle_days = false }), 90, 14)
 check(
 	"sans inactif compté : une seule barre, pas de noms",
