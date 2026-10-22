@@ -119,11 +119,6 @@ check(
 	strip(yl[8]):find("Jan.*Fév.*Mar.*Avr.*Mai.*Juin.*Juil.*Aoû.*Sep.*Oct.*Nov.*Déc") ~= nil,
 	true
 )
-local squares = 0
-for row = 1, 7 do
-	squares = squares + select(2, strip(yl[row]):gsub("■", "")) + select(2, strip(yl[row]):gsub("◆", ""))
-end
-check("une case par jour (365 en 2026)", squares, 365)
 check("aujourd'hui : « ◆ » (un seul), un vendredi", select(2, strip(yl[5]):gsub("◆", "")), 1)
 local worked = convert.fg(assemble.day_color(9 * 3600, data().cfg)) .. year_view.DAY
 check("un jour travaillé : dans la couleur de ses heures", table.concat(yl):find(worked, 1, true) ~= nil, true)
@@ -152,56 +147,125 @@ check(
 	board.year_lines(data(), 148)[8]:find(convert.bg(board.ACCENT), 1, true) ~= nil,
 	true
 )
--- toute la largeur : la place en plus va entre les mois, les cases d'un même mois restent régulières
--- les colonnes où commence chaque case (une suite de carrés)
-local function positions(line)
-	local out, col, before = {}, 0, false
-	for _, code in utf8.codes(strip(line)) do
-		col = col + 1
-		local square = code == utf8.codepoint("■") or code == utf8.codepoint("◆")
-		if square and not before then
-			out[#out + 1] = col
+-- une case = une remise à zéro des couleurs (chaque jour en écrit une, sur chacune de ses lignes)
+local function cells_of(line)
+	return select(2, line:gsub("\27%[0m", ""))
+end
+-- les colonnes visibles où commence chaque case, avec la couleur de la case
+local function cells_at(line)
+	local out, col, i = {}, 0, 1
+	local current
+	while i <= #line do
+		local code = line:match("^\27%[[%d;]*m", i)
+		if code then
+			if code == "\27[0m" then
+				current = nil
+			elseif not current then
+				current = { col = col + 1, code = code }
+				out[#out + 1] = current
+			end
+			i = i + #code
+		else
+			local ch = line:match("^[%z\1-\127\194-\244][\128-\191]*", i)
+			col = col + 1
+			i = i + #ch
 		end
-		before = square
 	end
 	return out
 end
+-- exact : un mois n'a que ses jours. Tout février travaillé : aucune case grise dans les colonnes de février
+local feb = {}
+for d = 1, 28 do
+	feb[string.format("2026-02-%02d", d)] = 9 * 3600
+end
+local feb_lines = board.year_lines(data({ days = feb }), 148)
+local feb_color = convert.fg(assemble.day_color(9 * 3600, data().cfg))
+local feb_cols, gray_cols, feb_count = {}, {}, 0
+for row = 1, 7 do
+	for _, c in ipairs(cells_at(feb_lines[row])) do
+		if c.code == feb_color then
+			feb_cols[c.col] = true
+			feb_count = feb_count + 1
+		else
+			gray_cols[c.col] = true
+		end
+	end
+end
+check("février : ses 28 jours", feb_count, 28)
+local shared = false
+for col in pairs(feb_cols) do
+	shared = shared or gray_cols[col] == true
+end
+check("un mois n'a que ses jours (aucune colonne partagée avec janvier ou mars)", shared, false)
+-- le nom du mois centré sous son bloc (à une colonne près)
+local feb_wide = board.year_lines(data({ days = feb }), 200)
+local lo, hi = math.huge, 0
+for row = 1, 7 do
+	for _, c in ipairs(cells_at(feb_wide[row])) do
+		if c.code == feb_color then
+			lo, hi = math.min(lo, c.col), math.max(hi, c.col)
+		end
+	end
+end
+local axis_plain = strip(feb_wide[8])
+local name_at = utf8.len(axis_plain:sub(1, axis_plain:find("Fév", 1, true) - 1)) + 1
+check("le nom du mois centré sous son bloc", math.abs((name_at + 1) - (lo + hi) / 2) <= 1, true)
+local function count_cells(lines, rows)
+	local n = 0
+	for row = 1, rows do
+		n = n + cells_of(lines[row])
+	end
+	return n
+end
+check("une case par jour (365 en 2026)", count_cells(yl, 7), 365)
+-- toute la largeur, et autant d'air à gauche qu'à droite
 for _, w in ipairs({ 118, 148, 200 }) do
-	local mon = positions(board.year_lines(data(), w)[1])
-	check("toute la largeur (" .. w .. ") : la dernière case près du bord droit", mon[#mon] >= w - 6, true)
-	local steps = {}
-	for k = 2, #mon do
-		steps[mon[k] - mon[k - 1]] = true
+	local lines = board.year_lines(data(), w)
+	local first, last = math.huge, 0
+	for row = 1, 7 do
+		local at = cells_at(lines[row])
+		first = math.min(first, at[1].col)
+		last = math.max(last, at[#at].col)
 	end
-	local distinct = 0
-	for _ in pairs(steps) do
-		distinct = distinct + 1
-	end
+	local left_air = first - (1 + year_view.LABEL) - 1
+	local right_air = w - last - 1
+	check("toute la largeur (" .. w .. ") : la dernière case près du bord droit", right_air <= 6, true)
 	check(
-		"des écarts réguliers (" .. w .. ") : la case, et la case plus l'espace entre deux mois",
-		distinct <= 3,
+		"centrée (" .. w .. ") : autant d'air à gauche qu'à droite (à 3 près)",
+		math.abs(left_air - right_air) <= 3,
 		true
 	)
 end
-local thursday = positions(yl[4]) -- le 1er janvier 2026 est un jeudi : sa ligne commence par une case
-local left_air = thursday[1] - (1 + year_view.LABEL) - 1
-local right_air = 148 - thursday[#thursday] - 1 -- (une case d'un carré, puis son espace)
+-- plus de hauteur : les jours s'allongent vers le bas
+check("la hauteur de l'année : 8 lignes dans une fenêtre de 34", board.year_height(34), 8)
+check("la hauteur de l'année : 15 lignes dans une fenêtre de 46 (2 lignes par jour)", board.year_height(46), 15)
+check("la hauteur de l'année : jamais plus de 3 lignes par jour", board.year_height(200), 22)
+local tall = board.year_lines(data(), 148, 15)
+check("2 lignes par jour : 15 lignes", #tall, 15)
 check(
-	"l'année centrée : autant d'air à gauche qu'à droite (à 2 près)",
-	math.abs(left_air - right_air) <= 2 and left_air >= 2,
+	"2 lignes par jour : le nom du jour sur la première",
+	strip(tall[1]):find("^ Lun ") ~= nil and strip(tall[2]):find("^      ") ~= nil,
 	true
 )
+check(
+	"2 lignes par jour : un pavé de couleur, puis une demi-case",
+	tall[1]:find("\27[48;", 1, true) ~= nil and strip(tall[2]):find("▀", 1, true) ~= nil,
+	true
+)
+check(
+	"2 lignes par jour : toujours une case par jour",
+	count_cells({ tall[1], tall[3], tall[5], tall[7], tall[9], tall[11], tall[13] }, 7),
+	365
+)
+check("2 lignes par jour : aujourd'hui « ◆ » dans sa case", select(2, strip(table.concat(tall)):gsub("◆", "")), 1)
+check("2 lignes par jour : les mois sur la dernière ligne", strip(tall[15]):find("Oct", 1, true) ~= nil, true)
 local wide = board.year_lines(data(), 228)
 check(
-	"une fenêtre large : des cases plus grandes (plusieurs carrés)",
-	strip(wide[1]):find("■■■", 1, true) ~= nil,
+	"une fenêtre large : des cases plus larges (des pavés de couleur)",
+	wide[1]:find("\27%[48;2;[%d;]+m\27%[38;2;[%d;]+m  \27%[0m") ~= nil,
 	true
 )
-local wide_cells = 0
-for row = 1, 7 do
-	wide_cells = wide_cells + #positions(wide[row])
-end
-check("une fenêtre large : toujours une case par jour", wide_cells, 365)
+check("une fenêtre large : toujours une case par jour", count_cells(wide, 7), 365)
 local en_yl = board.year_lines(data({ labels = en }), 148)
 check("en anglais : les jours", strip(en_yl[3]):find("^ Wed ") ~= nil, true)
 local page_year = board.render(data(), 150, 40)
@@ -228,7 +292,7 @@ for _, size in ipairs({ { 120, 34 }, { 150, 40 }, { 220, 60 } }) do
 	local tag = size[1] .. " x " .. size[2]
 	check("zones " .. tag .. " : toutes dans le cadre, et pas vides", ok, true)
 	check("zones " .. tag .. " : aucune ne chevauche une autre", apart, true)
-	check("zones " .. tag .. " : l'année fait 8 lignes", z.year.h, board.YEAR_HEIGHT)
+	check("zones " .. tag .. " : la hauteur de l'année suit la fenêtre", z.year.h, board.year_height(size[2]))
 	check(
 		"zones " .. tag .. " : la frise, 4 lignes, juste au-dessus du trait de l'aide",
 		z.timeline.h .. " " .. (z.timeline.y + z.timeline.h),
