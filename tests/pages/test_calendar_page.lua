@@ -707,7 +707,7 @@ local function scenarios()
 		board_text:find(convert.bg("#C9AB6B") .. convert.fg(convert.contrast("#C9AB6B")), 1, true) ~= nil,
 		true
 	)
-	local board_last = strip(board_text):match("([^\n]*)$")
+	local board_last = strip(board_text):match("([^\n]*)\n[^\n]*$") -- l'aide, juste au-dessus du bas du cadre
 	check(
 		"vue d'ensemble : la légende des couleurs au bout de l'aide, sans « * = aujourd'hui »",
 		board_last:find("24h", 1, true) ~= nil and board_last:find("* =", 1, true) == nil,
@@ -721,12 +721,12 @@ local function scenarios()
 	)
 	check(
 		"vue d'ensemble : la taille nécessaire",
-		strip(small_text):find("120 colonnes sur 32 lignes", 1, true) ~= nil,
+		strip(small_text):find("120 colonnes sur 34 lignes", 1, true) ~= nil,
 		true
 	)
 	check(
-		"vue d'ensemble, 31 lignes : trop bas",
-		strip(page.build_text({ cols = 120, rows = 31 })):find("Fenêtre trop petite", 1, true) == 1,
+		"vue d'ensemble, 33 lignes : trop bas",
+		strip(page.build_text({ cols = 120, rows = 33 })):find("Fenêtre trop petite", 1, true) == 1,
 		true
 	)
 

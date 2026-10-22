@@ -90,16 +90,15 @@ function M.year_stats(days, year, cfg, idle_days)
 	return s
 end
 
--- Dessine l'année. cfg : les réglages du calendrier, avec le dégradé (gradient.apply_to). Renvoie les lignes et la
--- largeur (celle qu'on centre). Avec les encadrés : l'année dans un cadre, le titre sur le haut, les validés sur le bas.
--- idle_days (facultatif) : le temps inactif par jour, ajouté aux statistiques (« Inactif : 42h10 (8 %) »).
-function M.render(days, year, today_key, cfg, labels, idle_days)
+-- La grille de l'année (sans titre ni statistiques) : la ligne des mois, puis une ligne par jour de la semaine. Renvoie
+-- 8 lignes, larges de content_width (aussi pour la vue d'ensemble de F2, calendar/board.lua).
+--   mark (facultatif) = { day = "AAAA-MM-JJ" (le jour choisi, en couleurs inversées), month = 1 à 12 (le mois choisi,
+--   son nom rempli de mark.accent) }
+function M.grid_lines(days, year, today_key, cfg, labels, mark)
+	mark = mark or {}
 	local offset = dates.offset(year, 1, cfg.week_starts_on)
 	local columns = M.columns(year, cfg.week_starts_on)
-	local width = content_width(year, cfg)
 	local count = days_in_year(year)
-	local s = M.year_stats(days, year, cfg, idle_days)
-
 	-- la ligne des mois : chaque nom au-dessus de la semaine de son 1er jour
 	local header = {}
 	local cursor = 0 -- la largeur déjà écrite
@@ -108,7 +107,11 @@ function M.render(days, year, today_key, cfg, labels, idle_days)
 		local at = M.LABEL + (col - 1) * 2
 		if at >= cursor then
 			local name = (labels.months_short or {})[month] or first_chars(labels.months[month], 3)
-			header[#header + 1] = string.rep(" ", at - cursor) .. name
+			local shown = name
+			if month == mark.month and mark.accent then
+				shown = convert.bg(mark.accent) .. convert.fg(convert.contrast(mark.accent)) .. name .. convert.RESET
+			end
+			header[#header + 1] = string.rep(" ", at - cursor) .. shown
 			cursor = at + utf8.len(name)
 		end
 	end
@@ -133,12 +136,24 @@ function M.render(days, year, today_key, cfg, labels, idle_days)
 				local key = dates.key_any(year, 1, i)
 				local secs = math.floor(math.max(0, days[key] or 0))
 				local color = (secs > 0 and assemble.day_color(secs, cfg)) or M.EMPTY_COLOR
-				local mark = (key == today_key) and M.TODAY or M.DAY
-				parts[#parts + 1] = convert.fg(color) .. mark .. convert.RESET .. " "
+				local square = (key == today_key) and M.TODAY or M.DAY
+				local selected = key == mark.day and assemble.SELECTED or ""
+				parts[#parts + 1] = selected .. convert.fg(color) .. square .. convert.RESET .. " "
 			end
 		end
 		content[#content + 1] = table.concat(parts)
 	end
+	return content, content_width(year, cfg)
+end
+
+-- Dessine l'année. cfg : les réglages du calendrier, avec le dégradé (gradient.apply_to). Renvoie les lignes et la
+-- largeur (celle qu'on centre). Avec les encadrés : l'année dans un cadre, le titre sur le haut, les validés sur le bas.
+-- idle_days (facultatif) : le temps inactif par jour, ajouté aux statistiques (« Inactif : 42h10 (8 %) »).
+function M.render(days, year, today_key, cfg, labels, idle_days)
+	local width = content_width(year, cfg)
+	local s = M.year_stats(days, year, cfg, idle_days)
+
+	local content = M.grid_lines(days, year, today_key, cfg, labels)
 	content[#content + 1] = ""
 
 	-- les statistiques
