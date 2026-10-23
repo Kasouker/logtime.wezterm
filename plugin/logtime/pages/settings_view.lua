@@ -464,11 +464,24 @@ function M.draw(o, cols, rows)
 			right_lines[i] = fit(string.rep(" ", margin) .. (preview.lines[i - top] or ""), right)
 		end
 	end
+	-- une ligne de l'aperçu qui commence (ou finit) par un trait horizontal le relie au cadre : ├ à gauche, ┤ à droite
+	-- (┼ à gauche là où le cadre rejoint déjà le panneau de gauche)
+	local function touches(i)
+		local plain = (right_lines[i] or ""):gsub("\27%[[%d;]*m", "")
+		local first = plain:sub(1, (utf8.offset(plain, 2) or (#plain + 1)) - 1)
+		local last = plain:sub(utf8.offset(plain, -1) or 1)
+		return first == b.h, last == b.h
+	end
+	local function right_part(i, joined)
+		local starts, ends = touches(i)
+		local left_edge = starts and (joined and b.x or b.l) or (joined and b.r or b.v)
+		return e(left_edge) .. right_lines[i] .. e(ends and b.r or b.v)
+	end
 	local function with_right(i, line)
 		if not show_preview then
 			return line .. e(b.v)
 		end
-		return line .. e(b.v) .. right_lines[i] .. e(b.v)
+		return line .. right_part(i, false)
 	end
 	-- la barre d'onglets : l'onglet ouvert rempli de sa couleur, du trait du haut à celui du bas (des demi-blocs à la
 	-- place des traits, au-dessus et en dessous de lui)
@@ -493,13 +506,16 @@ function M.draw(o, cols, rows)
 		.. e((show_preview and (b.t .. string.rep(b.h, right)) or "") .. b.tr)
 	out[2] = with_right(1, e(b.v) .. table.concat(cells, e(b.v)))
 	-- la jonction sous les onglets (├──┴──┤) : à droite, elle touche le trait qui sépare l'aperçu
-	out[3] = e(b.l) .. table.concat(bottoms, e(b.b)) .. e(b.r) .. (show_preview and (right_lines[2] .. e(b.v)) or "")
+	out[3] = e(b.l) .. table.concat(bottoms, e(b.b)) .. (show_preview and right_part(2, true) or e(b.r))
 	local content = left_content(o, left, inner_rows - 2)
 	for i, line in ipairs(content) do
 		local r = i + 2
 		if line == SEPARATOR then
-			local sep = e(b.l .. string.rep(b.h, left) .. b.r)
-			out[#out + 1] = show_preview and (sep .. right_lines[r] .. e(b.v)) or sep
+			if show_preview then
+				out[#out + 1] = e(b.l .. string.rep(b.h, left)) .. right_part(r, true)
+			else
+				out[#out + 1] = e(b.l .. string.rep(b.h, left) .. b.r)
+			end
 		else
 			out[#out + 1] = with_right(r, e(b.v) .. line)
 		end

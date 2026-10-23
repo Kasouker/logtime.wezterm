@@ -1464,15 +1464,40 @@ check(
 	true
 )
 check(
-	"aperçu à droite : le mois actuel (son nom en haut à gauche de la grille), avec les jours de la semaine",
-	table.concat(full, "\n"):find("Octobre", 1, true) ~= nil
+	"aperçu à droite : le mois actuel (jusqu'au 31), avec les jours de la semaine",
+	table.concat(full, "\n"):find("│ 31 ", 1, true) ~= nil
 		and table.concat(full, "\n"):find("Mercredi", 1, true) ~= nil,
 	true
 )
 check(
-	"aperçu : une ligne par semaine (« Semaine 1 » à « Semaine 5 » pour octobre 2026)",
-	table.concat(full, "\n"):find("Semaine 1", 1, true) ~= nil
-		and table.concat(full, "\n"):find("Semaine 5", 1, true) ~= nil,
+	"aperçu : le mois sans la colonne des semaines (ni « Semaine 1 » ni « Sem. 1 »)",
+	table.concat(full, "\n"):find("Semaine 1", 1, true) == nil
+		and table.concat(full, "\n"):find("Sem. 1", 1, true) == nil,
+	true
+)
+check(
+	"aperçu : les traits autour de la semaine rejoignent le cadre de la page (├ à gauche, ┤ à droite)",
+	(function()
+		local joined = 0
+		for _, line in ipairs(full) do
+			local plain = strip(line)
+			if
+				plain:find("├──", 1, true)
+				and plain:find("┬", 1, true)
+				and plain:sub(-#"─┤") == "─┤"
+			then
+				joined = joined + 1
+			end
+			if
+				plain:find("├──", 1, true)
+				and plain:find("┴", 1, true)
+				and plain:sub(-#"─┤") == "─┤"
+			then
+				joined = joined + 1
+			end
+		end
+		return joined >= 2
+	end)(),
 	true
 )
 check(
@@ -1484,7 +1509,7 @@ check(
 	"aperçu : de haut en bas, le mois, la semaine, les projets (le total), la frise",
 	(function()
 		local text = table.concat(full, "\n")
-		local month_at = text:find("Semaine 5", 1, true)
+		local month_at = text:find("│ 31 ", 1, true)
 		local week_at = text:find("Jours actifs", 1, true)
 		local projects_at = text:find("Total ", week_at or 1, true)
 		local timeline_at = text:find("24h00", projects_at or 1, true)
@@ -1557,9 +1582,9 @@ check(
 )
 -- la hauteur qu'il faut à l'aperçu : 4 lignes de moins sans frise (octobre 2026 : 5 semaines)
 e = open({ days = month_days, cols = 200, rows = 60 })
-check("aperçu : la hauteur minimum avec la frise", e.page.preview_block(fr).min_height, 34)
+check("aperçu : la hauteur minimum avec la frise", e.page.preview_block(fr).min_height, 36)
 e.cfg.show_timeline = false
-check("aperçu : 4 lignes de moins sans la frise", e.page.preview_block(fr).min_height, 30)
+check("aperçu : 4 lignes de moins sans la frise", e.page.preview_block(fr).min_height, 32)
 -- les tailles de fenêtre
 e = open({ days = month_days, cols = 100, rows = 40 })
 local narrow = e.page.build_lines({ cols = 100, rows = 40 })

@@ -1470,11 +1470,11 @@ check(
 
 -- ---- l'aperçu de F4 : le mois, la semaine, les projets, la frise, en colonne
 local min_pw, min_ph = board.preview_minimum(5)
-check("aperçu : la taille minimum (5 semaines)", min_pw .. " x " .. min_ph, "64 x 34")
-check("aperçu : sans frise, 4 lignes de moins", select(2, board.preview_minimum(5, false)), 30)
+check("aperçu : la taille minimum (5 semaines)", min_pw .. " x " .. min_ph, "65 x 36")
+check("aperçu : sans frise, 4 lignes de moins", select(2, board.preview_minimum(5, false)), 32)
 check("aperçu : trop étroit, rien", board.preview(pdata, min_pw - 1, 40), nil)
 check("aperçu : trop bas, rien", board.preview(pdata, 85, min_ph - 1), nil)
-for _, size in ipairs({ { 64, 34 }, { 85, 46 }, { 120, 60 } }) do
+for _, size in ipairs({ { 65, 36 }, { 85, 46 }, { 120, 60 } }) do
 	local pv = board.preview(pdata, size[1], size[2])
 	local exact = #pv == size[2]
 	for _, l in ipairs(pv) do
@@ -1500,9 +1500,34 @@ for _, size in ipairs({ { 64, 34 }, { 85, 46 }, { 120, 60 } }) do
 		end
 	end
 	check(
-		"aperçu " .. size[1] .. " x " .. size[2] .. " : la semaine juste sous le mois (pas de ligne vide)",
-		week_top,
-		month_bottom + 1
+		"aperçu "
+			.. size[1]
+			.. " x "
+			.. size[2]
+			.. " : un trait juste sous le mois (┬ sur le trait des chiffres), puis la semaine",
+		plain[month_bottom + 1]:find("┬", 1, true) ~= nil and week_top == month_bottom + 2,
+		true
+	)
+	local week_bottom
+	for k = week_top + 1, #plain do
+		if not week_bottom and plain[k]:find("╰", 1, true) then
+			week_bottom = k
+		end
+	end
+	check(
+		"aperçu " .. size[1] .. " x " .. size[2] .. " : un trait juste sous la semaine (┴), puis les projets",
+		plain[week_bottom + 1]:find("┴", 1, true) ~= nil and plain[week_bottom + 2]:find("╭", 1, true) ~= nil,
+		true
+	)
+	check(
+		"aperçu " .. size[1] .. " x " .. size[2] .. " : un trait vertical entre la semaine et ses chiffres",
+		plain[week_top + 1]:find("│ Jours actifs", 1, true) ~= nil,
+		true
+	)
+	check(
+		"aperçu " .. size[1] .. " x " .. size[2] .. " : le mois sans colonne des semaines",
+		table.concat(plain):find("Semaine 1", 1, true) == nil and table.concat(plain):find("Sem. 1", 1, true) == nil,
+		true
 	)
 	check(
 		"aperçu " .. size[1] .. " x " .. size[2] .. " : ses chiffres à droite de la semaine",
@@ -1523,6 +1548,24 @@ check(
 	"aperçu : un projet de la même couleur dans sa liste et sur la frise",
 	pv_text:find(convert.fg(nth_color(3)) .. "█", 1, true) ~= nil
 		and pv_text:find(convert.bg(nth_color(3)), 1, true) ~= nil,
+	true
+)
+local accented = data({ projects = PROJECTS, timeline = TIMELINE, accent = "#123456" }) -- (une couleur qui ne sert pas ailleurs)
+local fill = convert.bg("#123456")
+check(
+	"aperçu : rien de rempli de couleur (ni le jour, ni la semaine choisis)",
+	table.concat(board.preview(accented, 85, 46)):find(fill, 1, true),
+	nil
+)
+check(
+	"mais dans F2, le jour et la semaine choisis restent remplis",
+	table.concat(board.week_lines(accented, 80, 16)):find(fill, 1, true) ~= nil
+		and table.concat(board.month_lines(accented, 80, 20)):find(fill, 1, true) ~= nil,
+	true
+)
+check(
+	"aperçu : les données d'origine ne sont pas touchées",
+	accented.week_column == nil and accented.highlight == nil,
 	true
 )
 local pv_nofrise_data = data({ projects = PROJECTS, timeline = TIMELINE })

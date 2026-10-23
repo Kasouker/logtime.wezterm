@@ -424,6 +424,54 @@ for i, line in ipairs(plain) do
 end
 check("aperçu centré verticalement", math.abs(month_row - (42 / 2)) <= 3, true)
 check("aperçu dans la zone de droite", utf8.len(plain[month_row]:match("^(.-)October")) > 60, true)
+-- un aperçu fait de traits horizontaux : chaque trait rejoint le cadre (├ ┤ ; ┼ là où le cadre rejoint déjà la gauche)
+local ruled = view.draw(
+	list_page({
+		preview = {
+			min_width = 1,
+			min_height = 1,
+			draw = function(width, height)
+				local out = {}
+				for i = 1, height do
+					out[i] = string.rep("─", width)
+				end
+				return out
+			end,
+		},
+	}),
+	200,
+	42
+)
+local function chars(line)
+	local out = {}
+	for _, code in utf8.codes(strip(line)) do
+		out[#out + 1] = utf8.char(code)
+	end
+	return out
+end
+local top = chars(ruled[1])
+local junction -- la colonne du trait entre la gauche et l'aperçu (le dernier ┬ du haut)
+for k, ch in ipairs(top) do
+	if ch == "┬" then
+		junction = k
+	end
+end
+local joins, crosses, rights = 0, 0, 0
+for y = 2, #ruled - 1 do
+	local line = chars(ruled[y])
+	if line[junction] == "├" then
+		joins = joins + 1
+	elseif line[junction] == "┼" then
+		crosses = crosses + 1
+	end
+	if line[#line] == "┤" then
+		rights = rights + 1
+	end
+end
+check("aperçu en traits : chaque trait rejoint le bord droit (┤)", rights, #ruled - 2)
+check("aperçu en traits : à gauche, ├ ou ┼ partout", joins + crosses, #ruled - 2)
+check("aperçu en traits : ┼ sous les onglets et sur les séparations du panneau de gauche", crosses >= 2, true)
+check("aperçu en traits : ┼ sous les onglets", chars(ruled[3])[junction], "┼")
 local wide = view.draw(colors_page({ preview = MONTH }), 200, 42)
 check(
 	"200 colonnes : le panneau de gauche prend 42 % de la largeur",

@@ -291,7 +291,10 @@ function M.month_lines(o, width, height)
 	end
 	local weeks = overview.weeks(o.year, o.month, cfg.week_starts_on)
 	local count = #weeks
-	local cells = split(math.max(8, width - 2 - 9), 8) -- 8 colonnes, 9 traits verticaux, une colonne d'air de chaque côté
+	-- 8 colonnes (les 7 jours, puis les semaines), ou 7 sans la colonne des semaines (o.week_column = false) ; un trait
+	-- vertical de plus que de colonnes, une colonne d'air de chaque côté
+	local ncol = o.week_column == false and 7 or 8
+	local cells = split(math.max(ncol, width - 2 - (ncol + 1)), ncol)
 	-- toutes les semaines de la même hauteur (les lignes en trop vont autour du cadre)
 	local row_h = math.max(1, (height - 2 - (count - 1)) // count) -- le haut, le bas, un trait entre les semaines
 	local rows = {}
@@ -299,10 +302,10 @@ function M.month_lines(o, width, height)
 		rows[w] = row_h
 	end
 	local narrow = math.min(table.unpack(cells))
-	-- un trait de la grille (8 morceaux) avec, au milieu de chaque morceau, un texte (ou rien)
+	-- un trait de la grille (un morceau par colonne) avec, au milieu de chaque morceau, un texte (ou rien)
 	local function rule(l, mid, r, texts)
 		local parts = {}
-		for k = 1, 8 do
+		for k = 1, ncol do
 			local text, cell = texts and texts[k], cells[k]
 			if text and text ~= "" and vw(text) + 2 <= cell then
 				local before = (cell - vw(text) - 2) // 2
@@ -328,11 +331,13 @@ function M.month_lines(o, width, height)
 		local index = cfg.week_starts_on == "sunday" and ((i + 5) % 7 + 1) or i
 		names[i] = fits and long[index] or short[index]
 	end
-	local month_name = labels.months[o.month] or ""
-	if vw(month_name) + 2 > cells[8] then
-		month_name = (labels.months_short or {})[o.month] or month_name
+	if ncol == 8 then -- le nom du mois, sur la colonne des semaines
+		local month_name = labels.months[o.month] or ""
+		if vw(month_name) + 2 > cells[8] then
+			month_name = (labels.months_short or {})[o.month] or month_name
+		end
+		names[8] = month_name
 	end
-	names[8] = month_name
 	local out = { rule(b.tl, b.t, b.tr, names) }
 	-- la semaine du jour choisi
 	local selected
@@ -350,7 +355,7 @@ function M.month_lines(o, width, height)
 	local goal_secs = stats.has_goal(cfg.goal_hours) and cfg.goal_hours * 3600 or nil
 	for w, week in ipairs(weeks) do
 		local week_label = string.format(labels.overview_week or "Week %d", w)
-		if vw(week_label) > cells[8] then
+		if ncol == 8 and vw(week_label) > cells[8] then
 			week_label = string.format(labels.overview_week_short or "W%d", w)
 		end
 		local row = rows[w]
@@ -381,11 +386,13 @@ function M.month_lines(o, width, height)
 					parts[i] = string.rep(" ", cell)
 				end
 			end
-			local label = line == label_line and centered(week_label, cells[8]) or string.rep(" ", cells[8])
-			if w == selected then
-				label = convert.bg(accent) .. convert.fg(convert.contrast(accent)) .. label .. convert.RESET
+			if ncol == 8 then
+				local label = line == label_line and centered(week_label, cells[8]) or string.rep(" ", cells[8])
+				if w == selected then
+					label = convert.bg(accent) .. convert.fg(convert.contrast(accent)) .. label .. convert.RESET
+				end
+				parts[8] = label
 			end
-			parts[8] = label
 			out[#out + 1] = " " .. e(b.v) .. table.concat(parts, e(b.v)) .. e(b.v) .. " "
 		end
 		if w < count then
@@ -395,7 +402,10 @@ function M.month_lines(o, width, height)
 	-- le bas : les semaines et jours validés posés dessus (s'ils tiennent), les jonctions ┴ gardées ailleurs
 	local bottom = rule(b.bl, b.b, b.br)
 	local validated = assemble.validated_text(o.days, o.year, o.month, cfg, nil, labels)
-	local grid_w = 9 + cells[1] + cells[2] + cells[3] + cells[4] + cells[5] + cells[6] + cells[7] + cells[8]
+	local grid_w = ncol + 1
+	for k = 1, ncol do
+		grid_w = grid_w + cells[k]
+	end
 	if validated and vw(validated) + 4 <= grid_w - 2 then
 		local plain = bottom:gsub("\27%[[%d;]*m", "")
 		local cover = 1 + 2 + vw(validated) + 2 -- l'air, « ╰─ », le texte entre deux espaces
@@ -589,7 +599,7 @@ function M.week_lines(o, width, height)
 			end
 			lines[#lines + 1] = centered(day.total > 0 and "100%" or "", cell)
 		end
-		if day.key == o.day_key then
+		if day.key == o.day_key and o.highlight ~= false then
 			for k, line in ipairs(lines) do
 				-- le jour choisi : la colonne remplie de la couleur (les barres gardent leurs couleurs)
 				local style = convert.bg(accent) .. convert.fg(convert.contrast(accent))
@@ -1143,7 +1153,7 @@ M.PREVIEW_WEEK = 8 -- la semaine : au moins 8 lignes (cadre, durées, barres, no
 M.PREVIEW_PROJECTS = 6 -- les projets : au moins 6 lignes (cadre, total, objectif, deux projets)
 M.PREVIEW_MONTH_SHARE = 0.4 -- la place en plus : environ 40 % au mois (des semaines entières), la moitié du reste à la
 M.PREVIEW_WEEK_SHARE = 0.5 -- semaine, le reste aux projets
-M.PREVIEW_MIN_WIDTH = M.WEEK_SIDE + 2 + 8 + 7 * 4 -- les chiffres de la semaine, puis 7 colonnes de 4
+M.PREVIEW_MIN_WIDTH = M.WEEK_SIDE + 1 + 2 + 8 + 7 * 4 -- les chiffres de la semaine, un trait, puis 7 colonnes de 4
 
 -- Le mois : au moins le haut, le bas, `weeks` semaines de 2 lignes (le numéro, la durée) et un trait entre elles.
 local function preview_month_min(weeks)
@@ -1154,16 +1164,26 @@ end
 function M.preview_minimum(weeks, show_timeline)
 	return M.PREVIEW_MIN_WIDTH,
 		preview_month_min(weeks)
+			+ 1 -- le trait au-dessus de la semaine
 			+ M.PREVIEW_WEEK
+			+ 1 -- et celui en dessous
 			+ M.PREVIEW_PROJECTS
 			+ (show_timeline ~= false and M.TIMELINE_HEIGHT or 0)
 end
 
 -- L'aperçu de F4 : exactement `height` lignes de `width` colonnes, ou nil si la zone est trop petite. De haut en bas :
--- le mois, la semaine (ses barres, ses chiffres à droite), les projets du jour et les meilleurs de la semaine côte à
--- côte, la frise du jour (sans elle, si show_timeline = false). Les mêmes dessins que la vue d'ensemble de F2.
+-- le mois (sans la colonne des semaines), la semaine (ses barres, un trait, ses chiffres à droite) entre deux traits,
+-- les projets du jour et les meilleurs de la semaine côte à côte, la frise du jour (sans elle, si show_timeline =
+-- false). Les mêmes dessins que la vue d'ensemble de F2, sans rien de rempli de couleur (on ne choisit rien ici).
 --   o = comme pour M.render (sans legend)
 function M.preview(o, width, height)
+	local copy = { week_column = false, highlight = false }
+	for k, value in pairs(o) do
+		if copy[k] == nil then
+			copy[k] = value
+		end
+	end
+	o = copy
 	local weeks = #overview.weeks(o.year, o.month, o.cfg.week_starts_on)
 	local show_timeline = o.cfg.show_timeline ~= false
 	local min_w, min_h = M.preview_minimum(weeks, show_timeline)
@@ -1174,9 +1194,12 @@ function M.preview(o, width, height)
 	-- le mois : des semaines toutes de la même hauteur, et pas une ligne de plus (pas de vide sous son cadre)
 	local row_h = 2 + math.floor(extra * M.PREVIEW_MONTH_SHARE) // weeks
 	local month_h = 2 + weeks * row_h + (weeks - 1)
-	local rest = height - month_h - (show_timeline and M.TIMELINE_HEIGHT or 0) - M.PREVIEW_WEEK - M.PREVIEW_PROJECTS
+	local timeline_h = show_timeline and M.TIMELINE_HEIGHT or 0
+	local rest = height - month_h - 2 - timeline_h - M.PREVIEW_WEEK - M.PREVIEW_PROJECTS -- (2 : les traits)
 	local week_h = M.PREVIEW_WEEK + math.floor(rest * M.PREVIEW_WEEK_SHARE)
-	local projects_h = height - month_h - week_h - (show_timeline and M.TIMELINE_HEIGHT or 0)
+	local projects_h = height - month_h - 2 - week_h - timeline_h
+	local b, edge = o.b, o.edge or ""
+	local off = edge ~= "" and convert.RESET or ""
 	local out = {}
 	local function add(lines)
 		for _, line in ipairs(lines) do
@@ -1184,13 +1207,15 @@ function M.preview(o, width, height)
 		end
 	end
 	add(M.month_lines(o, width, month_h))
-	-- la semaine, et ses chiffres à droite
-	local week_w = width - M.WEEK_SIDE
+	-- la semaine, un trait, ses chiffres à droite ; un trait au-dessus et en dessous (┬ et ┴ sur le trait vertical)
+	local week_w = width - M.WEEK_SIDE - 1
 	local week = M.week_lines(o, week_w, week_h)
 	local side = M.week_side_lines(o, M.WEEK_SIDE, week_h)
+	out[#out + 1] = edge .. string.rep(b.h, week_w) .. b.t .. string.rep(b.h, M.WEEK_SIDE) .. off
 	for k = 1, week_h do
-		out[#out + 1] = fit(week[k], week_w) .. fit(side[k], M.WEEK_SIDE)
+		out[#out + 1] = fit(week[k], week_w) .. edge .. b.v .. off .. fit(side[k], M.WEEK_SIDE)
 	end
+	out[#out + 1] = edge .. string.rep(b.h, week_w) .. b.b .. string.rep(b.h, M.WEEK_SIDE) .. off
 	-- les projets du jour et de la semaine, côte à côte (l'objectif sur la ligne du total s'il tient dans les deux)
 	local colors = show_timeline and M.project_colors(o) or nil
 	local day_w = width // 2
