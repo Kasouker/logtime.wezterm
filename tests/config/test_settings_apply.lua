@@ -238,7 +238,7 @@ local function cleanup(env)
 	os.execute("rm -rf '" .. env.home .. "'")
 end
 
-local BIG = { cols = 300, rows = 74 } -- 4 colonnes x 3 rangées : 12 mois (8 + 3 x 21 + 2 = 73 lignes)
+local BIG = { cols = 300, rows = 72 } -- 4 colonnes x 3 rangées : 12 mois (6 + 3 x 21 + 2 = 71 lignes)
 local HEAT3 = convert.bg("#8C7A4A") -- le fond du niveau « 3 à 6 h » des quatre niveaux, pour 4h13
 local GOLD = convert.bg(gradient.make({}).color(15231))
 local BLUE = convert.bg(gradient.make({ color = "#3366CC" }).color(15231))

@@ -326,7 +326,7 @@ check("statistiques : deuxième ligne", lines[#lines], "  Meilleur jour : 10 (4h
 check(
 	"légende : niveaux par défaut",
 	strip(assemble.legend({}, fr)),
-	"  ██ <1h   ██ 1-3h   ██ 3-6h   ██ 6h+     * = aujourd'hui"
+	"  ██ <1h   ██ 1-3h   ██ 3-6h   ██ 6h+     * = Aujourd'hui"
 )
 check(
 	"un mois seul : plus de légende sous lui (la page la met dans un cadre)",
@@ -844,7 +844,7 @@ check("mois vide : pas de meilleur jour, série à zéro", empty[#empty], "  Sé
 check(
 	"légende : seuils personnalisés",
 	strip(assemble.legend({ thresholds = { 2, 4, 8 } }, fr)),
-	"  ██ <2h   ██ 2-4h   ██ 4-8h   ██ 8h+     * = aujourd'hui"
+	"  ██ <2h   ██ 2-4h   ██ 4-8h   ██ 8h+     * = Aujourd'hui"
 )
 
 -- anglais
@@ -853,7 +853,7 @@ check("anglais : titre", english[2], "  Logtime: October 2026   Month total: 5h4
 check("anglais : en-tête", english[4]:match("^%s*(%a+)"), "Mon")
 check("anglais : statistiques", english[#english - 1], "  Average per active day: 1h55")
 check("anglais : série", english[#english], "  Best day: 10 (4h13)   Current streak: 3 d")
-check("anglais : légende", strip(assemble.legend({}, en)):match("%* = today$"), "* = today")
+check("anglais : légende", strip(assemble.legend({}, en)):match("%* = Today$"), "* = Today")
 
 -- ============================================================
 -- calendar/assemble.lua : les couleurs
@@ -924,7 +924,7 @@ check("fonction de couleur : jamais appelée avec une valeur négative", negativ
 check(
 	"fonction de couleur : pas de légende des niveaux, seulement l'étoile",
 	strip(assemble.legend({ cell_color = gradient }, fr)),
-	"  * = aujourd'hui"
+	"  * = Aujourd'hui"
 )
 
 -- ============================================================
@@ -982,42 +982,42 @@ for k in pairs(_G) do
 end
 check("aucune variable globale ajoutée", table.concat(leaked, ","), "")
 
--- ---- l'aide et la légende de la page des mois, dans leurs cadres
+-- ---- l'aide de la page des mois dans son cadre, et sa légende
 local hb, hb_color = assemble.page_border({})
 local box, box_fits, box_star = assemble.help_box({ "a : 1", "bb : 2", "c : 3" }, "* = x", 40, hb, hb_color)
 check("aide : 3 lignes", #box, 3)
 check(
 	"aide : le haut, une jonction ┬ par séparation",
 	strip(box[1]),
-	"╭───────┬────────┬─────────────────────╮"
+	"╭───────┬────────┬───────┬─────┬───────╮"
 )
 check(
-	"aide : les parties séparées par des traits, « * = x » collé au bord droit",
+	"aide : les parties séparées par des traits, une case vide, puis « * = x » dans sa case au bord droit",
 	strip(box[2]),
-	"│ a : 1 │ bb : 2 │ c : 3         * = x │"
+	"│ a : 1 │ bb : 2 │ c : 3 │     │ * = x │"
 )
 check(
 	"aide : le bas, une jonction ┴ par séparation",
 	strip(box[3]),
-	"╰───────┴────────┴─────────────────────╯"
+	"╰───────┴────────┴───────┴─────┴───────╯"
 )
 check("aide : tout a tenu, avec l'étoile", tostring(box_fits) .. " " .. tostring(box_star), "true true")
-local tight, tight_fits, tight_star = assemble.help_box({ "a : 1", "bb : 2", "c : 3" }, "* = x", 26, hb, hb_color)
+local just = assemble.help_box({ "a : 1", "bb : 2", "c : 3" }, "* = x", 38, hb, hb_color)
 check(
-	"aide sans la place pour l'étoile : retirée, la dernière case va jusqu'au bord",
+	"aide : juste la place (une case vide de 3)",
+	strip(just[2]),
+	"│ a : 1 │ bb : 2 │ c : 3 │   │ * = x │"
+)
+local tight, tight_fits, tight_star = assemble.help_box({ "a : 1", "bb : 2", "c : 3" }, "* = x", 37, hb, hb_color)
+check(
+	"aide sans la place pour l'étoile (37) : retirée avec la case vide, la dernière case va jusqu'au bord",
 	strip(tight[2]),
-	"│ a : 1 │ bb : 2 │ c : 3 │"
+	"│ a : 1 │ bb : 2 │ c : 3            │"
 )
 check(
 	"aide sans la place pour l'étoile : a tenu, sans l'étoile",
 	tostring(tight_fits) .. " " .. tostring(tight_star),
 	"true false"
-)
-local edge31 = assemble.help_box({ "a : 1", "bb : 2", "c : 3" }, "* = x", 31, hb, hb_color)
-check(
-	"aide à une colonne près (31) : pas d'étoile, et le cadre se ferme bien au bord",
-	strip(edge31[2]),
-	"│ a : 1 │ bb : 2 │ c : 3      │"
 )
 local cut, cut_fits = assemble.help_box({ "a : 1", "bb : 2", "c : 3" }, "* = x", 20, hb, hb_color)
 check(
@@ -1043,18 +1043,12 @@ check(
 	select(2, assemble.page_border({ border_color = "rouge" })),
 	convert.fg(assemble.BORDER_COLOR)
 )
-local lb = assemble.legend_box({}, hb, "")
 check(
-	"légende : dans un cadre juste à sa taille",
-	strip(lb[1]) .. "|" .. strip(lb[2]) .. "|" .. strip(lb[3]),
-	"╭─────────────────────────────────────╮|│ ██ <1h   ██ 1-3h   ██ 3-6h   ██ 6h+ │|╰─────────────────────────────────────╯"
+	"légende : les couleurs seules, sans l'étoile",
+	strip(assemble.legend_colors({})),
+	"██ <1h   ██ 1-3h   ██ 3-6h   ██ 6h+"
 )
-check("légende : pas d'étoile", table.concat(lb):find("* =", 1, true), nil)
-check(
-	"légende sans couleurs (fonction de couleur sans texte) : pas de cadre",
-	#assemble.legend_box({ cell_color = gradient }, hb, ""),
-	0
-)
+check("légende : une fonction de couleur sans texte, rien", assemble.legend_colors({ cell_color = gradient }), "")
 
 print(string.format("\n%d vérifications réussies, %d échecs", passed, failed))
 os.exit(failed == 0 and 0 or 1)

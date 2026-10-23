@@ -318,7 +318,7 @@ local function scenarios()
 	check(
 		"texte : l'aide dans un cadre en haut, ses parties séparées par des traits",
 		text_lines[1]:sub(1, #"╭") .. " " .. text_lines[2] .. " " .. text_lines[3]:sub(1, #"╰"),
-		"╭ │ vue d'ensemble : Entrée │ aujourd'hui : t │ fermer : Échap/q  │ ╰"
+		"╭ │ vue d'ensemble : Entrée │ Aujourd'hui : t │ Fermer : Échap/q  │ ╰"
 	)
 	check(
 		"texte : le cadre de l'aide a la largeur du mois",
@@ -326,11 +326,9 @@ local function scenarios()
 		"65 65 65"
 	)
 	check(
-		"texte : en bas, la légende dans un cadre à sa taille, sans l'étoile",
-		text_lines[#text_lines - 2]:sub(1, #"╭")
-			.. text_lines[#text_lines - 1]:match("^│ (0h .- 24h) │$")
-			.. text_lines[#text_lines]:sub(1, #"╰"),
-		"╭0h ████████████████ 24h╰"
+		"texte : en bas, la légende seule, sans cadre ni étoile",
+		text_lines[#text_lines],
+		"  0h ████████████████ 24h"
 	)
 	check("texte : plus d'étoile en bas (elle est en haut quand il y a la place)", text:find("* =", 1, true), nil)
 	local english = strip(new_page(w, {
@@ -339,17 +337,44 @@ local function scenarios()
 		end,
 	}).build_text())
 	check(
-		"texte en anglais, un mois : tout tient (« Logtime: » et « * = today » collé à droite)",
+		"texte en anglais, un mois : « Logtime: » tient, pas la case de « * = Today »",
 		english:match("^[^\n]*\n([^\n]*)"),
-		"│ Logtime: overview: Enter │ today: t │ close: Esc/q  * = today │"
+		"│ Logtime: overview: Enter │ Today: t │ Close: Esc/q            │"
 	)
 	local wide = strip(page.build_text({ cols = 140, rows = 60 }))
 	local wide_second = wide:match("^[^\n]*\n([^\n]*)")
 	check(
-		"texte, plusieurs mois : « Logtime : » devant l'aide, et « * = aujourd'hui » collé au bord droit du cadre",
-		wide_second:find("^│ Logtime : vue d'ensemble : Entrée │") ~= nil
-			and wide_second:sub(-#"* = aujourd'hui │") == "* = aujourd'hui │",
+		"texte, plusieurs mois : « Logtime : » devant l'aide, une case vide, et « * = Aujourd'hui » dans sa case au bord droit",
+		wide_second:find(
+			"^│ Logtime : vue d'ensemble : Entrée │ Aujourd'hui : t │ Fermer : Échap/q │ +│ %* = Aujourd'hui │$"
+		) ~= nil,
 		true
+	)
+	-- avec les encadrés : le cadre de l'aide aligné sur ceux des mois (une colonne de marge, jusqu'au bout du dernier)
+	local framed_page = new_page(w, {
+		cfg = function()
+			return { week_starts_on = "monday", day_offset = 0, borders = true }
+		end,
+	})
+	local framed = {}
+	for line in (strip(framed_page.build_text({ cols = 140, rows = 60 })) .. "\n"):gmatch("(.-)\n") do
+		framed[#framed + 1] = line
+	end
+	local month_top
+	for k = 4, #framed do
+		if not month_top and framed[k]:find("╭", 1, true) then
+			month_top = framed[k]
+		end
+	end
+	check(
+		"encadrés : l'aide commence à la même colonne que les cadres des mois",
+		framed[1]:find("╭", 1, true),
+		month_top:find("╭", 1, true)
+	)
+	check(
+		"encadrés : et finit à la même colonne que le dernier",
+		utf8.len((framed[1]:gsub("%s+$", ""))),
+		utf8.len((month_top:gsub("%s+$", "")))
 	)
 	check(
 		"texte : le mois en cours (octobre 2026) est dessiné",
@@ -766,7 +791,7 @@ local function scenarios()
 	)
 	local board_top = strip(board_text):match("^[^\n]*\n([^\n]*)") -- la ligne des chiffres de l'année
 	check(
-		"vue d'ensemble : la légende des couleurs au bout de la ligne de l'année, sans « * = aujourd'hui »",
+		"vue d'ensemble : la légende des couleurs au bout de la ligne de l'année, sans « * = Aujourd'hui »",
 		board_top:find("24h │", 1, true) ~= nil and board_top:find("* =", 1, true) == nil,
 		true
 	)

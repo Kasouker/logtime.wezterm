@@ -496,13 +496,17 @@ function M.page_border(cfg)
 	return b, convert.fg(color)
 end
 
+M.HELP_GAP = 3 -- la case vide avant `right` : au moins 3 colonnes
+
 -- L'aide de la page des mois, dans un cadre de `width` colonnes (3 lignes) : ses parties séparées par un trait
--- vertical, `right` (« * = aujourd'hui ») collé au bord droit, dans la dernière case.
---   ╭─────────────────────────┬─────────────┬──────────────────────────────────╮
---   │ Logtime: overview: Enter │ today: t │ close: Esc/q           * = today │
---   ╰─────────────────────────┴─────────────┴──────────────────────────────────╯
--- Si tout ne tient pas : `right` est retiré, puis les parties sont coupées (jamais plus large que `width`). Renvoie
--- aussi si tout a tenu sans couper, et si `right` est là.
+-- vertical, puis une case vide qui prend la place en trop, puis `right` (« * = Today ») dans sa case, collée au bord
+-- droit.
+--   ╭──────────────────────────┬──────────┬──────────────┬───────────────┬───────────╮
+--   │ Logtime: overview: Enter │ Today: t │ Close: Esc/q │               │ * = Today │
+--   ╰──────────────────────────┴──────────┴──────────────┴───────────────┴───────────╯
+-- Si `right` ne tient pas : il est retiré (avec la case vide) et la dernière partie va jusqu'au bord ; si les
+-- parties ne tiennent pas non plus, elles sont coupées (jamais plus large que `width`). Renvoie aussi si les parties
+-- ont tenu sans couper, et si `right` est là.
 function M.help_box(parts, right, width, b, color)
 	local function e(s)
 		return color .. s .. convert.RESET
@@ -515,10 +519,13 @@ function M.help_box(parts, right, width, b, color)
 	for _, cell in ipairs(cells) do
 		used = used + visible_len(cell)
 	end
-	local with_right = right ~= nil and right ~= "" and used + visible_len(right) + 2 <= width
+	local fits = used <= width
+	-- la case vide, puis celle de `right` (son texte et un espace de chaque côté) : deux traits verticaux de plus
+	local gap = right and right ~= "" and width - used - 2 - (visible_len(right) + 2)
+	local with_right = gap and gap >= M.HELP_GAP or false
 	if with_right then
-		local last = #cells
-		cells[last] = cells[last] .. string.rep(" ", width - used - visible_len(right) - 1) .. right .. " "
+		cells[#cells + 1] = string.rep(" ", gap)
+		cells[#cells + 1] = " " .. right .. " "
 	elseif used < width then -- la dernière case va jusqu'au bord
 		cells[#cells] = cells[#cells] .. string.rep(" ", width - used)
 	end
@@ -542,22 +549,14 @@ function M.help_box(parts, right, width, b, color)
 		cut(e(b.v) .. table.concat(middles, e(b.v)) .. e(b.v)),
 		cut(e(b.bl .. table.concat(bottoms, b.b) .. b.br)),
 	},
-		used <= width,
+		fits,
 		with_right
 end
 
--- La légende des couleurs dans un cadre juste à sa taille (3 lignes), ou {} s'il n'y en a pas.
-function M.legend_box(cfg, b, color)
-	local legend = legend_colors(with_defaults(cfg))
-	if legend == "" then
-		return {}
-	end
-	local w = visible_len(legend) + 2
-	return {
-		color .. b.tl .. string.rep(b.h, w) .. b.tr .. convert.RESET,
-		color .. b.v .. convert.RESET .. " " .. legend .. " " .. color .. b.v .. convert.RESET,
-		color .. b.bl .. string.rep(b.h, w) .. b.br .. convert.RESET,
-	}
+-- La légende des couleurs, sans l'étoile (« * = Today » est dans l'aide, en haut) : « 0h ████ 24h », ou les quatre
+-- niveaux ; "" s'il n'y en a pas.
+function M.legend_colors(cfg)
+	return legend_colors(with_defaults(cfg))
 end
 
 -- Dessine un mois complet. Renvoie le texte (lignes séparées par "\n").

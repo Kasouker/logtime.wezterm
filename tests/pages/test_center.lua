@@ -349,7 +349,7 @@ check("build_text : cinq mois sur une rangée, 5 x 65 + 4 x 3 de largeur", count
 -- plusieurs mois : 2 x 2 dans 140 x 60
 w, page, pane = open({}, 140, 60)
 lines = drawn(pane)
-check("quatre mois : marge du haut = (60 - 51) / 2", empties(lines), 4)
+check("quatre mois : marge du haut = (60 - 49) / 2", empties(lines), 5)
 local _, first_title = find_line(lines, "Juillet 2026")
 check("quatre mois : marge à gauche = (140 - 133) / 2 = 3, plus les 2 espaces du titre", leading(first_title), 3 + 2)
 local _, second_title = find_line(lines, "Août 2026")
@@ -366,11 +366,11 @@ end
 check("quatre mois : aucune ligne ne dépasse la largeur de la fenêtre", widest <= 140, true)
 
 -- fenêtre à la taille exacte : pas de marge
-w, page, pane = open({}, 133, 51)
+w, page, pane = open({}, 133, 49)
 lines = drawn(pane)
-check("fenêtre de 133 x 51 (la taille exacte de 4 mois) : aucune marge en haut", empties(lines), 0)
+check("fenêtre de 133 x 49 (la taille exacte de 4 mois) : aucune marge en haut", empties(lines), 0)
 _, first_title = find_line(lines, "Juillet 2026")
-check("fenêtre de 133 x 51 : aucune marge à gauche (juste les 2 espaces du titre)", leading(first_title), 2)
+check("fenêtre de 133 x 49 : aucune marge à gauche (juste les 2 espaces du titre)", leading(first_title), 2)
 
 -- la fenêtre change de taille : les marges suivent
 w, page, pane = open({}, 100, 40)
@@ -393,7 +393,7 @@ local always_fits = true
 for _, size in ipairs({
 	{ 120, 40 },
 	{ 140, 60 },
-	{ 133, 51 },
+	{ 133, 49 },
 	{ 100, 100 },
 	{ 400, 25 },
 	{ 65, 25 },

@@ -197,8 +197,8 @@ check(
 )
 check("par défaut : les anciens niveaux ne sont plus utilisés", raw:find(HEAT3, 1, true) == nil, true)
 local text_lines = lines_of(strip(raw))
-local legend = text_lines[#text_lines - 1]
-check("par défaut : la légende est la barre du dégradé, dans son cadre", legend:sub(1, #"│ 0h "), "│ 0h ")
+local legend = text_lines[#text_lines]
+check("par défaut : la légende est la barre du dégradé, tout en bas (sans cadre)", legend:sub(1, #"  0h "), "  0h ")
 check("par défaut : la légende n'a plus l'étoile (elle est en haut)", legend:find("* =", 1, true), nil)
 check("par défaut : la légende va jusqu'à 24h", legend:find(" 24h", 1, true) ~= nil, true)
 check("par défaut : l'ancienne légende (<1h) a disparu", legend:find("<1h", 1, true), nil)
@@ -286,8 +286,8 @@ check(
 )
 text_lines = lines_of(strip(raw))
 check(
-	"cell_color explicite : pas de légende (pas de barre du dégradé), pas de cadre en bas",
-	text_lines[#text_lines]:find("╰", 1, true) == nil and text_lines[#text_lines] ~= "",
+	"cell_color explicite : pas de légende (pas de barre du dégradé), pas même des lignes vides à sa place",
+	text_lines[#text_lines]:find("%S") ~= nil and text_lines[#text_lines]:find("24h", 1, true) == nil,
 	true
 )
 calls = 0
@@ -325,10 +325,8 @@ check(
 check("dégradé, plusieurs mois : aucun ancien niveau", raw:find(HEAT3, 1, true) == nil, true)
 text_lines = lines_of(strip(raw))
 check(
-	"dégradé, plusieurs mois : la barre du dégradé, dans son cadre tout en bas",
-	text_lines[#text_lines - 1]:sub(1, #"│ 0h ") == "│ 0h "
-		and text_lines[#text_lines - 1]:sub(-#" 24h │") == " 24h │"
-		and text_lines[#text_lines]:sub(1, #"╰") == "╰",
+	"dégradé, plusieurs mois : la barre du dégradé tout en bas, sans cadre",
+	text_lines[#text_lines]:sub(1, #"  0h ") == "  0h " and text_lines[#text_lines]:sub(-#" 24h") == " 24h",
 	true
 )
 

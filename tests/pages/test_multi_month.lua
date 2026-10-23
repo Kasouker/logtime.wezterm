@@ -260,9 +260,9 @@ check(
 	1
 )
 check(
-	"140 x 60 : la légende des couleurs est à la fin, dans son cadre",
-	lines_of(text)[#lines_of(text) - 1],
-	"│ ██ <1h   ██ 1-3h   ██ 3-6h   ██ 6h+ │"
+	"140 x 60 : la légende des couleurs est à la fin, sans cadre ni étoile",
+	lines_of(text)[#lines_of(text)],
+	"  ██ <1h   ██ 1-3h   ██ 3-6h   ██ 6h+"
 )
 check("140 x 60 : les heures du 10 octobre (4h13) sont affichées", position(text, "4h13") ~= nil, true)
 check("140 x 60 : celles du 14 septembre (2h00) aussi", position(text, "2h00") ~= nil, true)
@@ -279,8 +279,8 @@ check(
 
 text, count = page.build_text({ cols = 140, rows = 30 })
 check("140 x 30 (une seule rangée tient) : deux mois côte à côte", count, 2)
-text, count = page.build_text({ cols = 140, rows = 28 })
-check("140 x 28 (trop bas pour un mois entier et ses deux cadres) : un seul mois", count, 1)
+text, count = page.build_text({ cols = 140, rows = 26 })
+check("140 x 26 (trop bas pour un mois entier, l'aide et la légende) : un seul mois", count, 1)
 text, count = page.build_text({ cols = 263, rows = 21 })
 check(
 	"263 x 21 (très large, trop bas) : le message « fenêtre trop petite » (0 mois), jamais des mois coupés",
@@ -302,10 +302,10 @@ check(
 		and line_of(text, "Août 2026") ~= line_of(text, "Septembre 2026"),
 	true
 )
-text, count = page.build_text({ cols = 400, rows = 29 })
+text, count = page.build_text({ cols = 400, rows = 27 })
 text = strip(text)
 check(
-	"400 x 29 : cinq mois côte à côte sur une seule rangée",
+	"400 x 27 : cinq mois côte à côte sur une seule rangée",
 	count == 5 and line_of(text, "Juillet 2026") == line_of(text, "Octobre 2026"),
 	true
 )
@@ -361,7 +361,7 @@ check(
 	"anglais : mois et légende en anglais",
 	position(text, "July 2026") ~= nil
 		and position(text, "October 2026") ~= nil
-		and text:find("* = today", 1, true) ~= nil,
+		and text:find("* = Today", 1, true) ~= nil,
 	true
 )
 text, count = new_page(w, { goal_hours = 3 }).build_text({ cols = 140, rows = 60 })
@@ -385,15 +385,15 @@ text, count = new_page(w, { borders = true }).build_text({ cols = 133, rows = 60
 check("encadrés : 133 colonnes = 65 + 3 + 65, 2 mois de large", count, 4)
 text, count = new_page(w, { borders = true }).build_text({ cols = 132, rows = 60 })
 check("encadrés : 132 colonnes, une de trop peu : 1 mois de large", count, 2)
-text, count = new_page(w, { borders = true }).build_text({ cols = 133, rows = 49 })
-check("encadrés : 49 lignes = 8 + 20 + 1 + 20 : 2 rangées", count, 4)
-text, count = new_page(w, { borders = true }).build_text({ cols = 133, rows = 48 })
-check("encadrés : 48 lignes : une seule rangée", count, 2)
-text, count = new_page(w, { borders = true }).build_text({ cols = 201, rows = 49 })
-check("encadrés, plein écran 201 x 49 : 6 mois (3 x 2)", count, 6)
+text, count = new_page(w, { borders = true }).build_text({ cols = 133, rows = 47 })
+check("encadrés : 47 lignes = 6 + 20 + 1 + 20 : 2 rangées", count, 4)
+text, count = new_page(w, { borders = true }).build_text({ cols = 133, rows = 46 })
+check("encadrés : 46 lignes : une seule rangée", count, 2)
+text, count = new_page(w, { borders = true }).build_text({ cols = 201, rows = 47 })
+check("encadrés, plein écran 201 x 47 : 6 mois (3 x 2)", count, 6)
 check(
-	"sans encadrés, 201 x 49 : 3 mois seulement (les encadrés prennent moins de place)",
-	select(2, new_page(w, {}).build_text({ cols = 201, rows = 49 })),
+	"sans encadrés, 201 x 47 : 3 mois seulement (les encadrés prennent moins de place)",
+	select(2, new_page(w, {}).build_text({ cols = 201, rows = 47 })),
 	3
 )
 local _, _, boxed_width = new_page(w, { borders = true }).build_text({ cols = 133, rows = 60 })
@@ -401,14 +401,14 @@ check("encadrés : la largeur à centrer est 65 + 3 + 65 = 133", boxed_width, 13
 text = new_page(w, { borders = true }).build_text({ cols = 133, rows = 60 })
 local boxed_lines = lines_of(strip(text))
 check(
-	"encadrés : la légende de la page dans son propre cadre, à sa taille (pas celui d'un mois)",
-	utf8.len(boxed_lines[#boxed_lines]) < 65 and boxed_lines[#boxed_lines]:sub(1, #"╰") == "╰",
-	true
+	"encadrés : la légende de la page hors des cadres des mois, tout en bas",
+	boxed_lines[#boxed_lines],
+	"  ██ <1h   ██ 1-3h   ██ 3-6h   ██ 6h+"
 )
 check(
-	"encadrés : l'aide de la page dans son propre cadre, de toute la largeur des mois",
-	utf8.len(boxed_lines[1]) .. boxed_lines[1]:sub(1, #"╭"),
-	"133╭"
+	"encadrés : l'aide de la page dans son propre cadre, aligné sur ceux des mois (une colonne de marge)",
+	utf8.len(boxed_lines[1]) .. boxed_lines[1]:sub(1, #" ╭"),
+	"133 ╭"
 )
 
 -- ============================================================
@@ -500,11 +500,11 @@ check(
 	true
 )
 check("agrandissement : le journal annonce 4 mois", w.logs.info[#w.logs.info]:find("(4 months)", 1, true) ~= nil, true)
-pane.dims.cols, pane.dims.viewport_rows = 200, 28
+pane.dims.cols, pane.dims.viewport_rows = 200, 26
 page.on_resize(win, pane)
 shown = last_text(pane)
 check(
-	"la fenêtre devient trop basse (200 x 28) : un seul mois",
+	"la fenêtre devient trop basse (200 x 26) : un seul mois",
 	position(shown, "Logtime : Octobre 2026") ~= nil,
 	true
 )
@@ -520,15 +520,15 @@ check(
 	true
 )
 check("120 x 60 : l'un sous l'autre", line_of(shown, "Septembre 2026") ~= line_of(shown, "Octobre 2026"), true)
-pane.dims.cols, pane.dims.viewport_rows = 140, 51
+pane.dims.cols, pane.dims.viewport_rows = 140, 49
 page.on_resize(win, pane)
 check(
-	"la fenêtre repasse à 140 x 51 : quatre mois à nouveau",
+	"la fenêtre repasse à 140 x 49 : quatre mois à nouveau",
 	position(last_text(pane), "Juillet 2026") ~= nil,
 	true
 )
 local drawn = lines_of(last_text(pane))
-check("140 x 51 : le dessin tient exactement dans la fenêtre", #drawn <= 51, true)
+check("140 x 49 : le dessin tient exactement dans la fenêtre", #drawn <= 49, true)
 local info_before = #w.logs.info
 w.events["window-resized"] = w.events["window-resized"] or {}
 check("aucune erreur pendant tous ces changements de taille", #w.logs.error, 0)

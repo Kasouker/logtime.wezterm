@@ -167,7 +167,7 @@ for _, line in ipairs(board.help_lines(fr.board_help, "0h ████ 24h", 59)
 end
 check("l'aide : chaque ligne fait la largeur", hl_sizes, true)
 
--- ---- la légende : sans « * = aujourd'hui »
+-- ---- la légende : sans « * = Aujourd'hui »
 local legend = board.legend(assemble.legend(gradient.apply_to({}), fr), fr)
 check("légende : plus de « aujourd'hui »", strip(legend):find("aujourd", 1, true), nil)
 check(

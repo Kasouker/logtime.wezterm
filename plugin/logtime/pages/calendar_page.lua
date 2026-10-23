@@ -134,10 +134,13 @@ function M.create(ctx)
 		if current_view() == M.VIEW.OVERVIEW then
 			return build_board_text(dims, labels, cfg)
 		end
-		-- en haut, l'aide dans un cadre de toute la largeur des mois (« * = aujourd'hui » collé à droite) ; en bas, la
-		-- légende des couleurs dans un cadre à sa taille
+		-- en haut, l'aide dans un cadre de toute la largeur des mois (« * = Aujourd'hui » dans sa case, collée à droite),
+		-- aligné sur leurs cadres (avec les encadrés, ils commencent après une colonne de marge) ; en bas, la légende
+		-- des couleurs
 		local b, edge = assemble.page_border(cfg)
+		local margin = assemble.border_of(cfg) and " " or ""
 		local function help_box(width)
+			width = width - #margin
 			local parts = {}
 			for part in (labels.page_help .. " | "):gmatch("(.-) | ") do
 				parts[#parts + 1] = part
@@ -153,10 +156,13 @@ function M.create(ctx)
 			if not fits then
 				lines = assemble.help_box(parts, labels.today, width, b, edge)
 			end
+			for k, line in ipairs(lines) do
+				lines[k] = margin .. line
+			end
 			return table.concat(lines, "\n")
 		end
-		local legend = table.concat(assemble.legend_box(cfg, b, edge), "\n")
-		legend = legend ~= "" and ("\n\n" .. legend) or "" -- (rien, pas même les lignes vides, sans légende)
+		local legend = assemble.legend_colors(cfg)
+		legend = legend ~= "" and ("\n\n  " .. legend) or "" -- (rien, pas même les lignes vides, sans légende)
 		local block_width, block_height = assemble.width(cfg), assemble.height(cfg) -- plus grand avec les encadrés
 		local plan = { count = 1 }
 		if dims then
