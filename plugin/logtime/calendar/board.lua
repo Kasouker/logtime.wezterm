@@ -1151,8 +1151,7 @@ end
 -- ---- l'aperçu de la page F4 : la droite de la vue d'ensemble, en colonne
 M.PREVIEW_WEEK = 8 -- la semaine : au moins 8 lignes (cadre, durées, barres, noms, pourcentages)
 M.PREVIEW_PROJECTS = 6 -- les projets : au moins 6 lignes (cadre, total, objectif, deux projets)
-M.PREVIEW_MONTH_SHARE = 0.4 -- la place en plus : environ 40 % au mois (des semaines entières), la moitié du reste à la
-M.PREVIEW_WEEK_SHARE = 0.5 -- semaine, le reste aux projets
+M.PREVIEW_MONTH_ROW = 3 -- les semaines du mois : 3 lignes chacune dès qu'il y a la place (sinon 2)
 M.PREVIEW_MIN_WIDTH = M.WEEK_SIDE + 1 + 2 + 8 + 7 * 4 -- les chiffres de la semaine, un trait, puis 7 colonnes de 4
 
 -- Le mois : au moins le haut, le bas, `weeks` semaines de 2 lignes (le numéro, la durée) et un trait entre elles.
@@ -1190,14 +1189,24 @@ function M.preview(o, width, height)
 	if width < min_w or height < min_h then
 		return nil
 	end
-	local extra = height - min_h
-	-- le mois : des semaines toutes de la même hauteur, et pas une ligne de plus (pas de vide sous son cadre)
-	local row_h = 2 + math.floor(extra * M.PREVIEW_MONTH_SHARE) // weeks
-	local month_h = 2 + weeks * row_h + (weeks - 1)
-	local timeline_h = show_timeline and M.TIMELINE_HEIGHT or 0
-	local rest = height - month_h - 2 - timeline_h - M.PREVIEW_WEEK - M.PREVIEW_PROJECTS -- (2 : les traits)
-	local week_h = M.PREVIEW_WEEK + math.floor(rest * M.PREVIEW_WEEK_SHARE)
-	local projects_h = height - month_h - 2 - week_h - timeline_h
+	local day_w = width // 2
+	-- l'objectif sur la ligne du total s'il tient dans les deux listes de projets (sinon dessous, dans les deux)
+	local below = M.head_line(M.day_head(o), select(2, M.day_head(o)), day_w - 4) == nil
+		or M.head_line(M.week_head(o), select(2, M.week_head(o)), width - day_w - 4) == nil
+	local room = height - 2 - (show_timeline and M.TIMELINE_HEIGHT or 0) -- (2 : les traits autour de la semaine)
+	-- le mois : des semaines de 3 lignes s'il y a la place, et pas une ligne de plus (pas de vide sous son cadre)
+	local function month_height(row)
+		return 2 + weeks * row + (weeks - 1)
+	end
+	local month_h = month_height(2)
+	if room - month_height(M.PREVIEW_MONTH_ROW) >= M.PREVIEW_WEEK + M.PREVIEW_PROJECTS then
+		month_h = month_height(M.PREVIEW_MONTH_ROW)
+	end
+	-- les projets : juste ce qu'il faut (le cadre, le total, l'objectif s'il est dessous, 5 projets ou 4 et « autres » ;
+	-- donc pas de ligne d'air sous le total) ; la semaine : tout le reste
+	local projects_h = 2 + (below and 2 or 1) + overview.PROJECTS
+	projects_h = math.max(M.PREVIEW_PROJECTS, math.min(projects_h, room - month_h - M.PREVIEW_WEEK))
+	local week_h = room - month_h - projects_h
 	local b, edge = o.b, o.edge or ""
 	local off = edge ~= "" and convert.RESET or ""
 	local out = {}
@@ -1218,9 +1227,6 @@ function M.preview(o, width, height)
 	out[#out + 1] = edge .. string.rep(b.h, week_w) .. b.b .. string.rep(b.h, M.WEEK_SIDE) .. off
 	-- les projets du jour et de la semaine, côte à côte (l'objectif sur la ligne du total s'il tient dans les deux)
 	local colors = show_timeline and M.project_colors(o) or nil
-	local day_w = width // 2
-	local below = M.head_line(M.day_head(o), select(2, M.day_head(o)), day_w - 4) == nil
-		or M.head_line(M.week_head(o), select(2, M.week_head(o)), width - day_w - 4) == nil
 	local day = M.day_projects_lines(o, day_w, projects_h, colors, below)
 	local best = M.week_projects_lines(o, width - day_w, projects_h, colors, below)
 	for k = 1, projects_h do

@@ -1550,6 +1550,78 @@ check(
 		and pv_text:find(convert.bg(nth_color(3)), 1, true) ~= nil,
 	true
 )
+-- les hauteurs : des semaines de 3 lignes s'il y a la place, les projets juste ce qu'il faut, la semaine le reste
+local function frames(lines)
+	-- les lignes (dans l'ordre) où commence un cadre « ╭ » et où il finit « ╰ », sur la première colonne de cadre
+	local tops, bottoms = {}, {}
+	for k, l in ipairs(lines) do
+		local plain = strip(l)
+		if plain:sub(1, 4) == " ╭" then
+			tops[#tops + 1] = k
+		elseif plain:sub(1, 4) == " ╰" then
+			bottoms[#bottoms + 1] = k
+		end
+	end
+	return tops, bottoms
+end
+local function month_rows(lines, top, bottom)
+	local rules = { top }
+	for k = top + 1, bottom - 1 do
+		if strip(lines[k]):sub(1, 4) == " ├" then
+			rules[#rules + 1] = k
+		end
+	end
+	rules[#rules + 1] = bottom
+	local heights = {}
+	for k = 2, #rules do
+		heights[#heights + 1] = rules[k] - rules[k - 1] - 1
+	end
+	return heights
+end
+local big = board.preview(pdata, 100, 48)
+local big_tops, big_bottoms = frames(big)
+local big_rows = month_rows(big, big_tops[1], big_bottoms[1])
+check("aperçu 100 x 48 : 5 semaines dans le mois", #big_rows, 5)
+check(
+	"aperçu 100 x 48 : toutes les cases du mois font 3 lignes",
+	math.min(table.unpack(big_rows)) .. "-" .. math.max(table.unpack(big_rows)),
+	"3-3"
+)
+check("aperçu 100 x 48 : les projets, 8 lignes (le cadre, le total, 5 projets)", big_bottoms[3] - big_tops[3] + 1, 8)
+check(
+	"aperçu 100 x 48 : pas de ligne d'air sous le total, le premier projet juste dessous",
+	strip(big[big_tops[3] + 2]):find("Bot Discord", 1, true) ~= nil,
+	true
+)
+local small_pv = board.preview(pdata, 65, 36)
+local small_tops, small_bottoms = frames(small_pv)
+local small_rows = month_rows(small_pv, small_tops[1], small_bottoms[1])
+check(
+	"aperçu au minimum : les cases du mois font 2 lignes (pas la place pour 3)",
+	math.max(table.unpack(small_rows)),
+	2
+)
+check(
+	"aperçu au minimum : la semaine garde ses 8 lignes (les projets se serrent)",
+	small_bottoms[2] - small_tops[2] + 1,
+	board.PREVIEW_WEEK
+)
+local huge = board.preview(pdata, 100, 70)
+local huge_tops, huge_bottoms = frames(huge)
+check(
+	"aperçu très haut : le mois et les projets gardent leur taille, la semaine prend le reste",
+	(huge_bottoms[1] - huge_tops[1])
+		.. " "
+		.. (huge_bottoms[3] - huge_tops[3])
+		.. " "
+		.. (huge_bottoms[2] - huge_tops[2] > big_bottoms[2] - big_tops[2] and "plus" or "pareil"),
+	(big_bottoms[1] - big_tops[1]) .. " " .. (big_bottoms[3] - big_tops[3]) .. " plus"
+)
+check(
+	"dans F2, la ligne d'air sous le total reste",
+	strip(board.day_projects_lines(pdata, 50, 12, pc)[3]):match("^ │ +│ $") ~= nil,
+	true
+)
 local accented = data({ projects = PROJECTS, timeline = TIMELINE, accent = "#123456" }) -- (une couleur qui ne sert pas ailleurs)
 local fill = convert.bg("#123456")
 check(
