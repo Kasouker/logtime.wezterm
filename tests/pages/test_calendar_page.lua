@@ -311,8 +311,46 @@ local function scenarios()
 	local w = new_wezterm()
 	local page = new_page(w)
 	local text = strip(page.build_text())
-	local first_line = text:match("^(.-)\n")
-	check("texte : première ligne = titre et aide", first_line, "  Logtime   " .. fr.page_help)
+	local text_lines = {}
+	for line in (text .. "\n"):gmatch("(.-)\n") do
+		text_lines[#text_lines + 1] = line
+	end
+	check(
+		"texte : l'aide dans un cadre en haut, ses parties séparées par des traits",
+		text_lines[1]:sub(1, #"╭") .. " " .. text_lines[2] .. " " .. text_lines[3]:sub(1, #"╰"),
+		"╭ │ vue d'ensemble : Entrée │ aujourd'hui : t │ fermer : Échap/q  │ ╰"
+	)
+	check(
+		"texte : le cadre de l'aide a la largeur du mois",
+		utf8.len(text_lines[1]) .. " " .. utf8.len(text_lines[2]) .. " " .. utf8.len(text_lines[3]),
+		"65 65 65"
+	)
+	check(
+		"texte : en bas, la légende dans un cadre à sa taille, sans l'étoile",
+		text_lines[#text_lines - 2]:sub(1, #"╭")
+			.. text_lines[#text_lines - 1]:match("^│ (0h .- 24h) │$")
+			.. text_lines[#text_lines]:sub(1, #"╰"),
+		"╭0h ████████████████ 24h╰"
+	)
+	check("texte : plus d'étoile en bas (elle est en haut quand il y a la place)", text:find("* =", 1, true), nil)
+	local english = strip(new_page(w, {
+		labels = function()
+			return en
+		end,
+	}).build_text())
+	check(
+		"texte en anglais, un mois : tout tient (« Logtime: » et « * = today » collé à droite)",
+		english:match("^[^\n]*\n([^\n]*)"),
+		"│ Logtime: overview: Enter │ today: t │ close: Esc/q  * = today │"
+	)
+	local wide = strip(page.build_text({ cols = 140, rows = 60 }))
+	local wide_second = wide:match("^[^\n]*\n([^\n]*)")
+	check(
+		"texte, plusieurs mois : « Logtime : » devant l'aide, et « * = aujourd'hui » collé au bord droit du cadre",
+		wide_second:find("^│ Logtime : vue d'ensemble : Entrée │") ~= nil
+			and wide_second:sub(-#"* = aujourd'hui │") == "* = aujourd'hui │",
+		true
+	)
 	check(
 		"texte : le mois en cours (octobre 2026) est dessiné",
 		text:find("Logtime : Octobre 2026", 1, true) ~= nil,
@@ -643,7 +681,7 @@ local function scenarios()
 	check(
 		"anglais : la page est en anglais",
 		strip(w.spawned[1].pane.injected[1]):find("Logtime: October 2026", 1, true) ~= nil
-			and strip(w.spawned[1].pane.injected[1]):find("Enter overview", 1, true) ~= nil,
+			and strip(w.spawned[1].pane.injected[1]):find("overview: Enter", 1, true) ~= nil,
 		true
 	)
 

@@ -401,9 +401,12 @@ local function scenarios()
 		"ping -n 86400 127.0.0.1>nul"
 	)
 	check(
-		"F2 : la ligne d'aide est la première ligne affichée (le dessin est centré)",
-		(text:gsub("^\n+", "")):match("^%s*(.-)\n"),
-		"Logtime   Entrée vue d'ensemble   t aujourd'hui   q fermer"
+		"F2 : l'aide dans son cadre est tout en haut (le dessin est centré)",
+		(text:gsub("^\n+", "")):match("^%s*(.-)\n"):sub(1, #"╭")
+			.. tostring(
+				(text:gsub("^\n+", "")):match("^[^\n]*\n([^\n]*)"):find("vue d'ensemble : Entrée", 1, true) ~= nil
+			),
+		"╭true"
 	)
 	check(
 		"F2 : lire les heures n'écrit rien (rien de nouveau à sauvegarder)",
@@ -449,7 +452,7 @@ local function scenarios()
 	text = last_text(e.w.spawned[1].pane)
 	check(
 		"réglages : en anglais",
-		text:find("Logtime: October 2026", 1, true) ~= nil and text:find("Enter overview", 1, true) ~= nil,
+		text:find("Logtime: October 2026", 1, true) ~= nil and text:find("overview: Enter", 1, true) ~= nil,
 		true
 	)
 	check("réglages : la semaine commence le dimanche", text:find("Sun%s+Mon") ~= nil, true)
@@ -1051,25 +1054,13 @@ local function scenarios()
 	check("inactif : aucune erreur", #e.w.logs.error, 0)
 	open_binding(config, "F2")(win, screen)
 	check(
-		"inactif : dans le calendrier, au bout de la légende",
-		last_text(idle_page):find("* = aujourd'hui     Aujourd'hui : 1h00 inactif sur 1h11 (85 %)", 1, true) ~= nil,
-		true
-	)
-	idle_page.dims = { viewport_rows = 40, cols = 80 }
-	page_binding(config, "r")(win, idle_page)
-	check(
-		"inactif : fenêtre trop étroite pour la ligne : pas affiché",
-		last_text(idle_page):find("inactif", 1, true),
+		"inactif : plus de ligne « Aujourd'hui : … inactif » sous le calendrier (il est dans la vue d'ensemble)",
+		last_text(idle_page):find("inactif sur", 1, true),
 		nil
 	)
-	check("inactif : mais le calendrier, si", last_text(idle_page):find("Octobre 2026", 1, true) ~= nil, true)
 	idle_page.dims = { viewport_rows = 50, cols = 200 }
 	page_binding(config, "r")(win, idle_page)
-	check(
-		"inactif : plusieurs mois, au bout de la légende commune",
-		last_text(idle_page):find("Aujourd'hui : 1h00 inactif sur 1h11 (85 %)", 1, true) ~= nil,
-		true
-	)
+	check("inactif : plusieurs mois, pas de ligne non plus", last_text(idle_page):find("inactif sur", 1, true), nil)
 	page_binding(config, "Enter")(win, idle_page)
 	check(
 		"inactif : la vue d'ensemble (touche Entrée), dans les chiffres de l'année",

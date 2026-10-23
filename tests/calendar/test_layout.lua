@@ -64,39 +64,39 @@ check("la hauteur d'un mois est celle du dessin", layout.BLOCK_HEIGHT, assemble.
 -- ============================================================
 -- plan : combien de mois, sur combien de colonnes
 -- ============================================================
--- une colonne a besoin de 65 colonnes, deux de 133 (65 + 3 + 65) ; une rangée de 25 lignes, deux de 47 (4 + 21 + 1 + 21)
-check("fenêtre de 65 x 25 : un seul mois", shape(layout.plan(65, 25)), "1:1x1")
-check("fenêtre de 132 x 47 : une seule colonne tient, deux rangées", shape(layout.plan(132, 47)), "2:1x2")
-check("fenêtre de 133 x 47 : 2 x 2", shape(layout.plan(133, 47)), "4:2x2")
-check("fenêtre de 133 x 46 : une rangée de deux", shape(layout.plan(133, 46)), "2:2x1")
-check("fenêtre de 133 x 25 : deux côte à côte", shape(layout.plan(133, 25)), "2:2x1")
-check("fenêtre de 132 x 25 : un seul", shape(layout.plan(132, 25)), "1:1x1")
+-- une colonne a besoin de 65 colonnes, deux de 133 (65 + 3 + 65) ; une rangée de 29 lignes, deux de 51 (8 + 21 + 1 + 21)
+check("fenêtre de 65 x 29 : un seul mois", shape(layout.plan(65, 29)), "1:1x1")
+check("fenêtre de 132 x 51 : une seule colonne tient, deux rangées", shape(layout.plan(132, 51)), "2:1x2")
+check("fenêtre de 133 x 51 : 2 x 2", shape(layout.plan(133, 51)), "4:2x2")
+check("fenêtre de 133 x 50 : une rangée de deux", shape(layout.plan(133, 50)), "2:2x1")
+check("fenêtre de 133 x 29 : deux côte à côte", shape(layout.plan(133, 29)), "2:2x1")
+check("fenêtre de 132 x 29 : un seul", shape(layout.plan(132, 29)), "1:1x1")
 check("fenêtre de 120 x 40 (la taille par défaut de WezTerm) : un seul", shape(layout.plan(120, 40)), "1:1x1")
-check("fenêtre de 200 x 60 : 2 x 2", shape(layout.plan(200, 60)), "4:2x2")
+check("fenêtre de 200 x 64 : 2 x 2", shape(layout.plan(200, 64)), "4:2x2")
 check("fenêtre de 65 x 100 : quatre empilés (une colonne)", shape(layout.plan(65, 100)), "4:1x4")
 check(
-	"fenêtre de 400 x 25 : cinq côte à côte (une seule rangée tient, et le plafond est de 12)",
-	shape(layout.plan(400, 25)),
+	"fenêtre de 400 x 29 : cinq côte à côte (une seule rangée tient, et le plafond est de 12)",
+	shape(layout.plan(400, 29)),
 	"5:5x1"
 )
 check(
-	"fenêtre de 269 x 91 : douze mois, 4 x 3 (le plafond par défaut est maintenant 12)",
-	shape(layout.plan(269, 91)),
+	"fenêtre de 269 x 95 : douze mois, 4 x 3 (le plafond par défaut est maintenant 12)",
+	shape(layout.plan(269, 95)),
 	"12:4x3"
 )
-check("fenêtre de 201 x 69 : neuf mois, 3 x 3", shape(layout.plan(201, 69)), "9:3x3")
+check("fenêtre de 201 x 73 : neuf mois, 3 x 3", shape(layout.plan(201, 73)), "9:3x3")
 check(
-	"fenêtre de 250 x 60 : six mois, 3 x 2 (quatre seulement avec l'ancien plafond)",
-	shape(layout.plan(250, 60)),
+	"fenêtre de 250 x 64 : six mois, 3 x 2 (quatre seulement avec l'ancien plafond)",
+	shape(layout.plan(250, 64)),
 	"6:3x2"
 )
-check("fenêtre de 201 x 47 : six mois, 3 x 2", shape(layout.plan(201, 47)), "6:3x2")
-check("fenêtre de 201 x 25 : trois côte à côte", shape(layout.plan(201, 25)), "3:3x1")
+check("fenêtre de 201 x 51 : six mois, 3 x 2", shape(layout.plan(201, 51)), "6:3x2")
+check("fenêtre de 201 x 29 : trois côte à côte", shape(layout.plan(201, 29)), "3:3x1")
 check("fenêtre de 20 x 5 : jamais moins de un", shape(layout.plan(20, 5)), "1:1x1")
 check("très large mais trop basse (263 x 21) : un seul, jamais des mois coupés", shape(layout.plan(263, 21)), "1:1x1")
 check("très large mais basse (224 x 10, plafond 3) : un seul", shape(layout.plan(224, 10, 3)), "1:1x1")
-check("juste trop basse pour un mois (400 x 24) : un seul", shape(layout.plan(400, 24)), "1:1x1")
-check("juste assez haute pour une rangée (400 x 25) : plusieurs", layout.plan(400, 25).count > 1, true)
+check("juste trop basse pour un mois (400 x 28) : un seul", shape(layout.plan(400, 28)), "1:1x1")
+check("juste assez haute pour une rangée (400 x 29) : plusieurs", layout.plan(400, 29).count > 1, true)
 check("très haute mais trop étroite (40 x 100) : un seul", shape(layout.plan(40, 100)), "1:1x1")
 check("juste trop étroite pour un mois (64 x 100) : un seul", shape(layout.plan(64, 100)), "1:1x1")
 check("juste assez large pour un mois (65 x 100) : empilés", layout.plan(65, 100).count > 1, true)
@@ -117,10 +117,10 @@ check("plafond de 0 : ramené à 1", layout.plan(1000, 300, 0).count, 1)
 check("plafond négatif : ramené à 1", layout.plan(1000, 300, -5).count, 1)
 check("plafond décimal : arrondi vers le bas", layout.plan(1000, 300, 2.9).count, 2)
 check("plafond en texte : le plafond par défaut", layout.plan(1000, 300, "beaucoup").count, 12)
-check("plafond de 3 dans une fenêtre 2 x 2 : trois mois, une case vide", shape(layout.plan(133, 47, 3)), "3:2x2")
+check("plafond de 3 dans une fenêtre 2 x 2 : trois mois, une case vide", shape(layout.plan(133, 51, 3)), "3:2x2")
 check(
-	"plafond de 3, fenêtre de 201 x 47 : trois côte à côte plutôt que 2 x 2 avec une case vide",
-	shape(layout.plan(201, 47, 3)),
+	"plafond de 3, fenêtre de 201 x 51 : trois côte à côte plutôt que 2 x 2 avec une case vide",
+	shape(layout.plan(201, 51, 3)),
 	"3:3x1"
 )
 
@@ -305,8 +305,11 @@ for year = 2020, 2031 do
 end
 check("144 mois : tous ont exactement la hauteur prévue (4, 5 ou 6 semaines)", heights_ok, true)
 check("144 mois : aucune ligne n'est plus large que prévu", widths_ok, true)
-local tail = strip(assemble.render_month(days, 2026, 10, "x", {}, fr))
-check("legend : identique à la dernière ligne du mois seul", strip(assemble.legend({}, fr)), tail:match("([^\n]*)$"))
+check(
+	"legend : les quatre niveaux, puis l'étoile",
+	strip(assemble.legend({}, fr)),
+	"  ██ <1h   ██ 1-3h   ██ 3-6h   ██ 6h+     * = aujourd'hui"
+)
 check(
 	"legend : avec une fonction de couleur, seulement l'étoile",
 	strip(assemble.legend({ cell_color = function() end }, fr)),

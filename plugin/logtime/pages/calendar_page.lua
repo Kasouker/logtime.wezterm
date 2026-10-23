@@ -8,8 +8,6 @@ local screen = load("ui/screen")
 local keytable = load("ui/keytable")
 local safe = load("ui/safe")
 local gradient = load("color/gradient")
-local stats = load("calendar/stats")
-local idle = load("core/idle")
 local convert = load("color/convert")
 
 local M = {}
@@ -82,21 +80,6 @@ function M.create(ctx)
 		return nil
 	end
 
-	-- Après la légende : « Aujourd'hui : 1h30 inactif sur 10h04 (15 %) » (rien si rien n'est compté aujourd'hui).
-	local function idle_today(labels)
-		local idle_days = ctx.idle_days and ctx.idle_days()
-		if not idle_days then
-			return "" -- pas de temps inactif (ou il n'est pas compté : réglage count_idle)
-		end
-		local today = ctx.today_key()
-		local total = ctx.days()[today] or 0
-		if total <= 0 then
-			return ""
-		end
-		local secs, percent = idle.share(total, idle_days[today])
-		return "     " .. string.format(labels.idle_today, stats.hm(secs), stats.hm(total), percent)
-	end
-
 	local function current_view()
 		local view = num(G.logtime_page_view)
 		if view == M.VIEW.OVERVIEW then
@@ -151,14 +134,39 @@ function M.create(ctx)
 		if current_view() == M.VIEW.OVERVIEW then
 			return build_board_text(dims, labels, cfg)
 		end
-		local help = "  " .. labels.title .. "   " .. labels.page_help
+		-- en haut, l'aide dans un cadre de toute la largeur des mois (« * = aujourd'hui » collé à droite) ; en bas, la
+		-- légende des couleurs dans un cadre à sa taille
+		local b, edge = assemble.page_border(cfg)
+		local function help_box(width)
+			local parts = {}
+			for part in (labels.page_help .. " | "):gmatch("(.-) | ") do
+				parts[#parts + 1] = part
+			end
+			-- « Logtime : » devant s'il tient (« * = aujourd'hui » collé à droite s'il reste la place), sinon sans lui
+			local lines, fits = assemble.help_box(
+				{ labels.title .. labels.colon .. parts[1], table.unpack(parts, 2) },
+				labels.today,
+				width,
+				b,
+				edge
+			)
+			if not fits then
+				lines = assemble.help_box(parts, labels.today, width, b, edge)
+			end
+			return table.concat(lines, "\n")
+		end
+		local legend = table.concat(assemble.legend_box(cfg, b, edge), "\n")
+		legend = legend ~= "" and ("\n\n" .. legend) or "" -- (rien, pas même les lignes vides, sans légende)
 		local block_width, block_height = assemble.width(cfg), assemble.height(cfg) -- plus grand avec les encadrés
 		local plan = { count = 1 }
 		if dims then
 			plan = layout.plan(dims.cols, dims.rows, cfg.max_months, block_width, block_height)
 		end
 		if plan.count <= 1 then
-			local text = help .. "\n" .. assemble.render_month(ctx.days(), year, month, ctx.today_key(), cfg, labels)
+			local text = help_box(block_width)
+				.. "\n"
+				.. assemble.render_month(ctx.days(), year, month, ctx.today_key(), cfg, labels)
+				.. legend
 			if dims then
 				-- Même un seul mois ne tient pas en entier : un message à la place d'un calendrier coupé.
 				local needed = select(2, text:gsub("\n", "\n")) + 1
@@ -166,12 +174,6 @@ function M.create(ctx)
 					local title, hint = labels.too_small, string.format(labels.too_small_hint, block_width, needed)
 					return title .. "\n" .. hint, 0, math.max(layout.visible_width(title), layout.visible_width(hint))
 				end
-			end
-			-- l'inactif au bout de la légende (la dernière ligne), seulement s'il tient dans la fenêtre
-			local with_idle = text .. idle_today(labels)
-			local last_line = with_idle:match("([^\n]*)$")
-			if not dims or layout.visible_width(last_line) <= (tonumber(dims.cols) or 0) then
-				text = with_idle
 			end
 			return text, 1, block_width
 		end
@@ -183,11 +185,7 @@ function M.create(ctx)
 		end
 		local body = layout.arrange(blocks, plan.columns, layout.GAP)
 		local width = plan.columns * block_width + (plan.columns - 1) * layout.GAP
-		return help .. "\n\n" .. table.concat(body, "\n") .. "\n\n" .. assemble.legend(cfg, labels) .. idle_today(
-			labels
-		),
-			plan.count,
-			width
+		return help_box(width) .. "\n\n" .. table.concat(body, "\n") .. legend, plan.count, width
 	end
 
 	-- Le texte, centré dans la fenêtre (réglage center = false pour le garder en haut à gauche).

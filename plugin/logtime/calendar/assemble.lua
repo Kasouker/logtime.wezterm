@@ -453,12 +453,10 @@ local function week_lines(days, year, month, today_key, cfg, rows)
 end
 
 -- La légende des couleurs en une ligne (seulement pour les quatre niveaux par défaut, sinon juste l'étoile)
-local function legend_line(cfg, labels)
+-- Les couleurs du calendrier, sans marge : « 0h ████ 24h » (dégradé), ou les quatre niveaux ; "" s'il n'y en a pas.
+local function legend_colors(cfg)
 	if cfg.cell_color then
-		if cfg.legend_text then
-			return "  " .. cfg.legend_text .. "     " .. labels.today
-		end
-		return "  " .. labels.today
+		return cfg.legend_text or ""
 	end
 	local t = cfg.thresholds
 	local legend = {
@@ -471,12 +469,95 @@ local function legend_line(cfg, labels)
 	for _, item in ipairs(legend) do
 		parts[#parts + 1] = convert.fg(item[1]) .. "██" .. convert.RESET .. " " .. item[2]
 	end
-	return "  " .. table.concat(parts, "   ") .. "     " .. labels.today
+	return table.concat(parts, "   ")
+end
+
+local function legend_line(cfg, labels)
+	local legend = legend_colors(cfg)
+	if legend == "" then
+		return "  " .. labels.today
+	end
+	return "  " .. legend .. "     " .. labels.today
 end
 
 -- La légende des couleurs (une ligne), pour la page qui affiche plusieurs mois.
 function M.legend(cfg, labels)
 	return legend_line(with_defaults(cfg), labels)
+end
+
+-- Les traits de la page des mois (le cadre de l'aide, celui de la légende) : le style et la couleur choisis, même
+-- sans les encadrés des mois (comme la vue d'ensemble). Renvoie les traits et le code de leur couleur.
+function M.page_border(cfg)
+	local b = M.BORDER_STYLES[cfg.border_style] or M.BORDER_STYLES.rounded
+	local color = cfg.border_color
+	if type(color) ~= "string" or not color:match("^#%x%x%x%x%x%x$") then
+		color = M.BORDER_COLOR
+	end
+	return b, convert.fg(color)
+end
+
+-- L'aide de la page des mois, dans un cadre de `width` colonnes (3 lignes) : ses parties séparées par un trait
+-- vertical, `right` (« * = aujourd'hui ») collé au bord droit, dans la dernière case.
+--   ╭─────────────────────────┬─────────────┬──────────────────────────────────╮
+--   │ Logtime: overview: Enter │ today: t │ close: Esc/q           * = today │
+--   ╰─────────────────────────┴─────────────┴──────────────────────────────────╯
+-- Si tout ne tient pas : `right` est retiré, puis les parties sont coupées (jamais plus large que `width`). Renvoie
+-- aussi si tout a tenu sans couper, et si `right` est là.
+function M.help_box(parts, right, width, b, color)
+	local function e(s)
+		return color .. s .. convert.RESET
+	end
+	local cells = {}
+	for k, part in ipairs(parts) do
+		cells[k] = " " .. part .. " "
+	end
+	local used = #cells + 1 -- les traits verticaux
+	for _, cell in ipairs(cells) do
+		used = used + visible_len(cell)
+	end
+	local with_right = right ~= nil and right ~= "" and used + visible_len(right) + 2 <= width
+	if with_right then
+		local last = #cells
+		cells[last] = cells[last] .. string.rep(" ", width - used - visible_len(right) - 1) .. right .. " "
+	elseif used < width then -- la dernière case va jusqu'au bord
+		cells[#cells] = cells[#cells] .. string.rep(" ", width - used)
+	end
+	local tops, bottoms, middles = {}, {}, {}
+	for k, cell in ipairs(cells) do
+		local w = visible_len(cell)
+		tops[k] = string.rep(b.h, w)
+		bottoms[k] = tops[k]
+		middles[k] = cell
+	end
+	local function cut(line)
+		local plain_len = visible_len(line)
+		if plain_len <= width then
+			return line
+		end
+		local plain = line:gsub("\27%[[%d;]*m", "")
+		return plain:sub(1, (utf8.offset(plain, width + 1) or (#plain + 1)) - 1)
+	end
+	return {
+		cut(e(b.tl .. table.concat(tops, b.t) .. b.tr)),
+		cut(e(b.v) .. table.concat(middles, e(b.v)) .. e(b.v)),
+		cut(e(b.bl .. table.concat(bottoms, b.b) .. b.br)),
+	},
+		used <= width,
+		with_right
+end
+
+-- La légende des couleurs dans un cadre juste à sa taille (3 lignes), ou {} s'il n'y en a pas.
+function M.legend_box(cfg, b, color)
+	local legend = legend_colors(with_defaults(cfg))
+	if legend == "" then
+		return {}
+	end
+	local w = visible_len(legend) + 2
+	return {
+		color .. b.tl .. string.rep(b.h, w) .. b.tr .. convert.RESET,
+		color .. b.v .. convert.RESET .. " " .. legend .. " " .. color .. b.v .. convert.RESET,
+		color .. b.bl .. string.rep(b.h, w) .. b.br .. convert.RESET,
+	}
 end
 
 -- Dessine un mois complet. Renvoie le texte (lignes séparées par "\n").
@@ -544,8 +625,7 @@ function M.render_month(days, year, month, today_key, cfg, labels)
 		add("  " .. validated)
 	end
 
-	add(legend_line(cfg, labels))
-	return table.concat(lines, "\n")
+	return table.concat(lines, "\n") -- (la légende des couleurs : sous le mois, dans la page)
 end
 
 -- Un mois en bloc compact, pour en afficher plusieurs côte à côte : le titre avec le total et les jours actifs, l'en-tête,

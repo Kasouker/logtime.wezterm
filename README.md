@@ -116,7 +116,7 @@ A misspelled option is reported in the logs, with a suggestion of the right name
 - The counter moves forward on every tab bar update (every second). A gap of **5 s or less** between two updates is normal time, counted in full.
 - A **longer gap** (sleep, hibernation) is counted up to a **sleep budget of 65 min per episode**: a computer that wakes up for a moment and goes back to sleep doesn't count the whole night.
 - The day changes at midnight (`day_offset` to change it).
-- **Idle time** is noted separately: the counter keeps counting everything, and the calendar shows how much of it was idle.
+- **Idle time** is noted separately: the counter keeps counting everything, and the overview shows how much of it was idle.
 
 ## Files
 

@@ -319,25 +319,30 @@ check(
 -- ============================================================
 check(
 	"statistiques : première ligne (le total est monté dans le titre)",
-	lines[#lines - 2],
+	lines[#lines - 1],
 	"  Moyenne par jour actif : 1h55"
 )
-check("statistiques : deuxième ligne", lines[#lines - 1], "  Meilleur jour : 10 (4h13)   Série en cours : 3 j")
+check("statistiques : deuxième ligne", lines[#lines], "  Meilleur jour : 10 (4h13)   Série en cours : 3 j")
 check(
 	"légende : niveaux par défaut",
-	lines[#lines],
+	strip(assemble.legend({}, fr)),
 	"  ██ <1h   ██ 1-3h   ██ 3-6h   ██ 6h+     * = aujourd'hui"
+)
+check(
+	"un mois seul : plus de légende sous lui (la page la met dans un cadre)",
+	lines[#lines]:find("██", 1, true),
+	nil
 )
 local with_goal = lines_of(strip(render(days, 2026, 10, "2026-10-12", { goal_hours = 3 })))
 check(
 	"objectif : 1 jour validé sur 31, aucune semaine",
-	with_goal[#with_goal - 1],
+	with_goal[#with_goal],
 	"  Semaines validées : 0/5 / Jours validés : 1/31"
 )
 local goal_zero = lines_of(strip(render(days, 2026, 10, "2026-10-12", { goal_hours = 0 })))
 check(
 	"objectif 0 (« aucun ») : pas de ligne Objectif",
-	goal_zero[#goal_zero - 1],
+	goal_zero[#goal_zero],
 	"  Meilleur jour : 10 (4h13)   Série en cours : 3 j"
 )
 check("has_goal : 0 n'est pas un objectif", stats.has_goal(0), false)
@@ -494,7 +499,7 @@ check(
 )
 check(
 	"mois seul : semaines et jours validés (jours sur le nombre de jours du mois)",
-	wk[#wk - 1],
+	wk[#wk],
 	"  Semaines validées : 1/5 / Jours validés : 5/31"
 )
 check(
@@ -591,11 +596,7 @@ check(
 	boxed[21],
 	" ╰──────────────────────────────────────────────────────────────╯"
 )
-check(
-	"cadre : la légende des couleurs reste dehors",
-	boxed[22],
-	"  ██ <1h   ██ 1-3h   ██ 3-6h   ██ 6h+     * = aujourd'hui"
-)
+check("cadre : le bas du cadre est la dernière ligne (la légende est dans la page)", #boxed, 21)
 check(
 	"cadre : un seul haut et un seul bas",
 	select(2, table.concat(boxed, "\n"):gsub("╭", "")) .. select(2, table.concat(boxed, "\n"):gsub("╰", "")),
@@ -838,12 +839,11 @@ check(
 	empty[2],
 	"  Logtime : Octobre 2026   Total du mois : 0h00 / Jours actifs : 0"
 )
-check("mois vide : moyenne à zéro", empty[#empty - 2], "  Moyenne par jour actif : 0h00")
-check("mois vide : pas de meilleur jour, série à zéro", empty[#empty - 1], "  Série en cours : 0 j")
-local custom_thresholds = lines_of(strip(render({}, 2026, 10, "x", { thresholds = { 2, 4, 8 } })))
+check("mois vide : moyenne à zéro", empty[#empty - 1], "  Moyenne par jour actif : 0h00")
+check("mois vide : pas de meilleur jour, série à zéro", empty[#empty], "  Série en cours : 0 j")
 check(
 	"légende : seuils personnalisés",
-	custom_thresholds[#custom_thresholds],
+	strip(assemble.legend({ thresholds = { 2, 4, 8 } }, fr)),
 	"  ██ <2h   ██ 2-4h   ██ 4-8h   ██ 8h+     * = aujourd'hui"
 )
 
@@ -851,9 +851,9 @@ check(
 local english = lines_of(strip(render(days, 2026, 10, "2026-10-12", {}, en)))
 check("anglais : titre", english[2], "  Logtime: October 2026   Month total: 5h45 / Active days: 3")
 check("anglais : en-tête", english[4]:match("^%s*(%a+)"), "Mon")
-check("anglais : statistiques", english[#english - 2], "  Average per active day: 1h55")
-check("anglais : série", english[#english - 1], "  Best day: 10 (4h13)   Current streak: 3 d")
-check("anglais : légende", english[#english]:match("%* = today$"), "* = today")
+check("anglais : statistiques", english[#english - 1], "  Average per active day: 1h55")
+check("anglais : série", english[#english], "  Best day: 10 (4h13)   Current streak: 3 d")
+check("anglais : légende", strip(assemble.legend({}, en)):match("%* = today$"), "* = today")
 
 -- ============================================================
 -- calendar/assemble.lua : les couleurs
@@ -921,10 +921,9 @@ for _, secs in ipairs(received) do
 	end
 end
 check("fonction de couleur : jamais appelée avec une valeur négative", negative, 0)
-local custom_lines = lines_of(strip(custom))
 check(
 	"fonction de couleur : pas de légende des niveaux, seulement l'étoile",
-	custom_lines[#custom_lines],
+	strip(assemble.legend({ cell_color = gradient }, fr)),
 	"  * = aujourd'hui"
 )
 
@@ -982,6 +981,80 @@ for k in pairs(_G) do
 	end
 end
 check("aucune variable globale ajoutée", table.concat(leaked, ","), "")
+
+-- ---- l'aide et la légende de la page des mois, dans leurs cadres
+local hb, hb_color = assemble.page_border({})
+local box, box_fits, box_star = assemble.help_box({ "a : 1", "bb : 2", "c : 3" }, "* = x", 40, hb, hb_color)
+check("aide : 3 lignes", #box, 3)
+check(
+	"aide : le haut, une jonction ┬ par séparation",
+	strip(box[1]),
+	"╭───────┬────────┬─────────────────────╮"
+)
+check(
+	"aide : les parties séparées par des traits, « * = x » collé au bord droit",
+	strip(box[2]),
+	"│ a : 1 │ bb : 2 │ c : 3         * = x │"
+)
+check(
+	"aide : le bas, une jonction ┴ par séparation",
+	strip(box[3]),
+	"╰───────┴────────┴─────────────────────╯"
+)
+check("aide : tout a tenu, avec l'étoile", tostring(box_fits) .. " " .. tostring(box_star), "true true")
+local tight, tight_fits, tight_star = assemble.help_box({ "a : 1", "bb : 2", "c : 3" }, "* = x", 26, hb, hb_color)
+check(
+	"aide sans la place pour l'étoile : retirée, la dernière case va jusqu'au bord",
+	strip(tight[2]),
+	"│ a : 1 │ bb : 2 │ c : 3 │"
+)
+check(
+	"aide sans la place pour l'étoile : a tenu, sans l'étoile",
+	tostring(tight_fits) .. " " .. tostring(tight_star),
+	"true false"
+)
+local edge31 = assemble.help_box({ "a : 1", "bb : 2", "c : 3" }, "* = x", 31, hb, hb_color)
+check(
+	"aide à une colonne près (31) : pas d'étoile, et le cadre se ferme bien au bord",
+	strip(edge31[2]),
+	"│ a : 1 │ bb : 2 │ c : 3      │"
+)
+local cut, cut_fits = assemble.help_box({ "a : 1", "bb : 2", "c : 3" }, "* = x", 20, hb, hb_color)
+check(
+	"aide trop large : coupée, jamais plus large",
+	utf8.len(strip(cut[1])) .. " " .. utf8.len(strip(cut[2])),
+	"20 20"
+)
+check("aide trop large : le dit", cut_fits, false)
+check("aide : dans la couleur des traits", box[1]:find(hb_color, 1, true), 1)
+local double_b = assemble.page_border({ border_style = "double", border_color = "#123456" })
+check(
+	"aide : le style choisi (double)",
+	strip(assemble.help_box({ "a" }, nil, 10, double_b, "")[1]):sub(1, #"╔"),
+	"╔"
+)
+check(
+	"traits de la page : la couleur choisie",
+	select(2, assemble.page_border({ border_color = "#123456" })),
+	convert.fg("#123456")
+)
+check(
+	"traits de la page : une couleur invalide, le gris",
+	select(2, assemble.page_border({ border_color = "rouge" })),
+	convert.fg(assemble.BORDER_COLOR)
+)
+local lb = assemble.legend_box({}, hb, "")
+check(
+	"légende : dans un cadre juste à sa taille",
+	strip(lb[1]) .. "|" .. strip(lb[2]) .. "|" .. strip(lb[3]),
+	"╭─────────────────────────────────────╮|│ ██ <1h   ██ 1-3h   ██ 3-6h   ██ 6h+ │|╰─────────────────────────────────────╯"
+)
+check("légende : pas d'étoile", table.concat(lb):find("* =", 1, true), nil)
+check(
+	"légende sans couleurs (fonction de couleur sans texte) : pas de cadre",
+	#assemble.legend_box({ cell_color = gradient }, hb, ""),
+	0
+)
 
 print(string.format("\n%d vérifications réussies, %d échecs", passed, failed))
 os.exit(failed == 0 and 0 or 1)

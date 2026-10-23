@@ -238,7 +238,7 @@ local function cleanup(env)
 	os.execute("rm -rf '" .. env.home .. "'")
 end
 
-local BIG = { cols = 300, rows = 70 } -- 4 colonnes x 3 rangées : 12 mois
+local BIG = { cols = 300, rows = 74 } -- 4 colonnes x 3 rangées : 12 mois (8 + 3 x 21 + 2 = 73 lignes)
 local HEAT3 = convert.bg("#8C7A4A") -- le fond du niveau « 3 à 6 h » des quatre niveaux, pour 4h13
 local GOLD = convert.bg(gradient.make({}).color(15231))
 local BLUE = convert.bg(gradient.make({ color = "#3366CC" }).color(15231))
@@ -324,8 +324,8 @@ e.settings('{"center": false}')
 config = e.M.apply_to_config({})
 frame, months, lines = open_page(e, config)
 check(
-	"center = false dans le fichier : l'aide est tout en haut à gauche",
-	lines[1]:find("Logtime   ", 1, true) == 3,
+	"center = false dans le fichier : le cadre de l'aide est tout en haut à gauche",
+	lines[1]:sub(1, #"╭") == "╭",
 	true
 )
 cleanup(e)
@@ -342,12 +342,7 @@ e = new_env({ cols = 120, rows = 40 })
 e.settings('{"max_months": 100, "lang": "de", "center": false, "gradiant": true}')
 config = e.M.apply_to_config({}, { lang = "en" })
 frame, months, lines = open_page(e, config)
-check(
-	"réglages incorrects : le bon réglage est appliqué (center = false)",
-	lines[1]:find("Logtime   ", 1, true) == 3
-		or lines[1]:find("Logtime", 1, true) ~= nil and lines[1]:find("Logtime", 1, true) <= 3,
-	true
-)
+check("réglages incorrects : le bon réglage est appliqué (center = false)", lines[1]:sub(1, #"╭") == "╭", true)
 check(
 	"réglages incorrects : la langue de wezterm.lua reste (l'incorrecte du fichier est ignorée)",
 	table.concat(lines, "\n"):find("October 2026", 1, true) ~= nil,

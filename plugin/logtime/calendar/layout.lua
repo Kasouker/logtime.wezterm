@@ -5,7 +5,7 @@ local M = {}
 M.BLOCK_WIDTH = 65 -- largeur d'un mois (c'est assemble.WIDTH)
 M.BLOCK_HEIGHT = 21 -- hauteur du plus grand mois : titre, en-tête, 6 semaines de 3 lignes, totaux
 M.GAP = 3 -- espaces entre deux mois côte à côte
-M.RESERVED_ROWS = 4 -- lignes prises par l'aide (1), une ligne vide, une ligne vide, la légende (1)
+M.RESERVED_ROWS = 8 -- lignes prises par l'aide dans son cadre (3), une ligne vide, une ligne vide, la légende (3)
 M.MAX_MONTHS = 12 -- nombre de mois affichés au maximum : par défaut autant que la fenêtre peut en contenir, jusqu'à une année entière
 
 local function strip_ansi(text)

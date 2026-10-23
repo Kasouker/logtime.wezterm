@@ -117,7 +117,7 @@ Une option mal écrite est signalée dans les journaux, avec une suggestion du b
 - Le compteur avance à chaque mise à jour de la barre d'onglets (chaque seconde). Un écart de **5 s ou moins** entre deux mises à jour est du temps normal, compté en entier.
 - Un **écart plus long** (veille, hibernation) est compté dans la limite d'un **budget de veille de 65 min par épisode** : un ordinateur qui se réveille un instant puis se rendort ne compte pas toute la nuit.
 - La journée change à minuit (`day_offset` pour changer ça).
-- Le **temps inactif** est noté à part : le compteur compte toujours tout, et le calendrier montre la part inactive.
+- Le **temps inactif** est noté à part : le compteur compte toujours tout, et la vue d'ensemble montre la part inactive.
 
 ## Fichiers
 

@@ -302,8 +302,8 @@ local text_lines = lines_of((page.build_text({ cols = 120, rows = 40 })))
 local top = math.floor((40 - #text_lines) / 2)
 check("un mois : la marge du haut est la moitié de l'espace libre", empties(lines), top)
 check("un mois : cette marge n'est pas nulle", top > 0, true)
-local _, help = find_line(lines, "Logtime   Entrée")
-check("un mois : l'aide est décalée de 27 (la marge) + 2 espaces", leading(help), 27 + 2)
+local _, help = find_line(lines, "│ vue d'ensemble")
+check("un mois : le cadre de l'aide est décalé de 27 (la marge, comme le mois)", leading(help), 27)
 local _, title = find_line(lines, "Logtime : Octobre 2026")
 check("un mois : le titre est décalé de la même marge", leading(title), 27 + 2)
 local _, header = find_line(lines, "Lun")
@@ -321,8 +321,8 @@ check("un mois : aucune ligne ne dépasse la largeur de la fenêtre", widest <= 
 w, page, pane = open({ center = false }, 120, 40)
 lines = drawn(pane)
 check(
-	"center = false : la première ligne est l'aide, tout en haut",
-	lines[1]:find("Logtime   Entrée", 1, true) == 3,
+	"center = false : la première ligne est le haut du cadre de l'aide, tout en haut à gauche",
+	lines[1]:sub(1, #"╭") == "╭",
 	true
 )
 _, header = find_line(lines, "Lun")
@@ -330,22 +330,26 @@ check("center = false : l'en-tête garde sa position d'origine (5 espaces)", lea
 
 -- sans taille connue : build_text ne centre jamais, il rend le texte brut
 local raw_text, count, width = page.build_text()
-check("build_text sans taille : première ligne = l'aide, sans marge", lines_of(raw_text)[1]:sub(1, 11), "  Logtime  ")
+check(
+	"build_text sans taille : première ligne = le haut du cadre de l'aide, sans marge",
+	(lines_of(raw_text)[1]:gsub("\27%[[%d;]*m", "")):sub(1, #"╭"),
+	"╭"
+)
 check("build_text sans taille : un mois, de la largeur du calendrier", count == 1 and width == layout.BLOCK_WIDTH, true)
 raw_text, count, width = page.build_text({ cols = 140, rows = 60 })
 check(
 	"build_text avec taille : le texte lui-même n'est pas centré (c'est le dessin qui le fait)",
-	lines_of(raw_text)[1]:sub(1, 11),
-	"  Logtime  "
+	(lines_of(raw_text)[1]:gsub("\27%[[%d;]*m", "")):sub(1, #"╭"),
+	"╭"
 )
 check("build_text : quatre mois, 2 x 65 + 3 de largeur", count == 4 and width == 133, true)
-raw_text, count, width = page.build_text({ cols = 400, rows = 25 })
+raw_text, count, width = page.build_text({ cols = 400, rows = 29 })
 check("build_text : cinq mois sur une rangée, 5 x 65 + 4 x 3 de largeur", count == 5 and width == 337, true)
 
 -- plusieurs mois : 2 x 2 dans 140 x 60
 w, page, pane = open({}, 140, 60)
 lines = drawn(pane)
-check("quatre mois : marge du haut = (60 - 47) / 2", empties(lines), 6)
+check("quatre mois : marge du haut = (60 - 51) / 2", empties(lines), 4)
 local _, first_title = find_line(lines, "Juillet 2026")
 check("quatre mois : marge à gauche = (140 - 133) / 2 = 3, plus les 2 espaces du titre", leading(first_title), 3 + 2)
 local _, second_title = find_line(lines, "Août 2026")
@@ -362,21 +366,21 @@ end
 check("quatre mois : aucune ligne ne dépasse la largeur de la fenêtre", widest <= 140, true)
 
 -- fenêtre à la taille exacte : pas de marge
-w, page, pane = open({}, 133, 47)
+w, page, pane = open({}, 133, 51)
 lines = drawn(pane)
-check("fenêtre de 133 x 47 (la taille exacte de 4 mois) : aucune marge en haut", empties(lines), 0)
+check("fenêtre de 133 x 51 (la taille exacte de 4 mois) : aucune marge en haut", empties(lines), 0)
 _, first_title = find_line(lines, "Juillet 2026")
-check("fenêtre de 133 x 47 : aucune marge à gauche (juste les 2 espaces du titre)", leading(first_title), 2)
+check("fenêtre de 133 x 51 : aucune marge à gauche (juste les 2 espaces du titre)", leading(first_title), 2)
 
 -- la fenêtre change de taille : les marges suivent
 w, page, pane = open({}, 100, 40)
 w.GLOBAL.logtime_page_pane = pane.id
-_, help = find_line(drawn(pane), "Logtime   Entrée")
-check("avant : fenêtre de 100 colonnes, marge de 17 (+ 2)", leading(help), 17 + 2)
+_, help = find_line(drawn(pane), "│ vue d'ensemble")
+check("avant : fenêtre de 100 colonnes, marge de 17", leading(help), 17)
 pane.dims.cols = 120
 page.on_resize(new_window(w, 120, 40), pane)
-_, help = find_line(drawn(pane), "Logtime   Entrée")
-check("après : fenêtre de 120 colonnes, marge de 27 (+ 2) : le calendrier reste centré", leading(help), 27 + 2)
+_, help = find_line(drawn(pane), "│ vue d'ensemble")
+check("après : fenêtre de 120 colonnes, marge de 27 : le calendrier reste centré", leading(help), 27)
 pane.dims.cols, pane.dims.viewport_rows = 120, 60
 page.on_resize(new_window(w, 120, 60), pane)
 lines = drawn(pane)
@@ -389,7 +393,7 @@ local always_fits = true
 for _, size in ipairs({
 	{ 120, 40 },
 	{ 140, 60 },
-	{ 133, 47 },
+	{ 133, 51 },
 	{ 100, 100 },
 	{ 400, 25 },
 	{ 65, 25 },
