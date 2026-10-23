@@ -27,7 +27,7 @@ A [WezTerm](https://wezterm.org) plugin that **tracks the time you spend in your
 
 | Overview | Settings (`F4`) |
 |---|---|
-| ![Overview](docs/year.en.png) | ![Settings](docs/settings.en.png) |
+| ![Overview](docs/overview.en.png) | ![Settings](docs/settings.en.png) |
 
 ## Installation
 

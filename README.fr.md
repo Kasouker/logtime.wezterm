@@ -27,7 +27,7 @@ Un plugin [WezTerm](https://wezterm.org) qui **compte le temps passé dans ton t
 
 | Vue d'ensemble | Réglages (`F4`) |
 |---|---|
-| ![Vue d'ensemble](docs/year.fr.png) | ![Réglages](docs/settings.fr.png) |
+| ![Vue d'ensemble](docs/overview.fr.png) | ![Réglages](docs/settings.fr.png) |
 
 ## Installation
 
