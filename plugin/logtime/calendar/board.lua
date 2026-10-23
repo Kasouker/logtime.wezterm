@@ -1138,4 +1138,76 @@ function M.render(o, width, height)
 	return out
 end
 
+-- ---- l'aperçu de la page F4 : la droite de la vue d'ensemble, en colonne
+M.PREVIEW_WEEK = 8 -- la semaine : au moins 8 lignes (cadre, durées, barres, noms, pourcentages)
+M.PREVIEW_PROJECTS = 6 -- les projets : au moins 6 lignes (cadre, total, objectif, deux projets)
+M.PREVIEW_MONTH_SHARE = 0.4 -- la place en plus : environ 40 % au mois (des semaines entières), la moitié du reste à la
+M.PREVIEW_WEEK_SHARE = 0.5 -- semaine, le reste aux projets
+M.PREVIEW_MIN_WIDTH = M.WEEK_SIDE + 2 + 8 + 7 * 4 -- les chiffres de la semaine, puis 7 colonnes de 4
+
+-- Le mois : au moins le haut, le bas, `weeks` semaines de 2 lignes (le numéro, la durée) et un trait entre elles.
+local function preview_month_min(weeks)
+	return 2 + weeks * 2 + (weeks - 1)
+end
+
+-- La taille minimum de l'aperçu (largeur, hauteur), pour un mois de `weeks` semaines.
+function M.preview_minimum(weeks, show_timeline)
+	return M.PREVIEW_MIN_WIDTH,
+		preview_month_min(weeks)
+			+ M.PREVIEW_WEEK
+			+ M.PREVIEW_PROJECTS
+			+ (show_timeline ~= false and M.TIMELINE_HEIGHT or 0)
+end
+
+-- L'aperçu de F4 : exactement `height` lignes de `width` colonnes, ou nil si la zone est trop petite. De haut en bas :
+-- le mois, la semaine (ses barres, ses chiffres à droite), les projets du jour et les meilleurs de la semaine côte à
+-- côte, la frise du jour (sans elle, si show_timeline = false). Les mêmes dessins que la vue d'ensemble de F2.
+--   o = comme pour M.render (sans legend)
+function M.preview(o, width, height)
+	local weeks = #overview.weeks(o.year, o.month, o.cfg.week_starts_on)
+	local show_timeline = o.cfg.show_timeline ~= false
+	local min_w, min_h = M.preview_minimum(weeks, show_timeline)
+	if width < min_w or height < min_h then
+		return nil
+	end
+	local extra = height - min_h
+	-- le mois : des semaines toutes de la même hauteur, et pas une ligne de plus (pas de vide sous son cadre)
+	local row_h = 2 + math.floor(extra * M.PREVIEW_MONTH_SHARE) // weeks
+	local month_h = 2 + weeks * row_h + (weeks - 1)
+	local rest = height - month_h - (show_timeline and M.TIMELINE_HEIGHT or 0) - M.PREVIEW_WEEK - M.PREVIEW_PROJECTS
+	local week_h = M.PREVIEW_WEEK + math.floor(rest * M.PREVIEW_WEEK_SHARE)
+	local projects_h = height - month_h - week_h - (show_timeline and M.TIMELINE_HEIGHT or 0)
+	local out = {}
+	local function add(lines)
+		for _, line in ipairs(lines) do
+			out[#out + 1] = fit(line, width)
+		end
+	end
+	add(M.month_lines(o, width, month_h))
+	-- la semaine, et ses chiffres à droite
+	local week_w = width - M.WEEK_SIDE
+	local week = M.week_lines(o, week_w, week_h)
+	local side = M.week_side_lines(o, M.WEEK_SIDE, week_h)
+	for k = 1, week_h do
+		out[#out + 1] = fit(week[k], week_w) .. fit(side[k], M.WEEK_SIDE)
+	end
+	-- les projets du jour et de la semaine, côte à côte (l'objectif sur la ligne du total s'il tient dans les deux)
+	local colors = show_timeline and M.project_colors(o) or nil
+	local day_w = width // 2
+	local below = M.head_line(M.day_head(o), select(2, M.day_head(o)), day_w - 4) == nil
+		or M.head_line(M.week_head(o), select(2, M.week_head(o)), width - day_w - 4) == nil
+	local day = M.day_projects_lines(o, day_w, projects_h, colors, below)
+	local best = M.week_projects_lines(o, width - day_w, projects_h, colors, below)
+	for k = 1, projects_h do
+		out[#out + 1] = fit(day[k], day_w) .. fit(best[k], width - day_w)
+	end
+	-- la frise du jour, avec une colonne d'air de chaque côté (comme les cadres au-dessus)
+	if show_timeline then
+		for _, line in ipairs(overview.timeline(o, o.day_key or o.today_key, width - 2, colors)) do
+			out[#out + 1] = " " .. fit(line, width - 2) .. " "
+		end
+	end
+	return out
+end
+
 return M

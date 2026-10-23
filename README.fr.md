@@ -65,7 +65,7 @@ C'est tout : le compteur apparaît dans la barre d'onglets, `F2` ouvre le calend
 
 **Dans la vue d'ensemble** (il lui faut une fenêtre d'au moins 120 colonnes × 34 lignes) : `←` `→` (ou `h` `l`) jour · `↑` `↓` (ou `k` `j`) semaine · `Maj+Tab` `Tab` (ou `PgUp` `PgDn`) mois (et l'année, après décembre ou avant janvier) · `t` aujourd'hui · `Entrée` ou `Échap` retour au calendrier, sur le mois où tu étais · `r` rafraîchir · `q` fermer.
 
-**Dans la page de réglages** (elle remplit toute la fenêtre, avec un aperçu à droite quand il y a la place : le mois, puis aujourd'hui — temps actif et inactif, temps par projet, et la frise de la journée) : `Tab` / `Maj+Tab` onglet suivant / précédent (Couleurs, Calendrier, Général) · flèches ou `h j k l` choisir · `Entrée` enregistrer une couleur · `←` `→` changer une valeur (enregistrée tout de suite) · `d` valeur par défaut · `y` / `n` utiliser (ou non) les couleurs de ton thème · `q` ou `Échap` fermer.
+**Dans la page de réglages** (elle remplit toute la fenêtre, avec un aperçu à droite quand il y a la place, dessiné comme la vue d'ensemble : le mois, la semaine et ses chiffres, les projets du jour et les meilleurs de la semaine, et la frise de la journée) : `Tab` / `Maj+Tab` onglet suivant / précédent (Couleurs, Calendrier, Général) · flèches ou `h j k l` choisir · `Entrée` enregistrer une couleur · `←` `→` changer une valeur (enregistrée tout de suite) · `d` valeur par défaut · `y` / `n` utiliser (ou non) les couleurs de ton thème · `q` ou `Échap` fermer.
 
 Les touches de la page n'agissent que dans l'onglet de la page : ailleurs, une touche va à ton shell comme d'habitude.
 

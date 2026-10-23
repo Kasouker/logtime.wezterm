@@ -17,6 +17,7 @@ local convert = load("color/convert")
 local schema = load("settings/schema")
 local assemble = load("calendar/assemble")
 local view = load("pages/settings_view")
+local board = load("calendar/board")
 local overview = load("calendar/overview")
 
 local M = {}
@@ -479,15 +480,22 @@ function M.create(ctx)
 			labels = labels,
 			b = b,
 			edge = convert.fg(border),
+			-- la semaine et le jour choisis remplis de la couleur choisie (comme dans la vue d'ensemble de F2)
+			accent = type(applied.gradient_color) == "string"
+					and applied.gradient_color:match("^#%x%x%x%x%x%x$")
+					and applied.gradient_color
+				or gradient.DEFAULT_COLOR,
 		}
-		local min_width, min_height =
-			overview.minimum(#overview.weeks(view_data.year, view_data.month, applied.week_starts_on))
-		-- la vue du mois et du jour (calendar/overview.lua) : elle remplit toute la zone de droite
+		local min_width, min_height = board.preview_minimum(
+			#overview.weeks(view_data.year, view_data.month, applied.week_starts_on),
+			applied.show_timeline
+		)
+		-- la droite de la vue d'ensemble de F2, en colonne (calendar/board.lua) : elle remplit toute la zone de droite
 		return {
 			min_width = min_width,
 			min_height = min_height,
 			draw = function(width, height)
-				return overview.render(view_data, width, height)
+				return board.preview(view_data, width, height)
 			end,
 		}
 	end

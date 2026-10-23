@@ -1476,10 +1476,26 @@ check(
 	true
 )
 check(
-	"aperçu : le détail du jour (le total et les barres actif / inactif)",
-	table.concat(full, "\n"):find("Total", 1, true) ~= nil
-		and table.concat(full, "\n"):find("Actif", 1, true) ~= nil
-		and table.concat(full, "\n"):find("Inactif", 1, true) ~= nil,
+	"aperçu : la semaine, avec ses chiffres (« Jours actifs »)",
+	table.concat(full, "\n"):find("Jours actifs", 1, true) ~= nil,
+	true
+)
+check(
+	"aperçu : de haut en bas, le mois, la semaine, les projets (le total), la frise",
+	(function()
+		local text = table.concat(full, "\n")
+		local month_at = text:find("Semaine 5", 1, true)
+		local week_at = text:find("Jours actifs", 1, true)
+		local projects_at = text:find("Total ", week_at or 1, true)
+		local timeline_at = text:find("24h00", projects_at or 1, true)
+		return month_at ~= nil
+			and week_at ~= nil
+			and projects_at ~= nil
+			and timeline_at ~= nil
+			and month_at < week_at
+			and week_at < projects_at
+			and projects_at < timeline_at
+	end)(),
 	true
 )
 check("aperçu : la frise du jour (« 0h00 … 24h00 »)", table.concat(full, "\n"):find("24h00", 1, true) ~= nil, true)
@@ -1539,6 +1555,11 @@ check(
 	frame_of(e.pane):find(convert.fg("#3366CC") .. "╔", 1, true) ~= nil,
 	true
 )
+-- la hauteur qu'il faut à l'aperçu : 4 lignes de moins sans frise (octobre 2026 : 5 semaines)
+e = open({ days = month_days, cols = 200, rows = 60 })
+check("aperçu : la hauteur minimum avec la frise", e.page.preview_block(fr).min_height, 34)
+e.cfg.show_timeline = false
+check("aperçu : 4 lignes de moins sans la frise", e.page.preview_block(fr).min_height, 30)
 -- les tailles de fenêtre
 e = open({ days = month_days, cols = 100, rows = 40 })
 local narrow = e.page.build_lines({ cols = 100, rows = 40 })

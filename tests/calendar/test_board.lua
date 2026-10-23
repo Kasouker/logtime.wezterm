@@ -1468,5 +1468,73 @@ check(
 	"┴"
 )
 
+-- ---- l'aperçu de F4 : le mois, la semaine, les projets, la frise, en colonne
+local min_pw, min_ph = board.preview_minimum(5)
+check("aperçu : la taille minimum (5 semaines)", min_pw .. " x " .. min_ph, "64 x 34")
+check("aperçu : sans frise, 4 lignes de moins", select(2, board.preview_minimum(5, false)), 30)
+check("aperçu : trop étroit, rien", board.preview(pdata, min_pw - 1, 40), nil)
+check("aperçu : trop bas, rien", board.preview(pdata, 85, min_ph - 1), nil)
+for _, size in ipairs({ { 64, 34 }, { 85, 46 }, { 120, 60 } }) do
+	local pv = board.preview(pdata, size[1], size[2])
+	local exact = #pv == size[2]
+	for _, l in ipairs(pv) do
+		exact = exact and layout.visible_width(l) == size[1]
+	end
+	check("aperçu " .. size[1] .. " x " .. size[2] .. " : exactement la taille", exact, true)
+	local plain = {}
+	for k, l in ipairs(pv) do
+		plain[k] = strip(l)
+	end
+	check(
+		"aperçu " .. size[1] .. " x " .. size[2] .. " : le mois tout en haut",
+		plain[1]:find("╭", 1, true) ~= nil,
+		true
+	)
+	local month_bottom, week_top
+	for k, l in ipairs(plain) do
+		if not month_bottom and l:find("╰", 1, true) then
+			month_bottom = k
+		end
+		if month_bottom and not week_top and k > month_bottom and l:find("╭", 1, true) then
+			week_top = k -- le haut du cadre de la semaine (« Lun 12 », ou « Lun » quand c'est étroit)
+		end
+	end
+	check(
+		"aperçu " .. size[1] .. " x " .. size[2] .. " : la semaine juste sous le mois (pas de ligne vide)",
+		week_top,
+		month_bottom + 1
+	)
+	check(
+		"aperçu " .. size[1] .. " x " .. size[2] .. " : ses chiffres à droite de la semaine",
+		plain[week_top + 1]:find("Jours actifs", 1, true) ~= nil,
+		true
+	)
+	check(
+		"aperçu " .. size[1] .. " x " .. size[2] .. " : la frise tout en bas",
+		plain[#plain - 3]:find("24h00", 1, true) ~= nil and plain[#plain]:find("╰", 1, true) ~= nil,
+		true
+	)
+end
+local pv = board.preview(pdata, 85, 46)
+local pv_text = table.concat(pv)
+check("aperçu : les projets du jour", strip(pv_text):find("Bot Discord", 1, true) ~= nil, true)
+check("aperçu : les meilleurs de la semaine", strip(pv_text):find("libft", 1, true) ~= nil, true)
+check(
+	"aperçu : un projet de la même couleur dans sa liste et sur la frise",
+	pv_text:find(convert.fg(nth_color(3)) .. "█", 1, true) ~= nil
+		and pv_text:find(convert.bg(nth_color(3)), 1, true) ~= nil,
+	true
+)
+local pv_nofrise_data = data({ projects = PROJECTS, timeline = TIMELINE })
+pv_nofrise_data.cfg = gradient.apply_to({ goal_hours = 7, goal_days = 3, show_timeline = false })
+local pv_nofrise = board.preview(pv_nofrise_data, 85, 46)
+check("aperçu sans frise : exactement la hauteur", #pv_nofrise, 46)
+check("aperçu sans frise : pas de frise", strip(table.concat(pv_nofrise)):find("24h00", 1, true), nil)
+check(
+	"aperçu sans frise : les projets descendent jusqu'en bas",
+	strip(pv_nofrise[46]):find("╰", 1, true) ~= nil and strip(pv_nofrise[45]):find("│", 1, true) ~= nil,
+	true
+)
+
 print(string.format("\n%d vérifications réussies, %d échecs", passed, failed))
 os.exit(failed == 0 and 0 or 1)
