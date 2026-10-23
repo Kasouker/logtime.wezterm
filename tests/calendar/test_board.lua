@@ -1180,8 +1180,17 @@ check(
 	true
 )
 check(
-	"projets du jour : le titre sur le trait du haut",
-	strip(dp[1]):find("╭─ Par projet (temps actif) ─", 1, true) ~= nil,
+	"projets du jour : le titre au milieu du trait du haut",
+	(function()
+		local top = strip(dp[1])
+		local at = top:find(" Par projet (temps actif) ", 1, true)
+		if not at then
+			return false
+		end
+		local left = utf8.len(top:sub(1, at - 1))
+		local right = utf8.len(top) - left - utf8.len(" Par projet (temps actif) ")
+		return math.abs(left - right) <= 1
+	end)(),
 	true
 )
 check("projets du jour : le total du jour", strip(dp[2]):find("Total  2h00", 1, true) ~= nil, true)

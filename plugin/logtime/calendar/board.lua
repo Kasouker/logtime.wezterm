@@ -718,9 +718,9 @@ local function hbar(share, width, color)
 		.. convert.RESET
 end
 
--- Une liste de projets dans son cadre (une colonne d'air de chaque côté), le titre posé sur le trait du haut (à
--- gauche, ou au milieu si `middle`) : exactement `height` lignes de `width` colonnes.
---   ╭─ Par projet (temps actif) ─────────╮
+-- Une liste de projets dans son cadre (une colonne d'air de chaque côté), le titre posé au milieu du trait du haut :
+-- exactement `height` lignes de `width` colonnes.
+--   ╭──── Par projet (temps actif) ──────╮
 --   │ Total  10h00         ✓ objectif 7h │   `head` à gauche, `goal` (rien sans objectif) à droite (M.head_line),
 --   │                                    │   ou `goal` dessous, à droite, si `below` (pas la place dans les deux listes)
 --   │                                    │   (une ligne d'air s'il y a la place)
@@ -728,7 +728,7 @@ end
 --   ╰────────────────────────────────────╯
 --   `of` : le temps par projet ({ [projet] = secondes }), `total` : le temps dont on prend la part (les pourcentages),
 --   `color(projet)` : la couleur de sa barre, `empty` : le texte quand rien n'est compté.
-local function project_box(o, width, height, title, middle, head, goal, below, of, total, color, empty)
+local function project_box(o, width, height, title, head, goal, below, of, total, color, empty)
 	local b, edge = o.b, o.edge or ""
 	local off = edge ~= "" and convert.RESET or ""
 	local function e(s_)
@@ -794,7 +794,7 @@ local function project_box(o, width, height, title, middle, head, goal, below, o
 	if title == "" then
 		top = e(b.tl .. string.rep(b.h, inner_w) .. b.tr)
 	else
-		local before = middle and (inner_w - vw(title) - 2) // 2 or 1
+		local before = (inner_w - vw(title) - 2) // 2
 		top = e(b.tl .. string.rep(b.h, before))
 			.. " "
 			.. title
@@ -859,7 +859,6 @@ function M.day_projects_lines(o, width, height, colors, below)
 		width,
 		height,
 		labels.detail_projects,
-		false,
 		head,
 		goal,
 		below or M.head_line(head, goal, width - 4) == nil,
@@ -887,7 +886,6 @@ function M.week_projects_lines(o, width, height, colors, below)
 		width,
 		height,
 		labels.board_week_projects or "",
-		true,
 		head,
 		goal,
 		below or M.head_line(head, goal, width - 4) == nil,
