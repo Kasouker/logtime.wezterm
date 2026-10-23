@@ -138,7 +138,7 @@ Why not directly in your home folder: WezTerm reloads its whole config whenever 
 
 ## Troubleshooting
 
-Open the logs: `Ctrl+Shift+L` (debug overlay). On load you should see `logtime: version 1.0.3 loaded from ...`. The plugin writes its errors there, for example a misspelled option, a key already used in your config, or a save that failed.
+Open the logs: `Ctrl+Shift+L` (debug overlay). On load you should see `logtime: version 1.1.0 loaded from ...`. The plugin writes its errors there, for example a misspelled option, a key already used in your config, or a save that failed.
 
 - **No counter**: check `status` is not `false`. If you show your own status bar, call `logtime.tick(window)` in it.
 - **A setting is not saved** (`✗ Not saved: …` in the `F4` page): the reason is shown at the bottom of the page, and in full (with the file path) in the logs.
