@@ -900,7 +900,7 @@ check(
 	true
 )
 check("la partie vide : en gris foncé", table.concat(wl):find(convert.fg(board.TRACK) .. "░", 1, true) ~= nil, true)
-check("la partie vide : le gris foncé des barres de F4", board.TRACK, load_module("calendar/overview").EMPTY_COLOR)
+check("la partie vide : en gris foncé (#3B404C)", board.TRACK, "#3B404C")
 check(
 	"la semaine : l'inactif avant l'actif (13 % puis 87 %)",
 	strip(wl[15]):find("13%", 1, true) < strip(wl[15]):find("87%", 1, true),
